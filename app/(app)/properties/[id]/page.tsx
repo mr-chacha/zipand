@@ -8,7 +8,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSession } from "@/lib/auth";
-import { formatDate, formatDateTime, formatPrice, toPyeong } from "@/lib/format";
+import { formatAvailableFrom, formatDate, formatDateTime, formatPrice, toPyeong } from "@/lib/format";
 import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
 import type { VisitField } from "@/types";
@@ -264,7 +264,7 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
                 {[
                   ["관리비", property.maintenance_fee !== null ? `${property.maintenance_fee}만원` : "-"],
                   ["방 / 욕실", `${property.rooms ?? "-"} / ${property.baths ?? "-"}`],
-                  ["입주 가능일", formatDate(property.available_from)],
+                  ["입주 가능일", formatAvailableFrom(property)],
                   ["담당자", property.manager?.name ?? "-"],
                   ["지역", property.region ?? "-"],
                   ["등록일", formatDate(property.created_at)],

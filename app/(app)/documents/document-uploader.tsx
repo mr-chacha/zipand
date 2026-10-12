@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { FileUp, Loader2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { NativeSelect } from "@/components/form/native-select";
+import { DatePicker } from "@/components/form/date-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createDocument } from "@/lib/actions/documents";
 import { DOC_TYPES, type DocType } from "@/lib/constants";
@@ -136,7 +136,7 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="doc-issued">발급일</Label>
-          <Input id="doc-issued" type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+          <DatePicker id="doc-issued" value={issuedAt} onChange={setIssuedAt} />
         </div>
         <Button className="w-full" onClick={submit} disabled={!file || pending}>
           {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Upload data-icon="inline-start" />}

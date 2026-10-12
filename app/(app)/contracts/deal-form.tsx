@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
+import { DatePicker } from "@/components/form/date-picker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,11 +58,11 @@ export function DealForm({ properties, customers, defaultPropertyId, defaultCust
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="contract_date">계약일</Label>
-          <Input id="contract_date" name="contract_date" type="date" defaultValue={deal?.contract_date ?? ""} />
+          <DatePicker id="contract_date" name="contract_date" defaultValue={deal?.contract_date ?? ""} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="balance_date">잔금일</Label>
-          <Input id="balance_date" name="balance_date" type="date" defaultValue={deal?.balance_date ?? ""} />
+          <DatePicker id="balance_date" name="balance_date" defaultValue={deal?.balance_date ?? ""} />
         </div>
       </div>
       <div className="space-y-1.5">

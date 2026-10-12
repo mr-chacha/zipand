@@ -813,6 +813,7 @@ export type Database = {
           address: string
           area_m2: number | null
           available_from: string | null
+          available_negotiable: boolean
           baths: number | null
           created_at: string
           created_by: string | null
@@ -840,6 +841,7 @@ export type Database = {
           address: string
           area_m2?: number | null
           available_from?: string | null
+          available_negotiable?: boolean
           baths?: number | null
           created_at?: string
           created_by?: string | null
@@ -867,6 +869,7 @@ export type Database = {
           address?: string
           area_m2?: number | null
           available_from?: string | null
+          available_negotiable?: boolean
           baths?: number | null
           created_at?: string
           created_by?: string | null

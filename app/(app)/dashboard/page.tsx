@@ -9,6 +9,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
 import { addDays, getCalendarEvents, monthGrid, parseMonth } from "@/lib/calendar";
+import { CUSTOMER_CLOSED_STATUSES } from "@/lib/constants";
 import { formatDate, formatDateTime, formatPrice, todayKst } from "@/lib/format";
 import { getCustomerOptions, getOfficeMembers, getPropertyList, getPropertyOptions } from "@/lib/queries";
 import { GettingStarted } from "./getting-started";
@@ -48,12 +49,15 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         .not("stage", "in", "(완료,취소)")
         .order("balance_date", { ascending: true, nullsFirst: false })
         .limit(6),
-      supabase.from("customers").select("id", { count: "exact", head: true }).eq("status", "진행 중"),
+      supabase
+        .from("customers")
+        .select("id", { count: "exact", head: true })
+        .not("status", "in", `(${CUSTOMER_CLOSED_STATUSES.map((s) => `"${s}"`).join(",")})`),
     ]);
 
   const stats = [
     { label: "광고 중 매물", value: propertyOptions.filter((p) => p.status === "광고 중").length, href: "/properties" },
-    { label: "진행 중 고객", value: customerCount.count ?? 0, href: "/customers" },
+    { label: "관리 중 고객", value: customerCount.count ?? 0, href: "/customers" },
     { label: "검토 필요 문서", value: pendingDocs.data?.length ?? 0, href: "/documents?status=검토 필요" },
     { label: "진행 중 거래", value: activeDeals.data?.length ?? 0, href: "/contracts" },
   ];

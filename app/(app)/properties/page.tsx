@@ -10,6 +10,7 @@ export const metadata: Metadata = { title: "매물 관리" };
 
 export default async function PropertiesPage({ searchParams }: PageProps<"/properties">) {
   const { q } = await searchParams;
+  const query = typeof q === "string" ? q.trim() : "";
   const properties = await getPropertyList();
 
   return (
@@ -24,7 +25,7 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
           </Link>
         }
       />
-      <PropertyList properties={properties} initialQuery={typeof q === "string" ? q : ""} />
+      <PropertyList key={query} properties={properties} initialQuery={query} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Bell, LifeBuoy, LogOut, Menu, Search, Settings, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,13 @@ import { ROLE_LABELS } from "@/lib/constants";
 import { Logo } from "./logo";
 import { SidebarNav } from "./sidebar-nav";
 
+const SEARCH_SCOPES = [
+  { path: "/properties", placeholder: "매물명, 주소, 지역 검색" },
+  { path: "/customers", placeholder: "고객 이름, 연락처, 지역 검색" },
+  { path: "/documents", placeholder: "문서 종류, 파일명, 매물명 검색" },
+  { path: "/contracts", placeholder: "거래 매물명, 고객 이름 검색" },
+];
+
 interface AppHeaderProps {
   userName: string;
   officeName: string;
@@ -32,11 +39,16 @@ interface AppHeaderProps {
 export function AppHeader({ userName, officeName, role }: AppHeaderProps) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const scope = SEARCH_SCOPES.find((s) => pathname === s.path || pathname.startsWith(`${s.path}/`));
+  const currentQuery = scope && pathname === scope.path ? (searchParams.get("q") ?? "") : "";
 
   const onSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const q = new FormData(e.currentTarget).get("q");
-    if (typeof q === "string" && q.trim()) router.push(`/properties?q=${encodeURIComponent(q.trim())}`);
+    if (!scope) return;
+    const q = String(new FormData(e.currentTarget).get("q") ?? "").trim();
+    router.push(q ? `${scope.path}?q=${encodeURIComponent(q)}` : scope.path);
   };
 
   return (
@@ -56,10 +68,20 @@ export function AppHeader({ userName, officeName, role }: AppHeaderProps) {
         </SheetContent>
       </Sheet>
 
-      <form onSubmit={onSearch} className="relative hidden max-w-md flex-1 md:block">
-        <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input name="q" placeholder="매물명, 주소 검색" className="pl-8" />
-      </form>
+      {scope && (
+        <form onSubmit={onSearch} className="relative hidden max-w-md flex-1 md:block">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            key={`${scope.path}:${currentQuery}`}
+            name="q"
+            type="search"
+            defaultValue={currentQuery}
+            placeholder={scope.placeholder}
+            aria-label={scope.placeholder}
+            className="pl-8"
+          />
+        </form>
+      )}
 
       <div className="ml-auto flex items-center gap-2">
         <Badge variant="secondary" className="hidden sm:inline-flex">

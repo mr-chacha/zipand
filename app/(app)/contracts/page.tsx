@@ -15,7 +15,8 @@ import { ClauseLibrary } from "./clause-library";
 export const metadata: Metadata = { title: "계약 준비" };
 
 export default async function ContractsPage({ searchParams }: PageProps<"/contracts">) {
-  const { tab } = await searchParams;
+  const { tab, q } = await searchParams;
+  const keyword = typeof q === "string" ? q.trim() : "";
   const { supabase } = await getSession();
 
   const [{ data: deals }, { data: officeClauses }] = await Promise.all([
@@ -28,8 +29,11 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
     supabase.from("office_clauses").select("id, category, title, body").order("created_at", { ascending: false }),
   ]);
 
-  const active = (deals ?? []).filter((d) => d.stage !== "완료" && d.stage !== "취소");
-  const closed = (deals ?? []).filter((d) => d.stage === "완료" || d.stage === "취소");
+  const matched = keyword
+    ? (deals ?? []).filter((d) => `${d.property?.title ?? ""} ${d.customer?.name ?? ""}`.includes(keyword))
+    : (deals ?? []);
+  const active = matched.filter((d) => d.stage !== "완료" && d.stage !== "취소");
+  const closed = matched.filter((d) => d.stage === "완료" || d.stage === "취소");
 
   const renderDeals = (list: typeof active, empty: string) =>
     list.length === 0 ? (

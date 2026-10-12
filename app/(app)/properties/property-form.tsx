@@ -6,6 +6,7 @@ import { ComingSoonPanel } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
+import { DatePicker } from "@/components/form/date-picker";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -118,6 +119,7 @@ export function PropertyForm({
   const { state, pending, onSubmit } = useFormAction(action, { prepare: uploadMedia });
   const [dealType, setDealType] = useState<string>(d?.deal_type ?? "전세");
   const [propertyType, setPropertyType] = useState<string>(d?.property_type ?? "아파트");
+  const [availableMode, setAvailableMode] = useState(d?.available_negotiable ? "negotiable" : d?.available_from ? "date" : "");
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
@@ -145,16 +147,16 @@ export function PropertyForm({
           </div>
           <div className="space-y-2">
             <Label htmlFor="title">매물명 *</Label>
-            <Input id="title" name="title" defaultValue={d?.title} placeholder="예: 래미안 리버뷰 102동 1503호" required />
+            <Input id="title" name="title" defaultValue={d?.title} placeholder="예) 래미안 리버뷰 102동 1503호" required />
           </div>
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="address">주소 *</Label>
-              <Input id="address" name="address" defaultValue={d?.address} placeholder="도로명 또는 지번 주소" required />
+              <Input id="address" name="address" defaultValue={d?.address} placeholder="예) 서울시 마포구 월드컵북로 123" required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="region">지역 (시·구)</Label>
-              <Input id="region" name="region" defaultValue={d?.region ?? ""} placeholder="예: 마포구" />
+              <Input id="region" name="region" defaultValue={d?.region ?? ""} placeholder="예) 마포구" />
             </div>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
@@ -183,7 +185,7 @@ export function PropertyForm({
         <CardContent className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="price">{dealType === "매매" ? "매매가" : "보증금"} (만원) *</Label>
-            <Input id="price" name="price" inputMode="numeric" defaultValue={d?.price ?? ""} placeholder="52000" required />
+            <Input id="price" name="price" inputMode="numeric" defaultValue={d?.price ?? ""} placeholder="예) 52000" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="monthly_rent">월세 (만원)</Label>
@@ -192,26 +194,26 @@ export function PropertyForm({
               name="monthly_rent"
               inputMode="numeric"
               defaultValue={d?.monthly_rent ?? ""}
-              placeholder={dealType === "월세" ? "85" : "월세 거래만 입력"}
+              placeholder={dealType === "월세" ? "예) 85" : "월세 거래만 입력"}
               disabled={dealType !== "월세"}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="area_m2">전용면적 (㎡)</Label>
-            <Input id="area_m2" name="area_m2" inputMode="decimal" defaultValue={d?.area_m2 ?? ""} placeholder="84.9" />
+            <Input id="area_m2" name="area_m2" inputMode="decimal" defaultValue={d?.area_m2 ?? ""} placeholder="예) 84.9" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="maintenance_fee">관리비 (만원)</Label>
-            <Input id="maintenance_fee" name="maintenance_fee" inputMode="numeric" defaultValue={d?.maintenance_fee ?? ""} placeholder="25" />
+            <Input id="maintenance_fee" name="maintenance_fee" inputMode="numeric" defaultValue={d?.maintenance_fee ?? ""} placeholder="예) 25" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="floor">해당 층</Label>
-              <Input id="floor" name="floor" inputMode="numeric" defaultValue={d?.floor ?? ""} placeholder="15" />
+              <Input id="floor" name="floor" inputMode="numeric" defaultValue={d?.floor ?? ""} placeholder="예) 15" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="total_floors">전체 층</Label>
-              <Input id="total_floors" name="total_floors" inputMode="numeric" defaultValue={d?.total_floors ?? ""} placeholder="25" />
+              <Input id="total_floors" name="total_floors" inputMode="numeric" defaultValue={d?.total_floors ?? ""} placeholder="예) 25" />
             </div>
           </div>
           <div className="space-y-2">
@@ -221,16 +223,38 @@ export function PropertyForm({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="rooms">방</Label>
-              <Input id="rooms" name="rooms" inputMode="numeric" defaultValue={d?.rooms ?? ""} placeholder="3" />
+              <Input id="rooms" name="rooms" inputMode="numeric" defaultValue={d?.rooms ?? ""} placeholder="예) 3" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="baths">욕실</Label>
-              <Input id="baths" name="baths" inputMode="numeric" defaultValue={d?.baths ?? ""} placeholder="2" />
+              <Input id="baths" name="baths" inputMode="numeric" defaultValue={d?.baths ?? ""} placeholder="예) 2" />
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="available_from">입주 가능일</Label>
-            <Input id="available_from" name="available_from" type="date" defaultValue={d?.available_from ?? ""} />
+            <Label htmlFor="available_mode">입주 가능일</Label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <NativeSelect
+                id="available_mode"
+                name="available_mode"
+                options={[
+                  { value: "negotiable", label: "협의 가능" },
+                  { value: "date", label: "날짜 선택" },
+                ]}
+                placeholder="선택 안 함"
+                value={availableMode}
+                onChange={(e) => setAvailableMode(e.target.value)}
+              />
+              {availableMode === "date" && (
+                <DatePicker
+                  id="available_from"
+                  name="available_from"
+                  defaultValue={d?.available_from ?? ""}
+                  aria-label="입주 가능 날짜"
+                  defaultOpen={!d?.available_from}
+                  required
+                />
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -263,15 +287,15 @@ export function PropertyForm({
         <CardContent className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="description">매물 설명 (고객 공개)</Label>
-            <Textarea id="description" name="description" rows={3} defaultValue={d?.description ?? ""} placeholder="장점, 주변 환경 등" />
+            <Textarea id="description" name="description" rows={3} defaultValue={d?.description ?? ""} placeholder="예) 한강 조망, 초등학교 도보 5분" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="highlights">장점 키워드 (쉼표 또는 줄바꿈으로 구분)</Label>
-            <Input id="highlights" name="highlights" defaultValue={d?.highlights.join(", ") ?? ""} placeholder="남향, 역세권, 주차 1.5대" />
+            <Input id="highlights" name="highlights" defaultValue={d?.highlights.join(", ") ?? ""} placeholder="예) 남향, 역세권, 주차 1.5대" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="internal_memo">내부 메모 (비공개)</Label>
-            <Textarea id="internal_memo" name="internal_memo" rows={3} defaultValue={d?.internal_memo ?? ""} placeholder="임대인 협의 사항, 확인 필요 사항 등" />
+            <Textarea id="internal_memo" name="internal_memo" rows={3} defaultValue={d?.internal_memo ?? ""} placeholder="예) 임대인 협의 사항, 확인 필요 사항" />
           </div>
         </CardContent>
       </Card>

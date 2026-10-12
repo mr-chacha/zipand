@@ -26,6 +26,10 @@ export function toPyeong(areaM2: number | null | undefined) {
   return (Number(areaM2) / 3.3058).toFixed(1);
 }
 
+export function formatAvailableFrom(p: { available_from: string | null; available_negotiable?: boolean | null }) {
+  return p.available_negotiable ? "협의 가능" : formatDate(p.available_from);
+}
+
 export function formatDate(value: string | null | undefined) {
   if (!value) return "-";
   return new Intl.DateTimeFormat("ko-KR", {

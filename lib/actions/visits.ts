@@ -11,9 +11,8 @@ export async function createVisit(propertyId: string, _prev: ActionState | null,
   try {
     const labels = fd.getAll("field_label").map(String);
     const values = fd.getAll("field_value").map(String);
-    const notes = fd.getAll("field_note").map(String);
     const fields: VisitField[] = labels
-      .map((label, i) => ({ label: label.trim(), value: (values[i] ?? "").trim(), note: (notes[i] ?? "").trim() || undefined }))
+      .map((label, i) => ({ label: label.trim(), value: (values[i] ?? "").trim() }))
       .filter((f) => f.label && f.value);
 
     const checklist: ChecklistEntry[] = fd
@@ -42,11 +41,31 @@ export async function createVisit(propertyId: string, _prev: ActionState | null,
     });
     if (error) throw error;
 
+    const direction = fields.find((f) => f.label === "방향")?.value;
+    const availableText = fields.find((f) => f.label === "입주 가능일")?.value ?? "";
+    const dateMatch = availableText.match(/^(\d{4})[-./]\s*(\d{1,2})[-./]\s*(\d{1,2})\.?$/);
+    const available = dateMatch
+      ? {
+          available_from: `${dateMatch[1]}-${dateMatch[2].padStart(2, "0")}-${dateMatch[3].padStart(2, "0")}`,
+          available_negotiable: false,
+        }
+      : availableText.includes("협의")
+        ? { available_from: null, available_negotiable: true }
+        : null;
+    if (direction || available) {
+      const { error: syncError } = await supabase
+        .from("properties")
+        .update({ ...(direction && { direction }), ...available })
+        .eq("id", propertyId);
+      if (syncError) throw syncError;
+    }
+
     await supabase.from("properties").update({ status: "광고 중" }).eq("id", propertyId).eq("status", "임장 전");
     await logPropertyEvent(propertyId, `임장 기록 저장 (항목 ${fields.length}개)`);
   } catch (e) {
     return { error: toErrorMessage(e) };
   }
+  revalidatePath("/properties");
   revalidatePath(`/properties/${propertyId}`);
   revalidatePath(`/properties/${propertyId}/visit`);
   return { message: "임장 기록을 저장했어요." };

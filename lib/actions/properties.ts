@@ -10,6 +10,7 @@ import type { ActionState } from "@/types";
 
 function readPropertyForm(fd: FormData) {
   const deal_type = oneOf(fd, "deal_type", DEAL_TYPES, "거래 유형");
+  const availableMode = str(fd, "available_mode");
   return {
     title: requiredStr(fd, "title", "매물명"),
     address: requiredStr(fd, "address", "주소"),
@@ -26,7 +27,8 @@ function readPropertyForm(fd: FormData) {
     direction: str(fd, "direction"),
     rooms: int(fd, "rooms"),
     baths: int(fd, "baths"),
-    available_from: str(fd, "available_from"),
+    available_from: availableMode === "date" ? str(fd, "available_from") : null,
+    available_negotiable: availableMode === "negotiable",
     manager_id: str(fd, "manager_id"),
     description: str(fd, "description"),
     highlights: lines(str(fd, "highlights")),

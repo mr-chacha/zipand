@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
+import { DatePicker } from "@/components/form/date-picker";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,7 +43,7 @@ export function CustomerForm({ action, members, defaultValues: d, currentUserId,
           </div>
           <div className="space-y-2">
             <Label htmlFor="status">상태 *</Label>
-            <NativeSelect id="status" name="status" options={CUSTOMER_STATUSES} defaultValue={d?.status ?? "진행 중"} />
+            <NativeSelect id="status" name="status" options={CUSTOMER_STATUSES} defaultValue={d?.status ?? "연락 전"} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="manager_id">담당자</Label>
@@ -82,7 +83,7 @@ export function CustomerForm({ action, members, defaultValues: d, currentUserId,
           </div>
           <div className="space-y-2">
             <Label htmlFor="move_in_date">입주 희망일</Label>
-            <Input id="move_in_date" name="move_in_date" type="date" defaultValue={d?.move_in_date ?? ""} />
+            <DatePicker id="move_in_date" name="move_in_date" defaultValue={d?.move_in_date ?? ""} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="must_have">필수 조건</Label>

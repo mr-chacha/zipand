@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
+import { DatePicker } from "@/components/form/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -198,11 +199,11 @@ export function TaskDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="task-due">일시</Label>
-              <Input
+              <DatePicker
                 key={defaultDue}
                 id="task-due"
                 name="due_at"
-                type="datetime-local"
+                withTime
                 defaultValue={defaultDue ?? isoToKstLocal(null)}
                 required
               />

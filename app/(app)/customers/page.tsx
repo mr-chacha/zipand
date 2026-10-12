@@ -8,7 +8,9 @@ import { CustomerList } from "./customer-list";
 
 export const metadata: Metadata = { title: "고객 및 상담" };
 
-export default async function CustomersPage() {
+export default async function CustomersPage({ searchParams }: PageProps<"/customers">) {
+  const { q } = await searchParams;
+  const query = typeof q === "string" ? q.trim() : "";
   const { supabase } = await getSession();
   const { data } = await supabase
     .from("customers")
@@ -36,7 +38,7 @@ export default async function CustomersPage() {
           </Link>
         }
       />
-      <CustomerList customers={customers} />
+      <CustomerList key={query} customers={customers} initialQuery={query} />
     </div>
   );
 }

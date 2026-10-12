@@ -1,6 +1,6 @@
 import { MapPin, Phone } from "lucide-react";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
-import { formatDate, formatPrice, toPyeong } from "@/lib/format";
+import { formatAvailableFrom, formatPrice, toPyeong } from "@/lib/format";
 import type { BriefingSections } from "@/types";
 
 export interface BriefingData {
@@ -19,6 +19,7 @@ export interface BriefingData {
     rooms: number | null;
     baths: number | null;
     available_from: string | null;
+    available_negotiable?: boolean;
     highlights: string[];
   };
   photoUrls: string[];
@@ -55,7 +56,10 @@ export function BriefingView({
     { label: "방향", value: p.direction },
     { label: "방/욕실", value: p.rooms !== null ? `${p.rooms} / ${p.baths ?? "-"}` : null },
     { label: "관리비", value: p.maintenance_fee !== null ? `${p.maintenance_fee}만원` : null },
-    { label: "입주 가능일", value: p.available_from ? formatDate(p.available_from) : null },
+    {
+      label: "입주 가능일",
+      value: p.available_negotiable || p.available_from ? formatAvailableFrom(p) : null,
+    },
   ].filter((s) => s.value);
 
   return (

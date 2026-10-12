@@ -10,9 +10,9 @@ import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { PropertyStatusBadge } from "@/components/status-badge";
+import { DatePicker } from "@/components/form/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -71,7 +71,7 @@ export function ConsultationPanel({ customerId, consultations }: { customerId: s
       <form onSubmit={onSubmit} className="space-y-2 rounded-lg border p-3">
         <div className="flex flex-wrap gap-2">
           <NativeSelect name="channel" options={CONSULT_CHANNELS} defaultValue="전화" className="w-28" />
-          <Input name="consulted_at" type="datetime-local" defaultValue={isoToKstLocal(null)} className="w-auto" />
+          <DatePicker name="consulted_at" withTime defaultValue={isoToKstLocal(null)} className="w-56" aria-label="상담 일시" />
         </div>
         <Textarea name="content" rows={3} placeholder="상담 내용, 고객 반응, 다음에 할 일" required />
         <FormMessage state={state} />

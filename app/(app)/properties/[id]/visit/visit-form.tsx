@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { ComingSoonButton } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
 import { SubmitButton } from "@/components/form/submit-button";
+import { DatePicker } from "@/components/form/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,7 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createVisit } from "@/lib/actions/visits";
-import { DEFAULT_VISIT_CHECKLIST, VISIT_FIELD_LABELS } from "@/lib/constants";
+import { NativeSelect } from "@/components/form/native-select";
+import { CUSTOM_OPTION, DEFAULT_VISIT_CHECKLIST, VISIT_FIELD_LABELS, VISIT_FIELD_PLACEHOLDERS } from "@/lib/constants";
 import { isoToKstLocal } from "@/lib/format";
 import { toErrorMessage } from "@/lib/errors";
 import { uploadToStorage } from "@/lib/upload-client";
@@ -30,8 +32,41 @@ function formatSeconds(sec: number) {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
+function VisitFieldRow({ initialLabel, onRemove }: { initialLabel: string; onRemove: () => void }) {
+  const [labelChoice, setLabelChoice] = useState(initialLabel || CUSTOM_OPTION);
+  const [customLabel, setCustomLabel] = useState("");
+  const custom = labelChoice === CUSTOM_OPTION;
+  const label = custom ? customLabel : labelChoice;
+
+  return (
+    <div className="grid grid-cols-[8rem_1fr_auto] items-start gap-2 sm:grid-cols-[10rem_1fr_auto]">
+      <input type="hidden" name="field_label" value={label} />
+      <div className="space-y-2">
+        <NativeSelect
+          aria-label="항목"
+          options={[...VISIT_FIELD_LABELS, { value: CUSTOM_OPTION, label: "직접 입력" }]}
+          value={labelChoice}
+          onChange={(e) => setLabelChoice(e.target.value)}
+        />
+        {custom && (
+          <Input value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} placeholder="항목명" aria-label="항목명" />
+        )}
+      </div>
+      <Input
+        name="field_value"
+        placeholder={(!custom && VISIT_FIELD_PLACEHOLDERS[labelChoice]) || "내용"}
+        aria-label={`${label || "항목"} 내용`}
+      />
+      <Button type="button" size="icon" variant="ghost" aria-label="항목 삭제" onClick={onRemove}>
+        <Trash2 />
+      </Button>
+    </div>
+  );
+}
+
 export function VisitForm({ officeId, propertyId }: { officeId: string; propertyId: string }) {
   const [fields, setFields] = useState<FieldRow[]>(initialFields);
+  const [generation, setGeneration] = useState(0);
   const [checklist, setChecklist] = useState<string[]>(DEFAULT_VISIT_CHECKLIST);
   const [newCheck, setNewCheck] = useState("");
   const [audio, setAudio] = useState<{ path: string; name: string } | null>(null);
@@ -48,6 +83,7 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
     onSuccess: (result, form) => {
       form.reset();
       setFields(initialFields());
+      setGeneration((g) => g + 1);
       setChecklist(DEFAULT_VISIT_CHECKLIST);
       setAudio(null);
       toast.success(result.message);
@@ -177,7 +213,7 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
       <Card>
         <CardHeader>
           <CardTitle>현장 정보</CardTitle>
-          <CardDescription>구두로 들은 정보는 메모 칸에 출처를 남겨주세요 (예: 임대인 구두 안내)</CardDescription>
+          <CardDescription>방향과 입주 가능일(날짜로 적은 경우)은 매물 정보에도 반영돼요.</CardDescription>
           <CardAction>
             <Button
               type="button"
@@ -193,23 +229,14 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
         <CardContent className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="visited_at">임장 일시</Label>
-            <Input id="visited_at" name="visited_at" type="datetime-local" defaultValue={visitedAt} className="w-fit" />
+            <DatePicker id="visited_at" name="visited_at" withTime defaultValue={visitedAt} className="w-56" />
           </div>
           {fields.map((field) => (
-            <div key={field.key} className="grid grid-cols-[7rem_1fr_auto] gap-2 sm:grid-cols-[7rem_1fr_10rem_auto]">
-              <Input name="field_label" defaultValue={field.label} placeholder="항목" aria-label="항목명" />
-              <Input name="field_value" placeholder="내용" aria-label={`${field.label} 내용`} />
-              <Input name="field_note" placeholder="출처·메모" aria-label="출처 메모" className="hidden sm:block" />
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                aria-label="항목 삭제"
-                onClick={() => setFields((f) => f.filter((x) => x.key !== field.key))}
-              >
-                <Trash2 />
-              </Button>
-            </div>
+            <VisitFieldRow
+              key={`${generation}-${field.key}`}
+              initialLabel={field.label}
+              onRemove={() => setFields((f) => f.filter((x) => x.key !== field.key))}
+            />
           ))}
         </CardContent>
       </Card>

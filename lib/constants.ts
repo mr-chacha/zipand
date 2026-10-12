@@ -4,7 +4,8 @@ export const PROPERTY_STATUSES = ["임장 전", "광고 중", "계약 진행", "
 export const DOC_TYPES = ["등기사항증명서", "건축물대장", "기타"] as const;
 export const DOC_STATUSES = ["검토 필요", "검토 완료"] as const;
 export const SIGNAL_LEVELS = ["전문가 검토", "확인 필요", "참고"] as const;
-export const CUSTOMER_STATUSES = ["진행 중", "계약 완료", "보류", "종료"] as const;
+export const CUSTOMER_STATUSES = ["연락 전", "연락 완료", "진행 중", "관심 고객", "계약 완료", "중개 완료", "종료"] as const;
+export const CUSTOMER_CLOSED_STATUSES = ["계약 완료", "중개 완료", "종료"] as const;
 export const CONSULT_CHANNELS = ["방문", "전화", "메시지", "기타"] as const;
 export const TASK_TYPES = ["임장", "상담", "문서", "계약", "중도금", "잔금", "연락", "기타"] as const;
 export const DEAL_STAGES = ["조건 협의", "서류 확인", "계약 준비", "잔금 대기", "완료", "취소"] as const;
@@ -35,6 +36,19 @@ export const VERIFICATION_LABELS: Record<string, string> = {
 
 /** 임장 기록 구조화 항목 (기획서 7.2) */
 export const VISIT_FIELD_LABELS = ["방향", "채광", "수리 필요", "입주 가능일", "구조", "주차", "소음", "관리 상태"];
+
+export const VISIT_FIELD_PLACEHOLDERS: Record<string, string> = {
+  방향: "예) 남향, 남동향 (거실 기준)",
+  채광: "예) 오전 채광 좋음, 앞 동에 가려짐",
+  "수리 필요": "예) 도배·장판, 욕실 실리콘 교체",
+  "입주 가능일": "예) 2026-11-01, 즉시 입주, 협의 가능",
+  구조: "예) 판상형 3베이, 방 3 욕실 2",
+  주차: "예) 지하주차장 세대당 1.2대",
+  소음: "예) 대로변 차량 소음 있음, 조용함",
+  "관리 상태": "예) 공용부 깨끗함, 엘리베이터 노후",
+};
+
+export const CUSTOM_OPTION = "__custom__";
 
 export const DEFAULT_VISIT_CHECKLIST = [
   "누수 흔적",

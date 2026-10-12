@@ -9,6 +9,7 @@ import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { SignalBadge } from "@/components/status-badge";
+import { DatePicker } from "@/components/form/date-picker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -65,12 +66,12 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
         <div className="flex items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="issued_at">발급일</Label>
-            <Input
+            <DatePicker
               id="issued_at"
-              type="date"
               defaultValue={issuedAt ?? ""}
-              onBlur={(e) => {
-                if (e.target.value !== (issuedAt ?? "")) run(() => updateDocumentIssuedAt(documentId, e.target.value || null));
+              className="w-44"
+              onChange={(value) => {
+                if (value !== (issuedAt ?? "")) run(() => updateDocumentIssuedAt(documentId, value || null));
               }}
             />
           </div>

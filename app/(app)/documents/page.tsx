@@ -13,7 +13,8 @@ import { DocumentUploader } from "./document-uploader";
 export const metadata: Metadata = { title: "문서 관리" };
 
 export default async function DocumentsPage({ searchParams }: PageProps<"/documents">) {
-  const { property, status } = await searchParams;
+  const { property, status, q } = await searchParams;
+  const keyword = typeof q === "string" ? q.trim() : "";
   const { supabase, office } = await getSession();
 
   let query = supabase
@@ -21,7 +22,10 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
     .select("id, doc_type, file_name, file_size, status, issued_at, created_at, property:properties(id, title)")
     .order("created_at", { ascending: false });
   if (typeof status === "string" && status) query = query.eq("status", status);
-  const [{ data: documents }, propertyOptions] = await Promise.all([query, getPropertyOptions()]);
+  const [{ data: allDocuments }, propertyOptions] = await Promise.all([query, getPropertyOptions()]);
+  const documents = keyword
+    ? (allDocuments ?? []).filter((d) => `${d.doc_type} ${d.file_name} ${d.property?.title ?? ""}`.includes(keyword))
+    : allDocuments;
 
   const filters = [
     { label: "전체", value: "" },
@@ -65,12 +69,14 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
 
       <Card>
         <CardHeader>
-          <CardTitle>보관 문서 ({documents?.length ?? 0})</CardTitle>
+          <CardTitle>
+            {keyword ? `'${keyword}' 검색 결과` : "보관 문서"} ({documents?.length ?? 0})
+          </CardTitle>
           <div className="flex gap-1 pt-1">
             {filters.map((f) => (
               <Link
                 key={f.label}
-                href={f.value ? `/documents?status=${encodeURIComponent(f.value)}` : "/documents"}
+                href={`/documents?${new URLSearchParams({ ...(f.value && { status: f.value }), ...(keyword && { q: keyword }) })}`}
                 className={`rounded-full px-3 py-1 text-xs ${
                   currentStatus === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}

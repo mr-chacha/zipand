@@ -27,9 +27,9 @@ export interface CustomerListItem {
   consultationCount: number;
 }
 
-export function CustomerList({ customers }: { customers: CustomerListItem[] }) {
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("진행 중");
+export function CustomerList({ customers, initialQuery = "" }: { customers: CustomerListItem[]; initialQuery?: string }) {
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState("");
 
   const filtered = useMemo(() => {
     const q = query.trim();

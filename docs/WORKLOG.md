@@ -6,9 +6,10 @@
 ## 현재 상태
 - **단계**: Phase 2 — Supabase 연동 완료 (AI·앱·결제 제외 전 기능 동작), 가입·온보딩 UX 개선, 대시보드 캘린더
 - **완료**: 인증/사무소(간단 가입·단계별 시작하기), 매물·사진·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크, 고객·상담·후속 일정, 계약 준비(체크리스트·특약), 설정(사무소·구성원 초대·계정·구독 안내), 대시보드(일정 캘린더)
-- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261012180000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`)
+- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261012200000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`)
 - **다음 작업** (우선순위 순)
-  1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행)
+  1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행). 새 날짜 선택기(`components/form/date-picker.tsx`)는 브라우저 미확인 — 모든 날짜 입력 화면에서 확인·취소, 시간 선택, 폼 초기화 동작 점검
+  2. 선택 입력 날짜(입주 희망일·계약일·잔금일·발급일)를 비우는 방법 필요 여부 결정 (현재 날짜 선택기에 확인·취소만 있음)
   2. 모바일 레이아웃 점검 — 특히 임장 기록·사진·동영상 업로드, 캘린더 (현장 사용)
   3. 공개 브리핑에 동영상 노출 (`get_briefing` RPC·Storage 공개 정책 확장)
   3. 목록 페이지네이션(현재 전체 조회), 비밀번호 재설정(이메일) 흐름
@@ -41,6 +42,28 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-12 — 임장 현장 정보 반영, 페이지별 검색, 고객 상태, 날짜 선택기
+**작업 요약**
+- 임장 기록 현장 정보: 항목은 드롭다운(목록 + 직접 입력), 내용은 항목별 예시 placeholder가 있는 텍스트 입력. 출처·메모 칸 제거. 저장 시 방향·입주 가능일(날짜 또는 "협의")을 매물 정보에 반영 — 기존엔 임장 기록에만 저장돼 매물 상세 방향이 "-"로 보였음
+- 상단 검색창: 현재 페이지 목록만 검색(매물·고객·문서·계약 준비, `?q=`), 목록 없는 화면에서는 숨김
+- 고객 상태: 연락 전 / 연락 완료 / 진행 중 / 관심 고객 / 계약 완료 / 중개 완료 / 종료 (보류 제거, 기본값 연락 전). 고객 목록 기본 필터 전체, 대시보드 "관리 중 고객"은 종료 계열 제외 집계
+- 매물 등록·수정 폼 placeholder를 "예) …" 형식으로 통일
+- 입주 가능일: 선택 안 함 / 협의 가능 / 날짜 선택(선택 시 날짜 선택기). `properties.available_negotiable` 추가, 상세·공개 브리핑에 "협의 가능" 표시
+- outline 버튼 테두리 진하게(`border-foreground/20`, 그림자) — 배경과 구분
+- 날짜 선택기 `components/form/date-picker.tsx`: 네이티브 date/datetime-local 대체, 달력 + (선택) 시·분·오전/오후, 확인·취소 버튼만. 제출 값 형식은 기존과 동일, 폼 reset 시 기본값 복원
+
+**변경 파일/화면**
+- 화면: `/properties/[id]/visit`, `/properties/new`·`edit`, `/properties/[id]`, `/customers`, `/customers/[id]`, `/documents`, `/documents/[id]`, `/contracts`, `/dashboard`, 공개 브리핑
+- 마이그레이션: `20261012190000_customer_statuses`, `20261012200000_available_negotiable`(`get_briefing` 재정의 포함) — 원격 적용, 타입 재생성
+- 공통: `components/layout/app-header.tsx`, `components/form/date-picker.tsx`, `components/ui/button.tsx`, `lib/constants.ts`(`VISIT_FIELD_PLACEHOLDERS`, `CUSTOMER_CLOSED_STATUSES`), `lib/format.ts`(`formatAvailableFrom`), `lib/actions/visits.ts`, `lib/actions/properties.ts`
+
+**결정 사항**
+- 방향·입주 가능일만 매물 컬럼과 동기화, 나머지 현장 정보는 임장 기록(최근 임장 정보)에만 보관
+- 날짜 선택기에 "오늘"·"삭제" 없음(요청 사항)
+
+**남은 TODO**
+- 날짜 선택기 브라우저 점검, 선택 날짜 비우기 방법 결정
 
 ### 2026-10-12 — 간단 가입·단계별 시작하기, 매물 동영상, 대시보드 캘린더
 **작업 요약**

@@ -55,9 +55,12 @@ export function DealStageBadge({ stage }: { stage: string }) {
 }
 
 const customerStatusStyle: Record<string, string> = {
+  "연락 전": "bg-muted text-muted-foreground",
+  "연락 완료": "bg-primary/10 text-primary",
   "진행 중": "bg-primary/10 text-primary",
+  "관심 고객": "bg-warning/15 text-warning",
   "계약 완료": "bg-success/15 text-success",
-  보류: "bg-warning/15 text-warning",
+  "중개 완료": "bg-success/15 text-success",
   종료: "bg-muted text-muted-foreground",
 };
 
