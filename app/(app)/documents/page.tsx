@@ -1,111 +1,112 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, ImageUp, PenLine, RefreshCw, ShieldCheck, Upload } from "lucide-react";
+import { FileText, ShieldCheck } from "lucide-react";
+import { ComingSoonPanel } from "@/components/coming-soon";
 import { PageHeader } from "@/components/page-header";
-import { AnalysisStatusBadge } from "@/components/status-badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { DocStatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { documents } from "@/lib/mock/documents";
-import { DocumentUploadOptions } from "./upload-options";
+import { getSession } from "@/lib/auth";
+import { formatDate, formatDateTime, formatFileSize } from "@/lib/format";
+import { getPropertyOptions } from "@/lib/queries";
+import { DocumentUploader } from "./document-uploader";
 
-export const metadata: Metadata = { title: "AI 문서 분석" };
+export const metadata: Metadata = { title: "문서 관리" };
 
-export default function DocumentsPage() {
+export default async function DocumentsPage({ searchParams }: PageProps<"/documents">) {
+  const { property, status } = await searchParams;
+  const { supabase, office } = await getSession();
+
+  let query = supabase
+    .from("documents")
+    .select("id, doc_type, file_name, file_size, status, issued_at, created_at, property:properties(id, title)")
+    .order("created_at", { ascending: false });
+  if (typeof status === "string" && status) query = query.eq("status", status);
+  const [{ data: documents }, propertyOptions] = await Promise.all([query, getPropertyOptions()]);
+
+  const filters = [
+    { label: "전체", value: "" },
+    { label: "검토 필요", value: "검토 필요" },
+    { label: "검토 완료", value: "검토 완료" },
+  ];
+  const currentStatus = typeof status === "string" ? status : "";
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="AI 문서 분석"
-        description="등기사항증명서·건축물대장을 올리면 핵심 항목을 추출하고 원문 근거와 함께 확인할 사항을 알려드려요."
+        title="문서 관리"
+        description="등기사항증명서·건축물대장을 매물에 연결해 보관하고, 핵심 항목과 확인할 사항을 원문 근거와 함께 정리해요."
       />
 
-      <Card>
-        <CardContent className="grid gap-6 lg:grid-cols-5">
-          <div className="lg:col-span-3">
-            <div className="flex h-full min-h-56 flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed bg-muted/30 p-6 text-center">
-              <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-                <Upload className="size-6" />
-              </span>
-              <div>
-                <p className="font-medium">파일을 끌어다 놓거나 선택하세요</p>
-                <p className="text-sm text-muted-foreground">PDF, JPG, PNG · 최대 20MB · 최대 20페이지</p>
-              </div>
-              <Button>파일 선택</Button>
-            </div>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <CardHeader>
+            <CardTitle>서류 업로드</CardTitle>
+            <CardDescription>PDF, JPG, PNG · 최대 20MB</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DocumentUploader
+              officeId={office.id}
+              properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
+              defaultPropertyId={typeof property === "string" ? property : undefined}
+            />
+          </CardContent>
+        </Card>
+        <div className="space-y-4 lg:col-span-2">
+          <ComingSoonPanel
+            title="AI 문서 분석"
+            description="OCR로 소유자·근저당권·위반건축물 등 핵심 항목을 자동 추출하고 원문 근거를 연결하는 기능은 서비스 준비중이에요. 지금은 문서 상세에서 직접 입력하고 검토할 수 있어요."
+          />
+          <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0" />
+            업로드한 문서는 비공개 저장소에 보관되고, 같은 사무소 구성원만 열람할 수 있어요. 열람 링크는 1시간 후 만료돼요.
           </div>
-          <div className="space-y-4 lg:col-span-2">
-            <DocumentUploadOptions />
-            <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-              <ShieldCheck className="mt-0.5 size-4 shrink-0" />
-              업로드한 문서는 암호화해 저장되고, 사무소 권한이 있는 사용자만 볼 수 있어요. AI 분석은 업무 보조
-              자료이며 최종 확인은 원문으로 해주세요.
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>분석 이력</CardTitle>
-          <CardDescription>최근 업로드 순</CardDescription>
+          <CardTitle>보관 문서 ({documents?.length ?? 0})</CardTitle>
+          <div className="flex gap-1 pt-1">
+            {filters.map((f) => (
+              <Link
+                key={f.label}
+                href={f.value ? `/documents?status=${encodeURIComponent(f.value)}` : "/documents"}
+                className={`rounded-full px-3 py-1 text-xs ${
+                  currentStatus === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {f.label}
+              </Link>
+            ))}
+          </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {documents.map((doc) => (
-            <div key={doc.id} className="rounded-lg border p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                  <FileText className="size-5 text-muted-foreground" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium">{doc.type}</p>
-                    <AnalysisStatusBadge status={doc.status} />
-                  </div>
-                  <p className="truncate text-sm text-muted-foreground">
-                    {doc.propertyTitle} · {doc.fileName} · {doc.pages}p
-                  </p>
-                  <p className="text-xs text-muted-foreground">업로드 {doc.uploadedAt}</p>
+        <CardContent className="space-y-2">
+          {(documents ?? []).length === 0 && (
+            <p className="py-10 text-center text-sm text-muted-foreground">문서가 없어요.</p>
+          )}
+          {documents?.map((doc) => (
+            <Link
+              key={doc.id}
+              href={`/documents/${doc.id}`}
+              className="flex flex-col gap-2 rounded-lg border p-3 hover:bg-muted/50 sm:flex-row sm:items-center"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+                <FileText className="size-5 text-muted-foreground" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-medium">{doc.doc_type}</p>
+                  <DocStatusBadge status={doc.status} />
                 </div>
-                {(doc.status === "검토 필요" || doc.status === "검토 완료") && (
-                  <Link
-                    href={`/documents/${doc.id}`}
-                    className={buttonVariants({ variant: doc.status === "검토 필요" ? "default" : "outline", size: "sm" })}
-                  >
-                    {doc.status === "검토 필요" ? "검토하기" : "결과 보기"}
-                  </Link>
-                )}
+                <p className="truncate text-sm text-muted-foreground">
+                  {doc.property?.title} · {doc.file_name} · {formatFileSize(doc.file_size)}
+                </p>
               </div>
-
-              {doc.status === "분석 중" && (
-                <div className="mt-3 space-y-1.5">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>텍스트 인식 및 항목 추출 중…</span>
-                    <span>{doc.progress}%</span>
-                  </div>
-                  <Progress value={doc.progress ?? null} />
-                </div>
-              )}
-
-              {doc.status === "실패" && (
-                <div className="mt-3 space-y-3 rounded-lg bg-destructive/5 p-3">
-                  <p className="text-sm text-destructive">{doc.failReason}</p>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm">
-                      <RefreshCw data-icon="inline-start" />
-                      다시 업로드
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <ImageUp data-icon="inline-start" />
-                      이미지 보정 후 재분석
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <PenLine data-icon="inline-start" />
-                      직접 입력
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+              <div className="text-xs text-muted-foreground sm:text-right">
+                <p>업로드 {formatDateTime(doc.created_at)}</p>
+                <p>발급일 {formatDate(doc.issued_at)}</p>
+              </div>
+            </Link>
           ))}
         </CardContent>
       </Card>

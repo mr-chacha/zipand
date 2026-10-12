@@ -4,10 +4,10 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
-# 집앤드 프로젝트 작업 가이드
+# 집앤 프로젝트 작업 가이드
 
 ## 프로젝트 개요
-- 서비스명: **집앤드** (기획서 가칭: 중개파트너 AI) — 공인중개사 전용 AI 업무 비서 웹앱
+- 서비스명: **집앤** (기획서 가칭: 중개파트너 AI) — 공인중개사 전용 업무 비서 웹앱
 - 기획 요약: `docs/PLANNING.md` (원본: `../집앤드 기획문서.pdf`)
 - 작업 로그 / 이어서 할 작업: `docs/WORKLOG.md`
 
@@ -29,7 +29,17 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - Next.js 16 (App Router, Turbopack). `params`, `searchParams`는 Promise이므로 `await` 하고 `PageProps<'/route/[id]'>` 헬퍼를 사용한다.
 - UI: shadcn/ui (`base-nova` 스타일, **Base UI 기반**). Radix의 `asChild` 대신 `render` prop을 사용한다. 링크 버튼은 `<Link className={buttonVariants()}>` 패턴을 쓴다.
 - 클래스 병합은 `@/lib/utils`의 `cn`을 사용한다.
-- 현재 단계는 **UI 전용**: 실제 API/DB/AI 연동 없이 `lib/mock/`의 목업 데이터와 `types/`의 타입만 사용한다.
-- 새 화면은 `app/(app)/` 아래에, 인증 화면은 `app/(auth)/` 아래에 둔다.
+- 새 화면은 `app/(app)/` 아래에(로그인 필요), 인증 화면은 `app/(auth)/` 아래에 둔다. 비로그인 공개 화면은 `app/b/`처럼 그룹 밖에 두고 `lib/supabase/proxy.ts`의 공개 경로에 추가한다.
+- AI·모바일 앱 기능은 **서비스 준비중**: `components/coming-soon.tsx`(`ComingSoonButton`, `ComingSoonBadge`, `ComingSoonPanel`)로 표시하고, 같은 작업을 수동으로 할 수 있는 흐름을 제공한다. 결제도 준비중.
 - AI 결과 화면에는 원문 근거, 신뢰도, 사용자 검토 상태를 함께 표시한다(기획서 제품 원칙).
 - 작업 후 `npm run lint`, `npm run build`가 통과하는지 확인한다.
+
+## Supabase 규칙
+- 스키마 변경은 `supabase/migrations/`에 새 마이그레이션 파일로 추가한다(이미 원격에 적용된 파일은 수정 금지). 로컬 적용 `npm run db:reset`, 타입 재생성 `npm run db:types`.
+- 모든 업무 테이블은 `office_id` 기준 RLS(`current_office_id()`), `office_id`는 DB 기본값으로 채워지므로 insert 시 넣지 않는다.
+- 서버 데이터 접근은 `lib/auth.ts`의 `getSession()`(요청 단위 캐시)으로 `supabase`, `profile`, `office`를 얻는다. 목록 공통 쿼리는 `lib/queries.ts`.
+- 변경은 `lib/actions/*.ts` 서버 액션으로 하고 `ActionState`(`{ error?, message? }`)를 반환한다. 입력 파싱은 `lib/form.ts`, 오류 메시지는 `toErrorMessage`.
+- 폼은 `<form action>` 대신 `useFormAction`(`lib/use-form-action.ts`)을 쓴다(React 19 폼 자동 초기화로 오류 시 입력이 사라지는 문제 방지).
+- 파일은 브라우저에서 Storage로 직접 업로드(`lib/upload-client.ts`, 경로 `{office_id}/{property_id}/{uuid}.ext`) 후 서버 액션으로 DB 행을 만든다. 버킷은 모두 비공개이며 `lib/storage.ts`의 signed URL로 보여준다.
+- 대표 전용 작업(역할 변경 등)은 RLS·RPC(`update_member`)에서 막는다. UI 숨김만으로 권한을 처리하지 않는다.
+- 공개 데이터(브리핑)는 security definer RPC(`get_briefing`)로 필요한 필드만 노출한다. 내부 메모·개인정보·상세 주소는 포함하지 않는다.

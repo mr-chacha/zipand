@@ -1,9 +1,8 @@
-import { AlertTriangle, CheckCircle2, Info, Loader2, ShieldAlert, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { AnalysisStatus, ExtractSource, PropertyStatus, SignalLevel } from "@/types";
 
-const propertyStatusStyle: Record<PropertyStatus, string> = {
+const propertyStatusStyle: Record<string, string> = {
   "임장 전": "bg-muted text-muted-foreground",
   "광고 중": "bg-primary/10 text-primary",
   "계약 진행": "bg-warning/15 text-warning",
@@ -11,35 +10,29 @@ const propertyStatusStyle: Record<PropertyStatus, string> = {
   보류: "bg-destructive/10 text-destructive",
 };
 
-export function PropertyStatusBadge({ status }: { status: PropertyStatus }) {
+export function PropertyStatusBadge({ status }: { status: string }) {
   return <Badge className={cn("border-0", propertyStatusStyle[status])}>{status}</Badge>;
 }
 
-const analysisStatusStyle: Record<AnalysisStatus, { className: string; icon: React.ElementType }> = {
-  "분석 중": { className: "bg-primary/10 text-primary", icon: Loader2 },
-  "검토 필요": { className: "bg-warning/15 text-warning", icon: AlertTriangle },
-  "검토 완료": { className: "bg-success/15 text-success", icon: CheckCircle2 },
-  실패: { className: "bg-destructive/10 text-destructive", icon: XCircle },
-};
-
-export function AnalysisStatusBadge({ status }: { status: AnalysisStatus }) {
-  const { className, icon: Icon } = analysisStatusStyle[status];
+export function DocStatusBadge({ status }: { status: string }) {
+  const done = status === "검토 완료";
+  const Icon = done ? CheckCircle2 : AlertTriangle;
   return (
-    <Badge className={cn("border-0", className)}>
-      <Icon data-icon="inline-start" className={cn(status === "분석 중" && "animate-spin")} />
+    <Badge className={cn("border-0", done ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>
+      <Icon data-icon="inline-start" />
       {status}
     </Badge>
   );
 }
 
-const signalStyle: Record<SignalLevel, { className: string; icon: React.ElementType }> = {
+const signalStyle: Record<string, { className: string; icon: React.ElementType }> = {
   "전문가 검토": { className: "bg-destructive/10 text-destructive", icon: ShieldAlert },
   "확인 필요": { className: "bg-warning/15 text-warning", icon: AlertTriangle },
   참고: { className: "bg-muted text-muted-foreground", icon: Info },
 };
 
-export function SignalBadge({ level }: { level: SignalLevel }) {
-  const { className, icon: Icon } = signalStyle[level];
+export function SignalBadge({ level }: { level: string }) {
+  const { className, icon: Icon } = signalStyle[level] ?? signalStyle["참고"];
   return (
     <Badge className={cn("border-0", className)}>
       <Icon data-icon="inline-start" />
@@ -48,16 +41,26 @@ export function SignalBadge({ level }: { level: SignalLevel }) {
   );
 }
 
-const sourceStyle: Record<ExtractSource, string> = {
-  "AI 추출": "border-primary/30 text-primary",
-  "사용자 수정": "border-success/40 text-success",
-  "직접 입력": "border-border text-muted-foreground",
+const dealStageStyle: Record<string, string> = {
+  "조건 협의": "bg-muted text-muted-foreground",
+  "서류 확인": "bg-primary/10 text-primary",
+  "계약 준비": "bg-warning/15 text-warning",
+  "잔금 대기": "bg-warning/15 text-warning",
+  완료: "bg-success/15 text-success",
+  취소: "bg-destructive/10 text-destructive",
 };
 
-export function SourceBadge({ source }: { source: ExtractSource }) {
-  return (
-    <Badge variant="outline" className={cn("text-[10px]", sourceStyle[source])}>
-      {source}
-    </Badge>
-  );
+export function DealStageBadge({ stage }: { stage: string }) {
+  return <Badge className={cn("border-0", dealStageStyle[stage])}>{stage}</Badge>;
+}
+
+const customerStatusStyle: Record<string, string> = {
+  "진행 중": "bg-primary/10 text-primary",
+  "계약 완료": "bg-success/15 text-success",
+  보류: "bg-warning/15 text-warning",
+  종료: "bg-muted text-muted-foreground",
+};
+
+export function CustomerStatusBadge({ status }: { status: string }) {
+  return <Badge className={cn("border-0", customerStatusStyle[status])}>{status}</Badge>;
 }

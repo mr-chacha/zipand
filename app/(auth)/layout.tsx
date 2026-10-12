@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Logo } from "@/components/layout/logo";
 
@@ -31,8 +32,16 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           AI 분석 결과는 업무 보조 자료이며, 최종 확인·설명 책임은 중개사에게 있습니다.
         </p>
       </div>
-      <div className="flex items-center justify-center p-6">
+      <div className="flex flex-col items-center justify-center gap-8 p-6">
         <div className="w-full max-w-md">{children}</div>
+        <nav className="flex gap-4 text-xs text-muted-foreground">
+          <Link href="/terms" className="hover:text-foreground">
+            이용약관
+          </Link>
+          <Link href="/privacy" className="font-medium hover:text-foreground">
+            개인정보 처리방침
+          </Link>
+        </nav>
       </div>
     </div>
   );

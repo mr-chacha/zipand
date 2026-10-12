@@ -8,7 +8,7 @@ export function Logo({ className }: { className?: string }) {
       <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
         <House className="size-4" />
       </span>
-      <span className="text-lg tracking-tight">집앤드</span>
+      <span className="text-lg tracking-tight">집앤</span>
     </Link>
   );
 }

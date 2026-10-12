@@ -1,80 +1,111 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Download, RotateCcw } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
-import { AnalysisStatusBadge } from "@/components/status-badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { documents, getAnalysis, getDocument } from "@/lib/mock/documents";
-import { AnalysisReview } from "./analysis-review";
+import { DocStatusBadge } from "@/components/status-badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSession } from "@/lib/auth";
+import { DOC_FIELD_PRESETS, type DocType } from "@/lib/constants";
+import { formatDateTime, formatFileSize } from "@/lib/format";
+import { signedUrls } from "@/lib/storage";
+import { DocumentReview } from "./document-review";
 
-export function generateStaticParams() {
-  return documents.map((d) => ({ id: d.id }));
-}
-
-export async function generateMetadata({ params }: PageProps<"/documents/[id]">) {
-  const { id } = await params;
-  return { title: `${getDocument(id)?.type ?? "문서"} 분석 결과` };
-}
+export const metadata: Metadata = { title: "문서 검토" };
 
 export default async function DocumentDetailPage({ params }: PageProps<"/documents/[id]">) {
   const { id } = await params;
-  const doc = getDocument(id);
+  const { supabase } = await getSession();
+
+  const { data: doc } = await supabase
+    .from("documents")
+    .select(
+      "*, property:properties(id, title, address), uploader:profiles!documents_uploaded_by_fkey(name), reviewer:profiles!documents_reviewed_by_fkey(name)"
+    )
+    .eq("id", id)
+    .maybeSingle();
   if (!doc) notFound();
-  const analysis = getAnalysis(id);
+
+  const [fields, signals, urls] = await Promise.all([
+    supabase.from("document_fields").select("*").eq("document_id", id).order("created_at"),
+    supabase.from("document_signals").select("*").eq("document_id", id).order("created_at"),
+    signedUrls(supabase, "documents", [doc.storage_path]),
+  ]);
+  const fileUrl = urls[doc.storage_path];
+  const isPdf = doc.file_name.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`${doc.type} 분석 결과`}
-        description={`${doc.propertyTitle} · ${doc.fileName}`}
+        title={doc.doc_type}
+        description={`${doc.property?.title ?? ""} · ${doc.file_name}`}
         backHref="/documents"
-        backLabel="AI 문서 분석"
-        actions={
-          <>
-            <Button variant="outline">
-              <RotateCcw data-icon="inline-start" />
-              재분석
-            </Button>
-            <Button variant="outline">
-              <Download data-icon="inline-start" />
-              결과 내보내기
-            </Button>
-          </>
-        }
+        backLabel="문서 관리"
+        actions={<DocStatusBadge status={doc.status} />}
       />
 
-      <Card size="sm">
-        <CardContent className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <AnalysisStatusBadge status={doc.status} />
-          <span>
-            <span className="text-muted-foreground">발급일 </span>
-            {doc.issuedAt ?? "-"}
-          </span>
-          <span>
-            <span className="text-muted-foreground">페이지 </span>
-            {doc.pages}
-          </span>
-          <span>
-            <span className="text-muted-foreground">업로드 </span>
-            {doc.uploadedAt}
-          </span>
-          {analysis && (
-            <span className="text-xs text-muted-foreground sm:ml-auto">분석 모델 {analysis.modelVersion}</span>
-          )}
-        </CardContent>
-      </Card>
-
-      {analysis ? (
-        <AnalysisReview doc={doc} analysis={analysis} />
-      ) : (
-        <Card className="items-center gap-3 py-16 text-center">
-          <p className="text-sm text-muted-foreground">이 문서의 상세 분석 결과는 목업 데이터에 없어요.</p>
-          <Link href="/documents/d-2001" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            예시 결과 보기
-          </Link>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="overflow-hidden">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle>원문</CardTitle>
+            {fileUrl && (
+              <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
+                새 창에서 열기
+                <ExternalLink className="size-3" />
+              </a>
+            )}
+          </CardHeader>
+          <CardContent>
+            {!fileUrl ? (
+              <p className="py-20 text-center text-sm text-muted-foreground">파일을 불러오지 못했어요.</p>
+            ) : isPdf ? (
+              <iframe src={fileUrl} title={doc.file_name} className="h-[70vh] w-full rounded-lg border" />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={fileUrl} alt={doc.file_name} className="w-full rounded-lg border" />
+            )}
+            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <div>
+                <dt>매물</dt>
+                <dd className="text-foreground">
+                  {doc.property ? (
+                    <Link href={`/properties/${doc.property.id}`} className="hover:underline">
+                      {doc.property.title}
+                    </Link>
+                  ) : (
+                    "-"
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt>파일 크기</dt>
+                <dd className="text-foreground">{formatFileSize(doc.file_size)}</dd>
+              </div>
+              <div>
+                <dt>업로드</dt>
+                <dd className="text-foreground">
+                  {formatDateTime(doc.created_at)} {doc.uploader?.name && `· ${doc.uploader.name}`}
+                </dd>
+              </div>
+              <div>
+                <dt>검토</dt>
+                <dd className="text-foreground">
+                  {doc.reviewed_at ? `${formatDateTime(doc.reviewed_at)} · ${doc.reviewer?.name ?? ""}` : "-"}
+                </dd>
+              </div>
+            </dl>
+          </CardContent>
         </Card>
-      )}
+
+        <DocumentReview
+          documentId={id}
+          status={doc.status}
+          issuedAt={doc.issued_at}
+          presets={DOC_FIELD_PRESETS[doc.doc_type as DocType] ?? []}
+          fields={fields.data ?? []}
+          signals={signals.data ?? []}
+        />
+      </div>
     </div>
   );
 }

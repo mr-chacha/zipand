@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { FileText, LayoutGrid, List, Search, Users } from "lucide-react";
+import { Building2, FileText, LayoutGrid, List, Plus, Search, Users } from "lucide-react";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { PropertyStatusBadge } from "@/components/status-badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,34 +23,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatPrice, toPyeong } from "@/lib/format";
+import { DEAL_TYPES, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/constants";
+import { formatDate, formatPrice, toPyeong } from "@/lib/format";
+import type { PropertyListItem } from "@/lib/queries";
 import { cn } from "@/lib/utils";
-import type { DealType, Property, PropertyStatus, PropertyType } from "@/types";
 
 const ALL = "전체";
-const dealTypes: (DealType | typeof ALL)[] = [ALL, "매매", "전세", "월세"];
-const propertyTypes: (PropertyType | typeof ALL)[] = [ALL, "아파트", "오피스텔", "빌라", "원룸", "상가"];
-const statuses: (PropertyStatus | typeof ALL)[] = [ALL, "임장 전", "광고 중", "계약 진행", "계약 완료", "보류"];
 
-function FilterSelect<T extends string>({
+function FilterSelect({
   label,
   value,
   options,
   onChange,
 }: {
   label: string;
-  value: T;
-  options: T[];
-  onChange: (value: T) => void;
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
 }) {
   return (
-    <Select value={value} onValueChange={(v) => onChange(v as T)}>
-      <SelectTrigger className="min-w-28" aria-label={label}>
+    <Select value={value} onValueChange={(v) => onChange(v as string)}>
+      <SelectTrigger className="min-w-28 bg-background" aria-label={label}>
         <span className="text-muted-foreground">{label}</span>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {options.map((option) => (
+        {[ALL, ...options].map((option) => (
           <SelectItem key={option} value={option}>
             {option}
           </SelectItem>
@@ -60,24 +58,48 @@ function FilterSelect<T extends string>({
   );
 }
 
-export function PropertyList({ properties }: { properties: Property[] }) {
+export function PropertyList({
+  properties,
+  initialQuery,
+}: {
+  properties: PropertyListItem[];
+  initialQuery: string;
+}) {
   const [view, setView] = useState<"table" | "card">("table");
-  const [query, setQuery] = useState("");
-  const [dealType, setDealType] = useState<DealType | typeof ALL>(ALL);
-  const [propertyType, setPropertyType] = useState<PropertyType | typeof ALL>(ALL);
-  const [status, setStatus] = useState<PropertyStatus | typeof ALL>(ALL);
+  const [query, setQuery] = useState(initialQuery);
+  const [dealType, setDealType] = useState(ALL);
+  const [propertyType, setPropertyType] = useState(ALL);
+  const [status, setStatus] = useState(ALL);
 
   const filtered = useMemo(
     () =>
       properties.filter(
         (p) =>
-          (dealType === ALL || p.dealType === dealType) &&
-          (propertyType === ALL || p.propertyType === propertyType) &&
+          (dealType === ALL || p.deal_type === dealType) &&
+          (propertyType === ALL || p.property_type === propertyType) &&
           (status === ALL || p.status === status) &&
-          (query === "" || `${p.title} ${p.address}`.includes(query))
+          (query === "" || `${p.title} ${p.address} ${p.region ?? ""}`.includes(query))
       ),
     [properties, dealType, propertyType, status, query]
   );
+
+  if (properties.length === 0) {
+    return (
+      <Card className="items-center gap-4 py-16 text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Building2 className="size-6" />
+        </span>
+        <div>
+          <p className="font-medium">아직 등록된 매물이 없어요</p>
+          <p className="text-sm text-muted-foreground">첫 매물을 등록하고 임장 기록을 남겨보세요.</p>
+        </div>
+        <Link href="/properties/new" className={buttonVariants()}>
+          <Plus data-icon="inline-start" />
+          매물 등록
+        </Link>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -87,14 +109,14 @@ export function PropertyList({ properties }: { properties: Property[] }) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="매물명 또는 주소 검색"
+            placeholder="매물명, 주소, 지역 검색"
             className="bg-background pl-8"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <FilterSelect label="거래" value={dealType} options={dealTypes} onChange={setDealType} />
-          <FilterSelect label="유형" value={propertyType} options={propertyTypes} onChange={setPropertyType} />
-          <FilterSelect label="상태" value={status} options={statuses} onChange={setStatus} />
+          <FilterSelect label="거래" value={dealType} options={DEAL_TYPES} onChange={setDealType} />
+          <FilterSelect label="유형" value={propertyType} options={PROPERTY_TYPES} onChange={setPropertyType} />
+          <FilterSelect label="상태" value={status} options={PROPERTY_STATUSES} onChange={setStatus} />
           <div className="ml-auto hidden rounded-lg border bg-background p-0.5 md:flex">
             <Button
               variant={view === "table" ? "secondary" : "ghost"}
@@ -138,74 +160,86 @@ export function PropertyList({ properties }: { properties: Property[] }) {
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => (
-                  <TableRow key={p.id} className="cursor-pointer">
+                  <TableRow key={p.id}>
                     <TableCell className="pl-4">
-                      <Link href={`/properties/${p.id}`} className="flex items-center gap-3">
-                        <PropertyThumbnail type={p.propertyType} className="size-10 shrink-0 rounded-md" />
+                      <Link href={`/properties/${p.id}`} className="flex items-center gap-3 hover:underline">
+                        <PropertyThumbnail
+                          type={p.property_type}
+                          src={p.thumbUrl}
+                          className="size-10 shrink-0 rounded-md"
+                        />
                         <div className="min-w-0">
-                          <p className="truncate font-medium">{p.title}</p>
-                          <p className="truncate text-xs text-muted-foreground">{p.address}</p>
+                          <p className="max-w-64 truncate font-medium">{p.title}</p>
+                          <p className="max-w-64 truncate text-xs text-muted-foreground">{p.address}</p>
                         </div>
                       </Link>
                     </TableCell>
                     <TableCell>
-                      {p.propertyType} · {p.dealType}
+                      {p.property_type} · {p.deal_type}
                     </TableCell>
                     <TableCell className="font-medium tabular-nums">{formatPrice(p)}</TableCell>
                     <TableCell className="tabular-nums">
-                      {p.areaM2}㎡ <span className="text-muted-foreground">({toPyeong(p.areaM2)}평)</span>
+                      {p.area_m2 ? (
+                        <>
+                          {p.area_m2}㎡ <span className="text-muted-foreground">({toPyeong(p.area_m2)}평)</span>
+                        </>
+                      ) : (
+                        "-"
+                      )}
                     </TableCell>
                     <TableCell>
                       <PropertyStatusBadge status={p.status} />
                     </TableCell>
-                    <TableCell>{p.manager}</TableCell>
+                    <TableCell>{p.managerName ?? "-"}</TableCell>
                     <TableCell>
                       <span className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-0.5">
+                        <span className="flex items-center gap-0.5" title="연결 고객">
                           <Users className="size-3.5" />
-                          {p.linkedCustomers}
+                          {p.customerCount}
                         </span>
-                        <span className="flex items-center gap-0.5">
+                        <span className="flex items-center gap-0.5" title="서류">
                           <FileText className="size-3.5" />
-                          {p.documentsCount}
+                          {p.documentCount}
                         </span>
                       </span>
                     </TableCell>
-                    <TableCell className="pr-4 text-muted-foreground tabular-nums">{p.registeredAt}</TableCell>
+                    <TableCell className="pr-4 text-muted-foreground tabular-nums">{formatDate(p.created_at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </Card>
 
-          <div
-            className={cn(
-              "grid gap-4 sm:grid-cols-2 lg:grid-cols-3",
-              view === "table" && "md:hidden"
-            )}
-          >
+          <div className={cn("grid gap-4 sm:grid-cols-2 lg:grid-cols-3", view === "table" && "md:hidden")}>
             {filtered.map((p) => (
               <Link
                 key={p.id}
                 href={`/properties/${p.id}`}
                 className="overflow-hidden rounded-xl border bg-card transition-colors hover:border-primary/40"
               >
-                <PropertyThumbnail type={p.propertyType} className="aspect-[16/9]" />
+                <PropertyThumbnail type={p.property_type} src={p.thumbUrl} className="aspect-[16/9] w-full" />
                 <div className="space-y-2 p-4">
                   <div className="flex items-center justify-between">
                     <PropertyStatusBadge status={p.status} />
-                    <span className="text-xs text-muted-foreground">{p.registeredAt}</span>
+                    <span className="text-xs text-muted-foreground">{formatDate(p.created_at)}</span>
                   </div>
                   <div>
                     <p className="truncate font-semibold">{p.title}</p>
                     <p className="truncate text-xs text-muted-foreground">{p.address}</p>
                   </div>
                   <p className="text-lg font-bold text-primary">
-                    <span className="mr-1.5 text-sm font-medium text-foreground">{p.dealType}</span>
+                    <span className="mr-1.5 text-sm font-medium text-foreground">{p.deal_type}</span>
                     {formatPrice(p)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {p.propertyType} · {p.areaM2}㎡ ({toPyeong(p.areaM2)}평) · {p.floor}/{p.totalFloors}층 · {p.direction}
+                    {[
+                      p.property_type,
+                      p.area_m2 && `${p.area_m2}㎡ (${toPyeong(p.area_m2)}평)`,
+                      p.floor && `${p.floor}${p.total_floors ? `/${p.total_floors}` : ""}층`,
+                      p.direction,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
               </Link>

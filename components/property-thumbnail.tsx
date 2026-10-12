@@ -1,8 +1,7 @@
 import { Building, Building2, Home, Hotel, Store } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PropertyType } from "@/types";
 
-const iconMap: Record<PropertyType, React.ElementType> = {
+const iconMap: Record<string, React.ElementType> = {
   아파트: Building2,
   오피스텔: Hotel,
   빌라: Building,
@@ -10,15 +9,25 @@ const iconMap: Record<PropertyType, React.ElementType> = {
   상가: Store,
 };
 
-/** 실제 사진 업로드 전까지 사용하는 매물 썸네일 플레이스홀더 */
+/** 매물 사진. 사진이 없으면 매물 유형 아이콘 플레이스홀더를 보여준다. */
 export function PropertyThumbnail({
   type,
+  src,
+  alt = "",
   className,
 }: {
-  type: PropertyType;
+  type: string;
+  src?: string | null;
+  alt?: string;
   className?: string;
 }) {
-  const Icon = iconMap[type];
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되므로 이미지 최적화 캐시를 쓰지 않는다
+      <img src={src} alt={alt} className={cn("object-cover", className)} />
+    );
+  }
+  const Icon = iconMap[type] ?? Building2;
   return (
     <div
       className={cn(

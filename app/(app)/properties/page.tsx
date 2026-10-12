@@ -3,12 +3,15 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
-import { properties } from "@/lib/mock/properties";
+import { getPropertyList } from "@/lib/queries";
 import { PropertyList } from "./property-list";
 
 export const metadata: Metadata = { title: "매물 관리" };
 
-export default function PropertiesPage() {
+export default async function PropertiesPage({ searchParams }: PageProps<"/properties">) {
+  const { q } = await searchParams;
+  const properties = await getPropertyList();
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -21,7 +24,7 @@ export default function PropertiesPage() {
           </Link>
         }
       />
-      <PropertyList properties={properties} />
+      <PropertyList properties={properties} initialQuery={typeof q === "string" ? q : ""} />
     </div>
   );
 }

@@ -1,70 +1,69 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Building2,
-  CalendarClock,
-  CheckCircle2,
-  Circle,
-  FileSearch,
-  Mic,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, Building2, CalendarClock, FileUp, Plus, UserPlus } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
-import { AnalysisStatusBadge, PropertyStatusBadge } from "@/components/status-badge";
-import { Badge } from "@/components/ui/badge";
+import { DealStageBadge, PropertyStatusBadge } from "@/components/status-badge";
+import { TaskBoard } from "@/components/tasks/task-board";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { aiUsage, currentUser, deals, todayTasks } from "@/lib/mock/dashboard";
-import { documents } from "@/lib/mock/documents";
-import { properties } from "@/lib/mock/properties";
-import { formatPrice } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { getSession } from "@/lib/auth";
+import { formatDate, formatDateTime, formatPrice, todayKst } from "@/lib/format";
+import {
+  getCustomerOptions,
+  getOfficeMembers,
+  getPropertyList,
+  getPropertyOptions,
+  getTasks,
+  todayRange,
+} from "@/lib/queries";
 
 export const metadata: Metadata = { title: "대시보드" };
 
 const quickActions = [
-  {
-    title: "매물 등록",
-    description: "새 매물 정보를 기록해요",
-    href: "/properties/new",
-    icon: Plus,
-  },
-  {
-    title: "임장 기록",
-    description: "사진·음성으로 현장을 남겨요",
-    href: "/properties/p-1002/visit",
-    icon: Mic,
-  },
-  {
-    title: "문서 분석",
-    description: "등기·건축물대장을 분석해요",
-    href: "/documents",
-    icon: FileSearch,
-  },
+  { title: "매물 등록", description: "새 매물 정보를 기록해요", href: "/properties/new", icon: Plus },
+  { title: "고객 등록", description: "고객 조건과 상담을 남겨요", href: "/customers/new", icon: UserPlus },
+  { title: "서류 업로드", description: "등기·건축물대장을 보관해요", href: "/documents", icon: FileUp },
 ];
 
-const usageItems = [
-  { label: "임장 요약", ...aiUsage.visitSummary },
-  { label: "문서 분석", ...aiUsage.documentAnalysis },
-  { label: "브리핑 생성", ...aiUsage.briefing },
-];
+export default async function DashboardPage() {
+  const { supabase, profile } = await getSession();
+  const { todayStart, tomorrowStart } = todayRange();
 
-export default function DashboardPage() {
-  const pendingDocs = documents.filter((d) => d.status !== "검토 완료");
-  const recentProperties = [...properties]
-    .sort((a, b) => b.registeredAt.localeCompare(a.registeredAt))
-    .slice(0, 4);
-  const doneCount = todayTasks.filter((t) => t.done).length;
+  const [tasks, members, propertyOptions, customerOptions, recentProperties, pendingDocs, activeDeals, customerCount] =
+    await Promise.all([
+      getTasks(),
+      getOfficeMembers(),
+      getPropertyOptions(),
+      getCustomerOptions(),
+      getPropertyList(4),
+      supabase
+        .from("documents")
+        .select("id, doc_type, created_at, property:properties(title)")
+        .eq("status", "검토 필요")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("deals")
+        .select("id, stage, contract_date, balance_date, property:properties(title), customer:customers(name)")
+        .not("stage", "in", "(완료,취소)")
+        .order("balance_date", { ascending: true, nullsFirst: false })
+        .limit(6),
+      supabase.from("customers").select("id", { count: "exact", head: true }).eq("status", "진행 중"),
+    ]);
+
+  const stats = [
+    { label: "광고 중 매물", value: propertyOptions.filter((p) => p.status === "광고 중").length, href: "/properties" },
+    { label: "진행 중 고객", value: customerCount.count ?? 0, href: "/customers" },
+    { label: "검토 필요 문서", value: pendingDocs.data?.length ?? 0, href: "/documents?status=검토 필요" },
+    { label: "진행 중 거래", value: activeDeals.data?.length ?? 0, href: "/contracts" },
+  ];
+  const todayCount = tasks.filter((t) => !t.done && t.due_at >= todayStart && t.due_at < tomorrowStart).length;
+  const overdueCount = tasks.filter((t) => !t.done && t.due_at < todayStart).length;
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title={`안녕하세요, ${currentUser.name}님`}
-        description="오늘 처리할 업무와 검토가 필요한 항목을 확인하세요."
-      />
+      <PageHeader title={`안녕하세요, ${profile.name}님`} description="오늘 처리할 업무와 검토가 필요한 항목을 확인하세요." />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {quickActions.map((action) => (
@@ -85,118 +84,98 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((s) => (
+          <Link key={s.label} href={s.href} className="rounded-xl border bg-card p-4 hover:border-primary/40">
+            <p className="text-xs text-muted-foreground">{s.label}</p>
+            <p className="text-2xl font-bold tabular-nums">{s.value}</p>
+          </Link>
+        ))}
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>오늘의 업무</CardTitle>
+            <CardTitle>할 일</CardTitle>
             <CardDescription>
-              {todayTasks.length}건 중 {doneCount}건 완료
+              오늘 {todayCount}건{overdueCount > 0 && ` · 지연 ${overdueCount}건`}
             </CardDescription>
             <CardAction>
-              <Badge variant="secondary">10월 12일 (월)</Badge>
+              <span className="text-xs text-muted-foreground">{todayKst()}</span>
             </CardAction>
           </CardHeader>
-          <CardContent className="space-y-1">
-            {todayTasks.map((task) => (
-              <div
-                key={task.id}
-                className="flex items-center gap-3 rounded-lg px-2 py-2.5 hover:bg-muted/50"
-              >
-                {task.done ? (
-                  <CheckCircle2 className="size-5 text-success" />
-                ) : (
-                  <Circle className="size-5 text-muted-foreground/50" />
-                )}
-                <span className="w-12 text-sm text-muted-foreground tabular-nums">{task.time}</span>
-                <Badge variant="outline" className="w-12 justify-center">
-                  {task.type}
-                </Badge>
-                <span className={cn("flex-1 text-sm", task.done && "text-muted-foreground line-through")}>
-                  {task.title}
-                </span>
-              </div>
-            ))}
+          <CardContent>
+            <TaskBoard
+              tasks={tasks}
+              todayStart={todayStart}
+              tomorrowStart={tomorrowStart}
+              members={members.map((m) => ({ value: m.id, label: m.name }))}
+              properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
+              customers={customerOptions.map((c) => ({ value: c.id, label: c.name }))}
+              emptyText="예정된 할 일이 없어요. 임장·연락 일정을 추가해 보세요."
+            />
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>검토 대기 문서</CardTitle>
-            <CardDescription>AI 분석 결과를 확인해 주세요</CardDescription>
+            <CardTitle>검토 필요 문서</CardTitle>
+            <CardDescription>핵심 항목 확인을 마쳐주세요</CardDescription>
             <CardAction>
               <Link href="/documents" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                 전체
               </Link>
             </CardAction>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {pendingDocs.map((doc) => (
-              <Link
-                key={doc.id}
-                href={doc.status === "검토 필요" ? `/documents/${doc.id}` : "/documents"}
-                className="block space-y-1.5 rounded-lg border p-3 hover:bg-muted/50"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{doc.type}</span>
-                  <AnalysisStatusBadge status={doc.status} />
-                </div>
-                <p className="truncate text-xs text-muted-foreground">{doc.propertyTitle}</p>
+          <CardContent className="space-y-2">
+            {(pendingDocs.data ?? []).length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">검토할 문서가 없어요.</p>
+            )}
+            {pendingDocs.data?.map((doc) => (
+              <Link key={doc.id} href={`/documents/${doc.id}`} className="block space-y-0.5 rounded-lg border p-3 hover:bg-muted/50">
+                <p className="text-sm font-medium">{doc.doc_type}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {doc.property?.title} · {formatDateTime(doc.created_at)}
+                </p>
               </Link>
             ))}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>진행 중 거래</CardTitle>
-            <CardDescription>계약 단계별 진행 상황</CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y">
-            {deals.map((deal) => (
-              <Link
-                key={deal.id}
-                href={`/properties/${deal.propertyId}`}
-                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-                  <Building2 className="size-4 text-muted-foreground" />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{deal.propertyTitle}</p>
-                  <p className="text-xs text-muted-foreground">{deal.customerAlias}</p>
-                </div>
-                <Badge variant="secondary">{deal.stage}</Badge>
-                <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-                  <CalendarClock className="size-3.5" />
-                  {deal.dueDate.slice(5).replace("-", "/")}
-                </span>
-              </Link>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>이번 달 AI 사용량</CardTitle>
-            <CardDescription>{currentUser.plan} 플랜 기준</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {usageItems.map((item) => (
-              <div key={item.label} className="space-y-1.5">
-                <div className="flex justify-between text-sm">
-                  <span>{item.label}</span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {item.used} / {item.limit}
-                  </span>
-                </div>
-                <Progress value={(item.used / item.limit) * 100} />
+      <Card>
+        <CardHeader>
+          <CardTitle>진행 중 거래</CardTitle>
+          <CardDescription>잔금일이 가까운 순서</CardDescription>
+          <CardAction>
+            <Link href="/contracts" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              계약 준비
+              <ArrowRight data-icon="inline-end" />
+            </Link>
+          </CardAction>
+        </CardHeader>
+        <CardContent className="divide-y">
+          {(activeDeals.data ?? []).length === 0 && (
+            <p className="py-6 text-center text-sm text-muted-foreground">진행 중인 거래가 없어요.</p>
+          )}
+          {activeDeals.data?.map((deal) => (
+            <Link key={deal.id} href={`/contracts/${deal.id}`} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                <Building2 className="size-4 text-muted-foreground" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{deal.property?.title}</p>
+                <p className="text-xs text-muted-foreground">{deal.customer?.name ?? "고객 미지정"}</p>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+              <DealStageBadge stage={deal.stage} />
+              <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+                <CalendarClock className="size-3.5" />
+                잔금 {formatDate(deal.balance_date)}
+              </span>
+            </Link>
+          ))}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
@@ -209,18 +188,21 @@ export default function DashboardPage() {
           </CardAction>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {recentProperties.length === 0 && (
+            <p className="col-span-full py-6 text-center text-sm text-muted-foreground">등록된 매물이 없어요.</p>
+          )}
           {recentProperties.map((p) => (
             <Link
               key={p.id}
               href={`/properties/${p.id}`}
               className="overflow-hidden rounded-lg border transition-colors hover:border-primary/40"
             >
-              <PropertyThumbnail type={p.propertyType} className="aspect-video" />
+              <PropertyThumbnail type={p.property_type} src={p.thumbUrl} alt={p.title} className="aspect-video" />
               <div className="space-y-1 p-3">
                 <div className="flex items-center gap-1.5">
                   <PropertyStatusBadge status={p.status} />
                   <span className="text-xs text-muted-foreground">
-                    {p.propertyType} · {p.dealType}
+                    {p.property_type} · {p.deal_type}
                   </span>
                 </div>
                 <p className="truncate text-sm font-medium">{p.title}</p>

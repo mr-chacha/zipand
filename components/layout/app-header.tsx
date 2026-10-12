@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Bell, LogOut, Menu, Search, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Bell, LifeBuoy, LogOut, Menu, Search, Settings, UserRound } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,12 +18,26 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { currentUser } from "@/lib/mock/dashboard";
+import { logout } from "@/lib/actions/auth";
+import { ROLE_LABELS } from "@/lib/constants";
 import { Logo } from "./logo";
 import { SidebarNav } from "./sidebar-nav";
 
-export function AppHeader() {
+interface AppHeaderProps {
+  userName: string;
+  officeName: string;
+  role: string;
+}
+
+export function AppHeader({ userName, officeName, role }: AppHeaderProps) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+
+  const onSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const q = new FormData(e.currentTarget).get("q");
+    if (typeof q === "string" && q.trim()) router.push(`/properties?q=${encodeURIComponent(q.trim())}`);
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur lg:px-6">
@@ -41,44 +56,47 @@ export function AppHeader() {
         </SheetContent>
       </Sheet>
 
-      <div className="relative hidden max-w-md flex-1 md:block">
+      <form onSubmit={onSearch} className="relative hidden max-w-md flex-1 md:block">
         <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="매물명, 주소, 고객 검색" className="pl-8" />
-      </div>
+        <Input name="q" placeholder="매물명, 주소 검색" className="pl-8" />
+      </form>
 
       <div className="ml-auto flex items-center gap-2">
         <Badge variant="secondary" className="hidden sm:inline-flex">
-          {currentUser.plan} 플랜
+          {ROLE_LABELS[role]}
         </Badge>
-        <Button variant="ghost" size="icon" className="relative">
+        <Link href="/notifications" aria-label="알림" className={buttonVariants({ variant: "ghost", size: "icon" })}>
           <Bell />
-          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-destructive" />
-          <span className="sr-only">알림</span>
-        </Button>
+        </Link>
         <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<Button variant="ghost" className="h-9 gap-2 px-1.5" />}
-          >
+          <DropdownMenuTrigger render={<Button variant="ghost" className="h-9 gap-2 px-1.5" />}>
             <Avatar className="size-7">
-              <AvatarFallback className="bg-primary/10 text-xs text-primary">
-                {currentUser.name.slice(0, 1)}
-              </AvatarFallback>
+              <AvatarFallback className="bg-primary/10 text-xs text-primary">{userName.slice(0, 1)}</AvatarFallback>
             </Avatar>
-            <span className="hidden text-sm sm:inline">{currentUser.name}</span>
+            <span className="hidden text-sm sm:inline">{userName}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuGroup>
               <DropdownMenuLabel>
-                <p className="font-medium text-foreground">{currentUser.name}</p>
-                <p className="text-xs">{currentUser.office}</p>
+                <p className="font-medium text-foreground">{userName}</p>
+                <p className="text-xs">{officeName}</p>
               </DropdownMenuLabel>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User />
-              내 계정
+            <DropdownMenuItem render={<Link href="/mypage" />}>
+              <UserRound />
+              마이페이지
             </DropdownMenuItem>
-            <DropdownMenuItem render={<Link href="/login" />}>
+            <DropdownMenuItem render={<Link href="/settings?tab=account" />}>
+              <Settings />
+              계정 설정
+            </DropdownMenuItem>
+            <DropdownMenuItem render={<Link href="/help" />}>
+              <LifeBuoy />
+              고객센터
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => logout()}>
               <LogOut />
               로그아웃
             </DropdownMenuItem>
