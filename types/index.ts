@@ -40,7 +40,12 @@ export interface BriefingSections {
   contact: boolean;
 }
 
+/** 기능을 쓰기 전에 보완이 필요한 정보 */
+export type ProfileNeed = "phone" | "office_name";
+
 export interface ActionState {
   error?: string;
   message?: string;
+  /** 작업 전에 보완해야 할 프로필·사무소 정보 */
+  needs?: ProfileNeed[];
 }

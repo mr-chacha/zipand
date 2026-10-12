@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { toErrorMessage } from "@/lib/errors";
 import type { ActionState } from "@/types";
 
 type FormActionFn = (prev: ActionState | null, fd: FormData) => Promise<ActionState | void>;
@@ -11,7 +12,12 @@ type FormActionFn = (prev: ActionState | null, fd: FormData) => Promise<ActionSt
  */
 export function useFormAction(
   action: FormActionFn,
-  options: { initialState?: ActionState | null; onSuccess?: (state: ActionState, form: HTMLFormElement) => void } = {}
+  options: {
+    initialState?: ActionState | null;
+    onSuccess?: (state: ActionState, form: HTMLFormElement) => void;
+    /** 액션 전에 실행 (파일 업로드 등). FormData에 값을 추가할 수 있고, 던지면 오류로 표시한다. */
+    prepare?: (fd: FormData) => Promise<void>;
+  } = {}
 ) {
   const [state, setState] = useState<ActionState | null>(options.initialState ?? null);
   const [pending, startTransition] = useTransition();
@@ -21,6 +27,14 @@ export function useFormAction(
     const form = e.currentTarget;
     const fd = new FormData(form);
     startTransition(async () => {
+      if (options.prepare) {
+        try {
+          await options.prepare(fd);
+        } catch (error) {
+          setState({ error: toErrorMessage(error) });
+          return;
+        }
+      }
       const result = (await action(state, fd)) ?? null;
       setState(result);
       if (result && !result.error) options.onSuccess?.(result, form);

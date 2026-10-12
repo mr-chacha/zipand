@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { createDocument } from "@/lib/actions/documents";
 import { DOC_TYPES, type DocType } from "@/lib/constants";
 import { formatFileSize } from "@/lib/format";
+import { toErrorMessage } from "@/lib/errors";
 import { uploadToStorage } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
@@ -73,7 +74,7 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
         toast.success("업로드했어요. 핵심 항목을 정리해 주세요.");
         router.push(`/documents/${result.id}`);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : "업로드에 실패했어요.");
+        toast.error(toErrorMessage(e));
       }
     });
   };

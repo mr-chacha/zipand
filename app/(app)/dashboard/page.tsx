@@ -4,19 +4,14 @@ import { ArrowRight, Building2, CalendarClock, FileUp, Plus, UserPlus } from "lu
 import { PageHeader } from "@/components/page-header";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { DealStageBadge, PropertyStatusBadge } from "@/components/status-badge";
-import { TaskBoard } from "@/components/tasks/task-board";
+import { ScheduleCalendar } from "@/components/calendar/schedule-calendar";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
+import { addDays, getCalendarEvents, monthGrid, parseMonth } from "@/lib/calendar";
 import { formatDate, formatDateTime, formatPrice, todayKst } from "@/lib/format";
-import {
-  getCustomerOptions,
-  getOfficeMembers,
-  getPropertyList,
-  getPropertyOptions,
-  getTasks,
-  todayRange,
-} from "@/lib/queries";
+import { getCustomerOptions, getOfficeMembers, getPropertyList, getPropertyOptions } from "@/lib/queries";
+import { GettingStarted } from "./getting-started";
 
 export const metadata: Metadata = { title: "대시보드" };
 
@@ -26,13 +21,17 @@ const quickActions = [
   { title: "서류 업로드", description: "등기·건축물대장을 보관해요", href: "/documents", icon: FileUp },
 ];
 
-export default async function DashboardPage() {
-  const { supabase, profile } = await getSession();
-  const { todayStart, tomorrowStart } = todayRange();
+export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
+  const { month: monthParam } = await searchParams;
+  const { supabase } = await getSession();
+  const month = parseMonth(monthParam);
+  const grid = monthGrid(month);
+  const days: string[] = [];
+  for (let d = grid.start; d <= grid.end; d = addDays(d, 1)) days.push(d);
 
-  const [tasks, members, propertyOptions, customerOptions, recentProperties, pendingDocs, activeDeals, customerCount] =
+  const [events, members, propertyOptions, customerOptions, recentProperties, pendingDocs, activeDeals, customerCount] =
     await Promise.all([
-      getTasks(),
+      getCalendarEvents(grid.start, grid.end),
       getOfficeMembers(),
       getPropertyOptions(),
       getCustomerOptions(),
@@ -58,12 +57,14 @@ export default async function DashboardPage() {
     { label: "검토 필요 문서", value: pendingDocs.data?.length ?? 0, href: "/documents?status=검토 필요" },
     { label: "진행 중 거래", value: activeDeals.data?.length ?? 0, href: "/contracts" },
   ];
-  const todayCount = tasks.filter((t) => !t.done && t.due_at >= todayStart && t.due_at < tomorrowStart).length;
-  const overdueCount = tasks.filter((t) => !t.done && t.due_at < todayStart).length;
+  const today = todayKst();
+  const todayEvents = events.filter((e) => e.date === today && !e.done).length;
 
   return (
     <div className="space-y-6">
-      <PageHeader title={`안녕하세요, ${profile.name}님`} description="오늘 처리할 업무와 검토가 필요한 항목을 확인하세요." />
+      <PageHeader title={`안녕하세요 중개사님`} description="오늘 처리할 업무와 검토가 필요한 항목을 확인하세요." />
+
+      <GettingStarted />
 
       <div className="grid gap-3 sm:grid-cols-3">
         {quickActions.map((action) => (
@@ -93,30 +94,29 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>할 일</CardTitle>
-            <CardDescription>
-              오늘 {todayCount}건{overdueCount > 0 && ` · 지연 ${overdueCount}건`}
-            </CardDescription>
-            <CardAction>
-              <span className="text-xs text-muted-foreground">{todayKst()}</span>
-            </CardAction>
-          </CardHeader>
-          <CardContent>
-            <TaskBoard
-              tasks={tasks}
-              todayStart={todayStart}
-              tomorrowStart={tomorrowStart}
-              members={members.map((m) => ({ value: m.id, label: m.name }))}
-              properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
-              customers={customerOptions.map((c) => ({ value: c.id, label: c.name }))}
-              emptyText="예정된 할 일이 없어요. 임장·연락 일정을 추가해 보세요."
-            />
-          </CardContent>
-        </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>일정</CardTitle>
+          <CardDescription>
+            임장·상담 기록, 계약일·잔금일과 직접 추가한 일정을 한 달 단위로 확인해요 · 오늘 {todayEvents}건
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ScheduleCalendar
+            month={month}
+            prevMonth={grid.prevMonth}
+            nextMonth={grid.nextMonth}
+            days={days}
+            today={today}
+            events={events}
+            members={members.map((m) => ({ value: m.id, label: m.name }))}
+            properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
+            customers={customerOptions.map((c) => ({ value: c.id, label: c.name }))}
+          />
+        </CardContent>
+      </Card>
 
+      <div className="grid gap-6 lg:grid-cols-3">
         <Card>
           <CardHeader>
             <CardTitle>검토 필요 문서</CardTitle>
@@ -141,41 +141,41 @@ export default async function DashboardPage() {
             ))}
           </CardContent>
         </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>진행 중 거래</CardTitle>
-          <CardDescription>잔금일이 가까운 순서</CardDescription>
-          <CardAction>
-            <Link href="/contracts" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              계약 준비
-              <ArrowRight data-icon="inline-end" />
-            </Link>
-          </CardAction>
-        </CardHeader>
-        <CardContent className="divide-y">
-          {(activeDeals.data ?? []).length === 0 && (
-            <p className="py-6 text-center text-sm text-muted-foreground">진행 중인 거래가 없어요.</p>
-          )}
-          {activeDeals.data?.map((deal) => (
-            <Link key={deal.id} href={`/contracts/${deal.id}`} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-              <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-                <Building2 className="size-4 text-muted-foreground" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium">{deal.property?.title}</p>
-                <p className="text-xs text-muted-foreground">{deal.customer?.name ?? "고객 미지정"}</p>
-              </div>
-              <DealStageBadge stage={deal.stage} />
-              <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
-                <CalendarClock className="size-3.5" />
-                잔금 {formatDate(deal.balance_date)}
-              </span>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>진행 중 거래</CardTitle>
+            <CardDescription>잔금일이 가까운 순서</CardDescription>
+            <CardAction>
+              <Link href="/contracts" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                계약 준비
+                <ArrowRight data-icon="inline-end" />
+              </Link>
+            </CardAction>
+          </CardHeader>
+          <CardContent className="divide-y">
+            {(activeDeals.data ?? []).length === 0 && (
+              <p className="py-6 text-center text-sm text-muted-foreground">진행 중인 거래가 없어요.</p>
+            )}
+            {activeDeals.data?.map((deal) => (
+              <Link key={deal.id} href={`/contracts/${deal.id}`} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
+                  <Building2 className="size-4 text-muted-foreground" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{deal.property?.title}</p>
+                  <p className="text-xs text-muted-foreground">{deal.customer?.name ?? "고객 미지정"}</p>
+                </div>
+                <DealStageBadge stage={deal.stage} />
+                <span className="hidden items-center gap-1 text-xs text-muted-foreground sm:flex">
+                  <CalendarClock className="size-3.5" />
+                  잔금 {formatDate(deal.balance_date)}
+                </span>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader>

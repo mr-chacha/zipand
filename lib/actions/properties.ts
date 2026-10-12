@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { DEAL_TYPES, PROPERTY_STATUSES, PROPERTY_TYPES, type PropertyStatus } from "@/lib/constants";
 import { int, lines, num, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
+import { isPropertyPath } from "@/lib/storage";
 import type { ActionState } from "@/types";
 
 function readPropertyForm(fd: FormData) {
@@ -38,24 +39,68 @@ export async function logPropertyEvent(propertyId: string, message: string) {
   await supabase.from("property_events").insert({ property_id: propertyId, actor_id: profile.id, message });
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * 등록 폼에서 미리 올린 사진·동영상 경로. 브라우저가 매물 id를 먼저 만들고
+ * Storage에 업로드한 뒤 경로만 넘긴다.
+ */
+function readMediaPaths(fd: FormData, key: string, officeId: string, propertyId: string) {
+  return fd
+    .getAll(key)
+    .filter((v): v is string => typeof v === "string")
+    .filter((path) => isPropertyPath(path, officeId, propertyId));
+}
+
 export async function createProperty(_prev: ActionState | null, fd: FormData): Promise<ActionState> {
-  const { supabase, profile } = await getSession();
-  let id: string;
+  const { supabase, profile, office } = await getSession();
+  const requestedId = str(fd, "id");
+  const id = requestedId && UUID.test(requestedId) ? requestedId : crypto.randomUUID();
+  const photoPaths = readMediaPaths(fd, "photo_paths", office.id, id);
+  const videoPaths = readMediaPaths(fd, "video_paths", office.id, id);
+  const videoNames = fd.getAll("video_names").map(String);
+  const videoSizes = fd.getAll("video_sizes").map(Number);
+
   try {
     const values = readPropertyForm(fd);
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("properties")
-      .insert({ ...values, manager_id: values.manager_id ?? profile.id, created_by: profile.id })
-      .select("id")
-      .single();
+      .insert({ ...values, id, manager_id: values.manager_id ?? profile.id, created_by: profile.id });
     if (error) throw error;
-    id = data.id;
-    await logPropertyEvent(id, "매물 등록");
+
+    if (photoPaths.length) {
+      const { error: photoError } = await supabase
+        .from("property_photos")
+        .insert(photoPaths.map((storage_path, i) => ({ property_id: id, storage_path, sort_order: i })));
+      if (photoError) throw photoError;
+    }
+    if (videoPaths.length) {
+      const { error: videoError } = await supabase.from("property_videos").insert(
+        videoPaths.map((storage_path, i) => ({
+          property_id: id,
+          storage_path,
+          file_name: videoNames[i] ?? null,
+          size_bytes: Number.isFinite(videoSizes[i]) ? videoSizes[i] : null,
+          sort_order: i,
+        }))
+      );
+      if (videoError) throw videoError;
+    }
+
+    const media = [photoPaths.length && `사진 ${photoPaths.length}장`, videoPaths.length && `동영상 ${videoPaths.length}개`]
+      .filter(Boolean)
+      .join(", ");
+    await logPropertyEvent(id, media ? `매물 등록 (${media})` : "매물 등록");
   } catch (e) {
+    await Promise.all([
+      photoPaths.length && supabase.storage.from("property-photos").remove(photoPaths),
+      videoPaths.length && supabase.storage.from("property-videos").remove(videoPaths),
+    ]);
     return { error: toErrorMessage(e) };
   }
-  revalidatePath("/properties");
-  redirect(`/properties/${id}`);
+  revalidatePath("/", "layout");
+  const next = str(fd, "redirect_to");
+  redirect(next?.startsWith("/setup") ? next : `/properties/${id}`);
 }
 
 export async function updateProperty(id: string, _prev: ActionState | null, fd: FormData): Promise<ActionState> {
@@ -85,8 +130,9 @@ export async function updatePropertyStatus(id: string, status: PropertyStatus): 
 export async function deleteProperty(id: string): Promise<ActionState> {
   const { supabase } = await getSession();
 
-  const [photos, docs, visits] = await Promise.all([
+  const [photos, videos, docs, visits] = await Promise.all([
     supabase.from("property_photos").select("storage_path").eq("property_id", id),
+    supabase.from("property_videos").select("storage_path").eq("property_id", id),
     supabase.from("documents").select("storage_path").eq("property_id", id),
     supabase.from("property_visits").select("audio_path").eq("property_id", id),
   ]);
@@ -95,10 +141,12 @@ export async function deleteProperty(id: string): Promise<ActionState> {
   if (error) return { error: toErrorMessage(error) };
 
   const photoPaths = photos.data?.map((p) => p.storage_path) ?? [];
+  const videoPaths = videos.data?.map((v) => v.storage_path) ?? [];
   const docPaths = docs.data?.map((d) => d.storage_path) ?? [];
   const audioPaths = visits.data?.map((v) => v.audio_path).filter((p): p is string => Boolean(p)) ?? [];
   await Promise.all([
     photoPaths.length && supabase.storage.from("property-photos").remove(photoPaths),
+    videoPaths.length && supabase.storage.from("property-videos").remove(videoPaths),
     docPaths.length && supabase.storage.from("documents").remove(docPaths),
     audioPaths.length && supabase.storage.from("visit-audio").remove(audioPaths),
   ]);
@@ -158,4 +206,51 @@ export async function setCoverPhoto(photoId: string, propertyId: string): Promis
   );
   revalidatePath(`/properties/${propertyId}`);
   return { message: "대표 사진으로 지정했어요." };
+}
+
+export async function addPropertyVideos(
+  propertyId: string,
+  videos: { path: string; name: string; size: number }[]
+): Promise<ActionState> {
+  const { supabase, office } = await getSession();
+  const valid = videos.filter((v) => isPropertyPath(v.path, office.id, propertyId));
+  if (!valid.length) return { error: "추가할 동영상이 없어요." };
+
+  const { count } = await supabase
+    .from("property_videos")
+    .select("id", { count: "exact", head: true })
+    .eq("property_id", propertyId);
+  const { error } = await supabase.from("property_videos").insert(
+    valid.map((v, i) => ({
+      property_id: propertyId,
+      storage_path: v.path,
+      file_name: v.name,
+      size_bytes: v.size,
+      sort_order: (count ?? 0) + i,
+    }))
+  );
+  if (error) {
+    await supabase.storage.from("property-videos").remove(valid.map((v) => v.path));
+    return { error: toErrorMessage(error) };
+  }
+  await logPropertyEvent(propertyId, `동영상 ${valid.length}개 추가`);
+  revalidatePath(`/properties/${propertyId}`);
+  return { message: `동영상 ${valid.length}개를 추가했어요.` };
+}
+
+export async function deletePropertyVideo(videoId: string): Promise<ActionState> {
+  const { supabase } = await getSession();
+  const { data: video } = await supabase
+    .from("property_videos")
+    .select("storage_path, property_id")
+    .eq("id", videoId)
+    .single();
+  if (!video) return { error: "동영상을 찾을 수 없어요." };
+
+  const { error } = await supabase.from("property_videos").delete().eq("id", videoId);
+  if (error) return { error: toErrorMessage(error) };
+  await supabase.storage.from("property-videos").remove([video.storage_path]);
+  await logPropertyEvent(video.property_id, "동영상 삭제");
+  revalidatePath(`/properties/${video.property_id}`);
+  return { message: "동영상을 삭제했어요." };
 }

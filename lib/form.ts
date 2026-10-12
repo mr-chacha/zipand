@@ -47,15 +47,6 @@ export function lines(value: string | null) {
     .filter(Boolean);
 }
 
-/** 사용자에게 그대로 보여줄 수 있는 검증 오류 */
-export class FormError extends Error {}
+import { FormError } from "@/lib/errors";
 
-export function toErrorMessage(error: unknown) {
-  if (error instanceof FormError) return error.message;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String((error as { message: unknown }).message);
-    if (message.includes("row-level security")) return "권한이 없습니다.";
-    return message;
-  }
-  return "요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.";
-}
+export { FormError, toErrorMessage } from "@/lib/errors";

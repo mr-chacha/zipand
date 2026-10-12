@@ -4,12 +4,13 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: Phase 2 — Supabase 연동 완료 (AI·앱·결제 제외 전 기능 동작)
-- **완료**: 인증/사무소, 매물·사진·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크, 고객·상담·후속 일정, 계약 준비(체크리스트·특약), 설정(사무소·구성원 초대·계정·구독 안내), 대시보드
-- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결·마이그레이션 적용 완료. `.env.local`은 원격을 가리킴. 로컬 Docker Supabase는 스키마 변경 검증용
+- **단계**: Phase 2 — Supabase 연동 완료 (AI·앱·결제 제외 전 기능 동작), 가입·온보딩 UX 개선, 대시보드 캘린더
+- **완료**: 인증/사무소(간단 가입·단계별 시작하기), 매물·사진·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크, 고객·상담·후속 일정, 계약 준비(체크리스트·특약), 설정(사무소·구성원 초대·계정·구독 안내), 대시보드(일정 캘린더)
+- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261012180000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`)
 - **다음 작업** (우선순위 순)
-  1. 대시보드 Auth 설정 확인(Site URL, Redirect URL `/auth/confirm`, Confirm email, 최소 비밀번호 8자) 후 원격에서 가입·주요 흐름 점검
-  2. 모바일 레이아웃 점검 — 특히 임장 기록·사진 업로드 (현장 사용)
+  1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행)
+  2. 모바일 레이아웃 점검 — 특히 임장 기록·사진·동영상 업로드, 캘린더 (현장 사용)
+  3. 공개 브리핑에 동영상 노출 (`get_briefing` RPC·Storage 공개 정책 확장)
   3. 목록 페이지네이션(현재 전체 조회), 비밀번호 재설정(이메일) 흐름
   4. 약관·처리방침의 사업자 정보(회사명, 보호책임자, 국외 이전 항목) 확정 후 반영
   5. 소셜 로그인(카카오·네이버·구글) — 현재 "서비스 준비중"
@@ -17,13 +18,12 @@
 
 ## 로컬 개발
 ```bash
-npm run db:start   # Docker 필요. 최소 서비스만 실행 (auth, rest, storage, db)
-npm run db:reset   # 마이그레이션 재적용 (데이터 초기화)
-npm run db:types   # lib/supabase/database.types.ts 재생성
-npm run dev
+npm run dev        # .env.local = 원격 Supabase
+npm run db:push    # 새 마이그레이션 원격 적용
+npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재생성
 ```
-- `.env.local`은 `.env.example`을 복사하고 `npx supabase status`의 URL·publishable key를 넣는다.
-- 로컬은 이메일 인증이 꺼져 있어 가입 즉시 로그인된다.
+- `.env.local`은 `.env.example`을 복사하고 원격 프로젝트 URL·publishable key를 넣는다.
+- 로컬 Docker DB(`npm run db:start`/`db:reset`)는 선택 사항. 쓰려면 `.env.local`을 `npx supabase status` 값으로 바꾸고, 타입은 `supabase gen types typescript --local`로 생성한다.
 
 ## 원격 연결 방법
 1. supabase.com에서 프로젝트 생성 → `npx supabase login` → `npx supabase link --project-ref <ref>`
@@ -41,6 +41,32 @@ npm run dev
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-12 — 간단 가입·단계별 시작하기, 매물 동영상, 대시보드 캘린더
+**작업 요약**
+- 회원가입 간소화: 이메일·비밀번호·필수 약관만 입력(선택 동의 제거), 비밀번호 확인칸·규칙 실시간 체크(8자 이상, 영문·숫자 포함), 비밀번호 보기/숨기기(`components/form/password-input.tsx`, 로그인·설정 공용), 인증 메일 발송 시 "회원가입 완료" 화면
+- 가입 직후 `/onboarding`(이름·사무소명·휴대폰, 건너뛰기 가능, `profiles.onboarded_at`)
+- 단계별 시작하기 `/setup?step=N`: 내 정보 → 사무소 정보 → 첫 매물 → 고객 브리핑 → 구성원 초대(대표 5단계, 구성원 3단계). 순서대로만 진행, 이전 버튼으로 재입력, 대시보드에는 현재 단계 하나만 안내. 완료 후 `/setup`은 마이페이지로 이동(`profiles.setup_completed_at`), 마이페이지 메뉴에서 내 정보·사무소 정보·구성원 관리 수정
+- 기능 사용 중 부족한 정보 보완 다이얼로그(`components/complete-profile-dialog.tsx`): 브리핑 연락처 없을 때 휴대폰, 초대 시 기본 사무소명이면 사무소명
+- 오류 메시지 한국어화: `lib/errors.ts` `toErrorMessage`가 Supabase Auth·Postgres·Storage·네트워크 오류를 한국어로 변환, 미지정 영어 오류는 기본 문구로 대체(원문은 서버 로그 `[unmapped error]`)
+- 매물 사진·동영상: 등록 폼에서 함께 선택(`app/(app)/properties/media-picker.tsx`), 저장 시 브라우저가 매물 id를 먼저 만들고 Storage 업로드 후 경로 전달. 상세에 동영상 카드(`video-manager.tsx`) 추가·재생·삭제. 버킷 `property-videos`(비공개, 50MB, mp4/mov/webm), 테이블 `property_videos`
+- 대시보드 할 일 → 월간 캘린더(`components/calendar/schedule-calendar.tsx`, `lib/calendar.ts`): 일정(할 일)·임장 기록·중개 상담·계약일·잔금일 표시, 날짜 선택 시 일정 목록·일정 추가, 연·월 선택 팝오버, 종류별 필터(localStorage 유지). 할 일 종류에 중도금·잔금 추가
+- `.env.local`을 원격 Supabase로 전환
+
+**변경 파일/화면**
+- 화면: `/signup`, `/login`, `/onboarding`, `/setup`, `/dashboard`, `/mypage`, `/settings`, `/properties/new`, `/properties/[id]`, `/properties/[id]/briefing`
+- 마이그레이션: `20261012150000_onboarding`, `20261012160000_setup_progress`, `20261012170000_property_videos`, `20261012180000_task_types_calendar` (모두 원격 적용)
+- 공통: `lib/errors.ts`, `lib/password.ts`, `lib/profile.ts`, `lib/setup.ts`, `lib/calendar.ts`, `lib/actions/setup.ts`, `lib/use-form-action.ts`(`prepare` 옵션), `components/ui/popover.tsx`
+
+**결정 사항**
+- 시작하기 단계 완료 여부는 데이터(이름·휴대폰, 사무소명·대표 번호, 매물·브리핑·초대 수)로 판단, 마지막 단계 완료/건너뛰기만 `setup_completed_at`으로 저장
+- 구성원 초대 단계만 "나중에 초대할게요" 허용(1인 사무소)
+- 사용자에게 영어 오류 원문을 노출하지 않는다. 새 오류 코드는 `lib/errors.ts` 매핑에 추가
+- 동영상 50MB 제한은 Supabase 무료 플랜 업로드 한도 기준
+
+**남은 TODO**
+- 공개 브리핑 동영상, 동영상 썸네일·순서 변경
+- 원격 환경 수동 점검(위 다음 작업 1)
 
 ### 2026-10-12 — 원격 Supabase 연결
 **작업 요약**

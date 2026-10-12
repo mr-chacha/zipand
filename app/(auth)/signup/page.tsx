@@ -21,26 +21,27 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
   return (
     <div className="space-y-8">
       <Logo className="lg:hidden" />
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold">회원가입</h1>
-        {invite ? (
-          <p className="text-sm text-muted-foreground">
-            <strong className="text-foreground">{invite.office_name}</strong>에서{" "}
-            {ROLE_LABELS[invite.role]}(으)로 초대했어요.
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            가입하면 내 중개사무소 워크스페이스가 만들어지고, 대표로 등록돼요.
-          </p>
-        )}
-      </div>
 
       {inviteToken && !invite ? (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          초대 링크가 만료되었거나 이미 사용되었습니다. 사무소 대표에게 새 초대를 요청해 주세요.
-        </p>
+        <>
+          <h1 className="text-2xl font-bold">회원가입</h1>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            초대 링크가 만료되었거나 이미 사용되었습니다. 사무소 대표에게 새 초대를 요청해 주세요.
+          </p>
+        </>
       ) : (
-        <SignupForm inviteToken={invite ? inviteToken : null} inviteEmail={invite?.email} />
+        <SignupForm
+          inviteToken={invite ? inviteToken : null}
+          inviteEmail={invite?.email}
+          notice={
+            invite && (
+              <>
+                <strong className="text-foreground">{invite.office_name}</strong>에서 {ROLE_LABELS[invite.role]}(으)로
+                초대했어요.
+              </>
+            )
+          }
+        />
       )}
 
       <p className="text-center text-sm text-muted-foreground">

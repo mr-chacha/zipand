@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/layout/app-header";
 import { Logo } from "@/components/layout/logo";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
@@ -7,6 +8,7 @@ import { ROLE_LABELS } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { profile, office } = await getSession();
+  if (!profile.onboarded_at) redirect("/onboarding");
 
   return (
     <div className="flex min-h-screen bg-muted/30">

@@ -13,6 +13,7 @@ import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
 import type { VisitField } from "@/types";
 import { PhotoManager } from "./photo-manager";
+import { VideoManager } from "./video-manager";
 import { LinkedCustomers, PropertyHeaderActions, PropertyStatusSelect } from "./property-actions";
 
 export async function generateMetadata({ params }: PageProps<"/properties/[id]">) {
@@ -33,8 +34,14 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
     .maybeSingle();
   if (!property) notFound();
 
-  const [photos, visits, docs, links, events, customerOptions] = await Promise.all([
+  const [photos, videos, visits, docs, links, events, customerOptions] = await Promise.all([
     supabase.from("property_photos").select("id, storage_path").eq("property_id", id).order("sort_order").order("created_at"),
+    supabase
+      .from("property_videos")
+      .select("id, storage_path, file_name, size_bytes")
+      .eq("property_id", id)
+      .order("sort_order")
+      .order("created_at"),
     supabase.from("property_visits").select("id, visited_at, fields, memo").eq("property_id", id).order("visited_at", { ascending: false }).limit(5),
     supabase.from("documents").select("id, doc_type, file_name, status, created_at").eq("property_id", id).order("created_at", { ascending: false }),
     supabase.from("customer_properties").select("customer:customers(id, name, status, phone)").eq("property_id", id),
@@ -43,7 +50,11 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
   ]);
 
   const photoRows = photos.data ?? [];
-  const urls = await signedUrls(supabase, "property-photos", photoRows.map((p) => p.storage_path));
+  const videoRows = videos.data ?? [];
+  const [urls, videoUrls] = await Promise.all([
+    signedUrls(supabase, "property-photos", photoRows.map((p) => p.storage_path)),
+    signedUrls(supabase, "property-videos", videoRows.map((v) => v.storage_path)),
+  ]);
   const latestVisit = visits.data?.[0];
   const linkedCustomers = (links.data ?? []).map((l) => l.customer).filter((c) => c !== null);
 
@@ -86,6 +97,16 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
             propertyId={id}
             propertyType={property.property_type}
             photos={photoRows.map((p) => ({ id: p.id, url: urls[p.storage_path] ?? null }))}
+          />
+          <VideoManager
+            officeId={office.id}
+            propertyId={id}
+            videos={videoRows.map((v) => ({
+              id: v.id,
+              url: videoUrls[v.storage_path] ?? null,
+              name: v.file_name,
+              size: v.size_bytes,
+            }))}
           />
 
           <Tabs defaultValue="info">

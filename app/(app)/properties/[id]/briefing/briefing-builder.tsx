@@ -5,6 +5,7 @@ import { Copy, ExternalLink, EyeOff, Link2, Loader2, Printer, Trash2 } from "luc
 import { toast } from "sonner";
 import { BriefingView, DEFAULT_SECTIONS, type BriefingData } from "@/components/briefing-view";
 import { ComingSoonButton } from "@/components/coming-soon";
+import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { NativeSelect } from "@/components/form/native-select";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createBriefing, deleteBriefing } from "@/lib/actions/briefings";
 import { formatDate, formatDateTime } from "@/lib/format";
-import type { BriefingSections } from "@/types";
+import type { BriefingSections, ProfileNeed } from "@/types";
 
 const sectionOptions: { key: keyof BriefingSections; label: string }[] = [
   { key: "photos", label: "사진" },
@@ -49,6 +50,7 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
   const [comment, setComment] = useState(defaultComment);
   const [days, setDays] = useState("14");
   const [pending, startTransition] = useTransition();
+  const [needs, setNeeds] = useState<ProfileNeed[]>([]);
 
   const linkUrl = (token: string) => `${typeof window !== "undefined" ? window.location.origin : siteUrl}/b/${token}`;
 
@@ -60,6 +62,10 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
   const create = () =>
     startTransition(async () => {
       const result = await createBriefing(propertyId, sections, comment, Number(days));
+      if (result.needs) {
+        setNeeds(result.needs);
+        return;
+      }
       if (result.error || !result.token) {
         toast.error(result.error ?? "링크를 만들지 못했어요.");
         return;
@@ -69,6 +75,13 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
 
   return (
     <div className="grid gap-6 lg:grid-cols-5">
+      <CompleteProfileDialog
+        needs={needs}
+        onOpenChange={(open) => !open && setNeeds([])}
+        onCompleted={create}
+        title="고객에게 보여줄 연락처가 필요해요"
+        description="브리핑에 중개사 연락처를 포함하려면 휴대폰 번호를 입력해 주세요. 연락처 항목을 끄고 만들 수도 있어요."
+      />
       <div className="space-y-6 lg:col-span-2">
         <Card>
           <CardHeader>

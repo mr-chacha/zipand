@@ -12,7 +12,17 @@ export async function createBriefing(
   comment: string,
   days: number
 ): Promise<ActionState & { token?: string }> {
-  const { supabase, profile } = await getSession();
+  const { supabase, profile, office } = await getSession();
+  if (sections.contact && !profile.phone && !office.phone) {
+    const { data: property } = await supabase
+      .from("properties")
+      .select("manager:profiles!properties_manager_id_fkey(phone)")
+      .eq("id", propertyId)
+      .single();
+    if (!property?.manager?.phone) {
+      return { error: "고객에게 보여줄 연락처가 없어요.", needs: ["phone"] };
+    }
+  }
   const validDays = [3, 7, 14, 30].includes(days) ? days : 14;
   const { data, error } = await supabase
     .from("briefings")

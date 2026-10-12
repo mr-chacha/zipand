@@ -1,6 +1,7 @@
 "use client";
 
 import { FormMessage } from "@/components/form/form-message";
+import { PasswordInput } from "@/components/form/password-input";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,7 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
       </div>
       <div className="space-y-2">
         <Label htmlFor="password">비밀번호</Label>
-        <Input id="password" name="password" type="password" autoComplete="current-password" required />
+        <PasswordInput id="password" name="password" autoComplete="current-password" required />
       </div>
       <FormMessage state={state} />
       <SubmitButton size="lg" className="w-full" pending={pending} pendingText="로그인 중…">

@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { str } from "@/lib/form";
+import { str, toErrorMessage } from "@/lib/form";
+import { validatePassword } from "@/lib/password";
 import type { ActionState } from "@/types";
 
 function safeNext(next: string | null) {
@@ -16,12 +17,7 @@ export async function login(_prev: ActionState | null, formData: FormData): Prom
 
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) {
-    if (error.message.includes("Email not confirmed")) {
-      return { error: "이메일 인증이 완료되지 않았어요. 받은 메일의 인증 링크를 눌러주세요." };
-    }
-    return { error: "이메일 또는 비밀번호가 올바르지 않습니다." };
-  }
+  if (error) return { error: toErrorMessage(error) };
 
   redirect(safeNext(str(formData, "next")));
 }
@@ -29,48 +25,39 @@ export async function login(_prev: ActionState | null, formData: FormData): Prom
 export async function signup(_prev: ActionState | null, formData: FormData): Promise<ActionState> {
   const email = str(formData, "email");
   const password = str(formData, "password");
-  const name = str(formData, "name");
   const inviteToken = str(formData, "invite_token");
-  const officeName = str(formData, "office_name");
 
-  if (!email || !password || !name) return { error: "이름, 이메일, 비밀번호를 입력해 주세요." };
-  if (password.length < 8) return { error: "비밀번호는 8자 이상이어야 합니다." };
-  if (!inviteToken && !officeName) return { error: "사무소 이름을 입력해 주세요." };
+  if (!email || !password) return { error: "이메일과 비밀번호를 입력해 주세요." };
+  const passwordError = validatePassword(password, str(formData, "password_confirm"));
+  if (passwordError) return { error: passwordError };
   if (formData.get("agree_terms") !== "on" || formData.get("agree_privacy") !== "on") {
     return { error: "필수 약관에 동의해 주세요." };
   }
 
+  // 이름·사무소 이름은 가입 후 온보딩에서 받는다. 비어 있으면 가입 트리거가 기본값을 넣는다.
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/confirm?next=/dashboard`,
-      data: {
-        name,
-        phone: str(formData, "phone"),
-        license_no: str(formData, "license_no"),
-        office_name: officeName,
-        invite_token: inviteToken,
-      },
+      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/confirm?next=/onboarding`,
+      data: { invite_token: inviteToken },
     },
   });
 
   if (error) {
-    if (error.message.toLowerCase().includes("already registered")) {
-      return { error: "이미 가입된 이메일입니다." };
+    // 가입 트리거(handle_new_user)가 초대 검증에 실패하면 Auth는 "Database error saving new user"만 돌려준다
+    if (inviteToken && error.message.includes("Database error")) {
+      return { error: "초대 정보가 유효하지 않거나 초대받은 이메일과 달라요." };
     }
-    if (error.message.includes("Database error")) {
-      return { error: "초대 정보가 유효하지 않거나 초대받은 이메일과 다릅니다." };
-    }
-    return { error: error.message };
+    return { error: toErrorMessage(error) };
   }
 
   if (!data.session) {
-    return { message: `${email}로 인증 메일을 보냈어요. 메일의 링크를 누르면 가입이 완료됩니다.` };
+    return { message: `${email}로 인증 메일을 보냈어요.\n메일의 링크를 누르면 가입이 완료됩니다.` };
   }
 
-  redirect("/dashboard");
+  redirect("/onboarding");
 }
 
 export async function logout() {

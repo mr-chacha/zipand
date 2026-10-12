@@ -8,7 +8,7 @@ import { PropertyForm } from "../property-form";
 export const metadata: Metadata = { title: "매물 등록" };
 
 export default async function NewPropertyPage() {
-  const [{ profile }, members] = await Promise.all([getSession(), getOfficeMembers()]);
+  const [{ profile, office }, members] = await Promise.all([getSession(), getOfficeMembers()]);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -18,7 +18,13 @@ export default async function NewPropertyPage() {
         backHref="/properties"
         backLabel="매물 목록"
       />
-      <PropertyForm action={createProperty} members={members} currentUserId={profile.id} cancelHref="/properties" />
+      <PropertyForm
+        action={createProperty}
+        members={members}
+        currentUserId={profile.id}
+        officeId={office.id}
+        cancelHref="/properties"
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createVisit } from "@/lib/actions/visits";
 import { DEFAULT_VISIT_CHECKLIST, VISIT_FIELD_LABELS } from "@/lib/constants";
 import { isoToKstLocal } from "@/lib/format";
+import { toErrorMessage } from "@/lib/errors";
 import { uploadToStorage } from "@/lib/upload-client";
 import { useFormAction } from "@/lib/use-form-action";
 
@@ -65,7 +66,7 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
       const path = await uploadToStorage("visit-audio", officeId, propertyId, file);
       setAudio({ path, name: file.name });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "음성 파일 업로드에 실패했어요.");
+      toast.error(toErrorMessage(e));
     } finally {
       setUploading(false);
     }

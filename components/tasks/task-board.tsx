@@ -135,16 +135,25 @@ export function TaskBoard({
   );
 }
 
-function TaskDialog({
+export function TaskDialog({
   members,
   properties,
   customers,
   fixedCustomerId,
+  defaultDue,
+  trigger,
+  title = "할 일 추가",
+  description = "임장, 연락, 서류 확인 같은 후속 일정을 기록해요.",
 }: {
   members: Option[];
   properties: Option[];
   customers: Option[];
   fixedCustomerId?: string;
+  /** datetime-local 기본값 (YYYY-MM-DDTHH:mm, 한국 시간) */
+  defaultDue?: string;
+  trigger?: React.ReactElement;
+  title?: string;
+  description?: string;
 }) {
   const [open, setOpen] = useState(false);
   const { state, pending, onSubmit, setState } = useFormAction(createTask, {
@@ -164,21 +173,23 @@ function TaskDialog({
     >
       <DialogTrigger
         render={
-          <Button variant="outline" size="sm" className="w-full">
-            <Plus data-icon="inline-start" />
-            할 일 추가
-          </Button>
+          trigger ?? (
+            <Button variant="outline" size="sm" className="w-full">
+              <Plus data-icon="inline-start" />
+              할 일 추가
+            </Button>
+          )
         }
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>할 일 추가</DialogTitle>
-          <DialogDescription>임장, 연락, 서류 확인 같은 후속 일정을 기록해요.</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="task-title">할 일</Label>
-            <Input id="task-title" name="title" placeholder="예: 임대인에게 수리 일정 확인" required />
+            <Label htmlFor="task-title">내용</Label>
+            <Input id="task-title" name="title" placeholder="예: 래미안 102동 잔금, 임대인 수리 일정 확인" required />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -187,7 +198,14 @@ function TaskDialog({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="task-due">일시</Label>
-              <Input id="task-due" name="due_at" type="datetime-local" defaultValue={isoToKstLocal(null)} required />
+              <Input
+                key={defaultDue}
+                id="task-due"
+                name="due_at"
+                type="datetime-local"
+                defaultValue={defaultDue ?? isoToKstLocal(null)}
+                required
+              />
             </div>
           </div>
           {properties.length > 0 && (

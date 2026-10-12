@@ -1,3 +1,4 @@
+import { FormError, toErrorMessage } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/client";
 import { buildStoragePath, type Bucket } from "@/lib/storage";
 
@@ -9,10 +10,12 @@ export async function uploadToStorage(bucket: Bucket, officeId: string, property
     contentType: file.type || undefined,
     upsert: false,
   });
-  if (error) {
-    if (error.message.includes("mime type")) throw new Error("지원하지 않는 파일 형식입니다.");
-    if (error.message.toLowerCase().includes("size")) throw new Error("파일 크기가 너무 큽니다.");
-    throw new Error(error.message);
-  }
+  if (error) throw new FormError(toErrorMessage(error));
   return path;
+}
+
+/** 업로드 도중 실패했을 때 이미 올라간 파일 정리 */
+export async function removeFromStorage(bucket: Bucket, paths: string[]) {
+  if (!paths.length) return;
+  await createClient().storage.from(bucket).remove(paths);
 }

@@ -73,9 +73,14 @@ export default async function MyPage() {
   ];
 
   const menu = [
-    { label: "계정 정보 수정", href: "/settings?tab=account", icon: Pencil },
+    { label: "내 정보 수정", href: "/settings?tab=account", icon: Pencil },
     { label: "비밀번호 변경", href: "/settings?tab=account", icon: KeyRound },
-    { label: "사무소 정보", href: "/settings?tab=office", icon: Building2 },
+    { label: profile.role === "owner" ? "사무소 정보 수정" : "사무소 정보", href: "/settings?tab=office", icon: Building2 },
+    {
+      label: profile.role === "owner" ? "구성원 관리 (소속중개사·중개보조원 초대)" : "구성원 보기",
+      href: "/settings?tab=members",
+      icon: Users,
+    },
     { label: "알림 설정", href: "/notifications", icon: Bell, comingSoon: true },
     { label: "고객센터", href: "/help", icon: LifeBuoy },
     { label: "이용약관", href: "/terms", icon: FileText },

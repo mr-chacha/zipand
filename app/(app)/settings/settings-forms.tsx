@@ -1,11 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Copy, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
+import { PasswordInput } from "@/components/form/password-input";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,7 @@ import { changePassword, createInvite, revokeInvite, updateMember, updateOffice,
 import { ROLE_LABELS, VERIFICATION_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { useFormAction } from "@/lib/use-form-action";
-import type { Office, Profile } from "@/types";
+import type { ActionState, Office, Profile, ProfileNeed } from "@/types";
 
 function Field({
   label,
@@ -102,8 +104,14 @@ export function AccountForms({ profile }: { profile: Profile }) {
         </CardHeader>
         <CardContent>
           <form onSubmit={password.onSubmit} className="space-y-4">
-            <Field label="새 비밀번호" name="password" type="password" autoComplete="new-password" minLength={8} required />
-            <Field label="새 비밀번호 확인" name="password_confirm" type="password" autoComplete="new-password" required />
+            <div className="space-y-1.5">
+              <Label htmlFor="password">새 비밀번호</Label>
+              <PasswordInput id="password" name="password" autoComplete="new-password" placeholder="영문·숫자 포함 8자 이상" required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="password_confirm">새 비밀번호 확인</Label>
+              <PasswordInput id="password_confirm" name="password_confirm" autoComplete="new-password" required />
+            </div>
             <FormMessage state={password.state} />
             <div className="flex justify-end">
               <SubmitButton pending={password.pending}>변경</SubmitButton>
@@ -149,7 +157,16 @@ export function MemberManager({
   siteUrl: string;
 }) {
   const [pending, startTransition] = useTransition();
-  const invite = useFormAction(createInvite, {
+  const [needs, setNeeds] = useState<ProfileNeed[]>([]);
+  const inviteForm = useRef<HTMLFormElement>(null);
+  const invite = useFormAction(async (prev: ActionState | null, fd: FormData) => {
+    const result = await createInvite(prev, fd);
+    if (result.needs) {
+      setNeeds(result.needs);
+      return;
+    }
+    return result;
+  }, {
     onSuccess: (r, form) => {
       form.reset();
       if (r.message) toast.success(r.message);
@@ -232,7 +249,14 @@ export function MemberManager({
             <CardDescription>초대 링크로 가입하면 이 사무소의 구성원이 돼요. 링크는 7일간 유효해요.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form onSubmit={invite.onSubmit} className="flex flex-col gap-2 sm:flex-row">
+            <CompleteProfileDialog
+              needs={needs}
+              onOpenChange={(open) => !open && setNeeds([])}
+              onCompleted={() => inviteForm.current?.requestSubmit()}
+              title="사무소 이름을 먼저 정해주세요"
+              description="초대받은 분이 어느 사무소에 합류하는지 알 수 있도록 사무소 이름이 필요해요."
+            />
+            <form ref={inviteForm} onSubmit={invite.onSubmit} className="flex flex-col gap-2 sm:flex-row">
               <Input name="email" type="email" placeholder="초대할 이메일" required className="flex-1" />
               <NativeSelect
                 name="role"

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { Button } from "@/components/ui/button";
 import { addPropertyPhotos, deletePropertyPhoto, setCoverPhoto } from "@/lib/actions/properties";
+import { toErrorMessage } from "@/lib/errors";
 import { uploadToStorage } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
 
@@ -40,7 +41,7 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos }: Pho
       if (result.error) toast.error(result.error);
       else toast.success(`사진 ${paths.length}장을 추가했어요.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "업로드에 실패했어요.");
+      toast.error(toErrorMessage(e));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";

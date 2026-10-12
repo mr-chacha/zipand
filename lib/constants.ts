@@ -6,7 +6,7 @@ export const DOC_STATUSES = ["검토 필요", "검토 완료"] as const;
 export const SIGNAL_LEVELS = ["전문가 검토", "확인 필요", "참고"] as const;
 export const CUSTOMER_STATUSES = ["진행 중", "계약 완료", "보류", "종료"] as const;
 export const CONSULT_CHANNELS = ["방문", "전화", "메시지", "기타"] as const;
-export const TASK_TYPES = ["임장", "상담", "문서", "계약", "연락", "기타"] as const;
+export const TASK_TYPES = ["임장", "상담", "문서", "계약", "중도금", "잔금", "연락", "기타"] as const;
 export const DEAL_STAGES = ["조건 협의", "서류 확인", "계약 준비", "잔금 대기", "완료", "취소"] as const;
 export const DIRECTIONS = ["남향", "남동향", "남서향", "동향", "서향", "북향", "북동향", "북서향"] as const;
 
