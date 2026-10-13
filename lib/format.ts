@@ -26,6 +26,19 @@ export function toPyeong(areaM2: number | null | undefined) {
   return (Number(areaM2) / 3.3058).toFixed(1);
 }
 
+/** "25만원 (전기·수도 포함)" / "없음" / null(정보 없음) */
+export function formatMaintenance(p: {
+  maintenance_fee: number | null;
+  maintenance_status?: string | null;
+  maintenance_items?: string[] | null;
+}) {
+  if (p.maintenance_status === "없음") return "없음";
+  const items = p.maintenance_items?.length ? `${p.maintenance_items.join("·")} 포함` : "";
+  if (p.maintenance_fee !== null) return items ? `${p.maintenance_fee}만원 (${items})` : `${p.maintenance_fee}만원`;
+  if (p.maintenance_status === "있음") return items ? `있음 (${items})` : "있음";
+  return null;
+}
+
 export function formatAvailableFrom(p: { available_from: string | null; available_negotiable?: boolean | null }) {
   return p.available_negotiable ? "협의 가능" : formatDate(p.available_from);
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ComingSoonPanel } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
+import { AreaInput, MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { DatePicker } from "@/components/form/date-picker";
@@ -16,6 +17,7 @@ import { DEAL_TYPES, DIRECTIONS, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib
 import { useFormAction } from "@/lib/use-form-action";
 import { removeFromStorage, uploadToStorage } from "@/lib/upload-client";
 import type { ActionState, Property } from "@/types";
+import { MaintenanceField } from "./maintenance-field";
 import { MediaPicker, type PickedMedia } from "./media-picker";
 
 function ChoiceGroup({
@@ -49,6 +51,12 @@ function ChoiceGroup({
     </div>
   );
 }
+
+const CONTACT_ROLES = [
+  { key: "landlord", label: "임대인" },
+  { key: "caretaker", label: "관리인" },
+  { key: "tenant", label: "세입자" },
+] as const;
 
 interface PropertyFormProps {
   action: (prev: ActionState | null, fd: FormData) => Promise<ActionState>;
@@ -185,26 +193,21 @@ export function PropertyForm({
         <CardContent className="grid gap-5 sm:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="price">{dealType === "매매" ? "매매가" : "보증금"} (만원) *</Label>
-            <Input id="price" name="price" inputMode="numeric" defaultValue={d?.price ?? ""} placeholder="예) 52000" required />
+            <MoneyInput id="price" name="price" defaultValue={d?.price} placeholder="예) 52,000" required />
           </div>
           <div className="space-y-2">
             <Label htmlFor="monthly_rent">월세 (만원)</Label>
-            <Input
+            <MoneyInput
               id="monthly_rent"
               name="monthly_rent"
-              inputMode="numeric"
-              defaultValue={d?.monthly_rent ?? ""}
+              defaultValue={d?.monthly_rent}
               placeholder={dealType === "월세" ? "예) 85" : "월세 거래만 입력"}
               disabled={dealType !== "월세"}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="area_m2">전용면적 (㎡)</Label>
-            <Input id="area_m2" name="area_m2" inputMode="decimal" defaultValue={d?.area_m2 ?? ""} placeholder="예) 84.9" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="maintenance_fee">관리비 (만원)</Label>
-            <Input id="maintenance_fee" name="maintenance_fee" inputMode="numeric" defaultValue={d?.maintenance_fee ?? ""} placeholder="예) 25" />
+            <AreaInput id="area_m2" name="area_m2" defaultValue={d?.area_m2} placeholder="예) 84.9" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
@@ -256,6 +259,28 @@ export function PropertyForm({
               )}
             </div>
           </div>
+          <MaintenanceField status={d?.maintenance_status} fee={d?.maintenance_fee} items={d?.maintenance_items} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>관계자 연락처</CardTitle>
+          <CardDescription>사무소 내부에서만 보이고 고객 브리핑에는 노출되지 않아요</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-5 sm:grid-cols-3">
+          {CONTACT_ROLES.map(({ key, label }) => (
+            <div key={key} className="space-y-2">
+              <Label htmlFor={`${key}_phone`}>{label} 연락처</Label>
+              <Input
+                id={`${key}_phone`}
+                name={`${key}_phone`}
+                type="tel"
+                defaultValue={d?.[`${key}_phone`] ?? ""}
+                placeholder="예) 010-0000-0000"
+              />
+            </div>
+          ))}
         </CardContent>
       </Card>
 

@@ -29,8 +29,18 @@ export default async function BriefingPage({ params }: PageProps<"/properties/[i
   const paths = (photos.data ?? []).map((p) => p.storage_path);
   const urls = await signedUrls(supabase, "property-photos", paths);
 
+  /* eslint-disable @typescript-eslint/no-unused-vars -- 비공개 필드는 브리핑 미리보기(클라이언트)로 넘기지 않는다 */
+  const {
+    internal_memo,
+    landlord_phone,
+    caretaker_phone,
+    tenant_phone,
+    address,
+    ...publicProperty
+  } = property;
+  /* eslint-enable @typescript-eslint/no-unused-vars */
   const data: BriefingData = {
-    property: { ...property, area_m2: property.area_m2 === null ? null : Number(property.area_m2) },
+    property: { ...publicProperty, area_m2: property.area_m2 === null ? null : Number(property.area_m2) },
     photoUrls: paths.map((p) => urls[p]).filter(Boolean),
     followUps: latestVisit.data?.follow_ups ?? [],
     office: { name: office.name, phone: office.phone, address: office.address },

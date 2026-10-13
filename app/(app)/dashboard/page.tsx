@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Building2, CalendarClock, FileUp, Plus, UserPlus } from "lucide-react";
+import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { DealStageBadge, PropertyStatusBadge } from "@/components/status-badge";
@@ -11,16 +12,17 @@ import { getSession } from "@/lib/auth";
 import { addDays, getCalendarEvents, monthGrid, parseMonth } from "@/lib/calendar";
 import { CUSTOMER_CLOSED_STATUSES } from "@/lib/constants";
 import { formatDate, formatDateTime, formatPrice, todayKst } from "@/lib/format";
+import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions, getOfficeMembers, getPropertyList, getPropertyOptions } from "@/lib/queries";
 import { GettingStarted } from "./getting-started";
 
 export const metadata: Metadata = { title: "대시보드" };
 
 const quickActions = [
-  { title: "매물 등록", description: "새 매물 정보를 기록해요", href: "/properties/new", icon: Plus },
-  { title: "고객 등록", description: "고객 조건과 상담을 남겨요", href: "/customers/new", icon: UserPlus },
-  { title: "서류 업로드", description: "등기·건축물대장을 보관해요", href: "/documents", icon: FileUp },
-];
+  { title: "매물 등록", description: "새 매물 정보를 기록해요", href: "/properties/new", icon: Plus, kind: "property" },
+  { title: "고객 등록", description: "고객 조건과 상담을 남겨요", href: "/customers/new", icon: UserPlus, kind: "customer" },
+  { title: "서류 업로드", description: "등기·건축물대장을 보관해요", href: "/documents", icon: FileUp, kind: "document" },
+] as const;
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const { month: monthParam } = await searchParams;
@@ -30,7 +32,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const days: string[] = [];
   for (let d = grid.start; d <= grid.end; d = addDays(d, 1)) days.push(d);
 
-  const [events, members, propertyOptions, customerOptions, recentProperties, pendingDocs, activeDeals, customerCount] =
+  const [events, members, propertyOptions, customerOptions, recentProperties, pendingDocs, activeDeals, customerCount, gate] =
     await Promise.all([
       getCalendarEvents(grid.start, grid.end),
       getOfficeMembers(),
@@ -53,10 +55,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         .from("customers")
         .select("id", { count: "exact", head: true })
         .not("status", "in", `(${CUSTOMER_CLOSED_STATUSES.map((s) => `"${s}"`).join(",")})`),
+      getOfficeGate(),
     ]);
 
   const stats = [
-    { label: "광고 중 매물", value: propertyOptions.filter((p) => p.status === "광고 중").length, href: "/properties" },
+    { label: "등록 매물", value: propertyOptions.length, href: "/properties" },
     { label: "관리 중 고객", value: customerCount.count ?? 0, href: "/customers" },
     { label: "검토 필요 문서", value: pendingDocs.data?.length ?? 0, href: "/documents?status=검토 필요" },
     { label: "진행 중 거래", value: activeDeals.data?.length ?? 0, href: "/contracts" },
@@ -72,10 +75,13 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       <div className="grid gap-3 sm:grid-cols-3">
         {quickActions.map((action) => (
-          <Link
+          <GatedLink
             key={action.title}
             href={action.href}
-            className="group flex items-center gap-4 rounded-xl border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+            kind={action.kind}
+            blocked={gate.blocked[action.kind]}
+            isOwner={gate.isOwner}
+            className="group flex items-center gap-4 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-primary/5"
           >
             <span className="flex size-11 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <action.icon className="size-5" />
@@ -85,7 +91,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               <p className="text-xs text-muted-foreground">{action.description}</p>
             </div>
             <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
+          </GatedLink>
         ))}
       </div>
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { ComingSoonPanel } from "@/components/coming-soon";
+import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { DealStageBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSession } from "@/lib/auth";
 import { formatDate, formatManwon } from "@/lib/format";
+import { getOfficeGate } from "@/lib/office-gate";
 import { ClauseLibrary } from "./clause-library";
 
 export const metadata: Metadata = { title: "계약 준비" };
@@ -19,7 +21,7 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
   const keyword = typeof q === "string" ? q.trim() : "";
   const { supabase } = await getSession();
 
-  const [{ data: deals }, { data: officeClauses }] = await Promise.all([
+  const [{ data: deals }, { data: officeClauses }, gate] = await Promise.all([
     supabase
       .from("deals")
       .select(
@@ -27,6 +29,7 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
       )
       .order("updated_at", { ascending: false }),
     supabase.from("office_clauses").select("id, category, title, body").order("created_at", { ascending: false }),
+    getOfficeGate(),
   ]);
 
   const matched = keyword
@@ -79,10 +82,10 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
         title="계약 준비"
         description="거래별 확인 체크리스트와 특약을 정리해요. 최종 계약서 작성 전 단계를 돕는 기능이에요."
         actions={
-          <Link href="/contracts/new" className={buttonVariants()}>
+          <GatedLink href="/contracts/new" kind="deal" blocked={gate.blocked.deal} isOwner={gate.isOwner} className={buttonVariants()}>
             <Plus data-icon="inline-start" />
-            거래 시작
-          </Link>
+            계약 시작
+          </GatedLink>
         }
       />
 

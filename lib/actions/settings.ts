@@ -83,12 +83,12 @@ export async function updateOffice(_prev: ActionState | null, fd: FormData): Pro
   const { supabase, profile, office } = await getSession();
   if (profile.role !== "owner") return { error: OWNER_ONLY };
   try {
+    const registered = office.registered_at !== null;
     const { error } = await supabase
       .from("offices")
       .update({
         name: requiredStr(fd, "name", "사무소명"),
-        registration_no: str(fd, "registration_no"),
-        representative: str(fd, "representative"),
+        ...(!registered && { registration_no: str(fd, "registration_no"), representative: str(fd, "representative") }),
         phone: str(fd, "phone"),
         address: str(fd, "address"),
       })

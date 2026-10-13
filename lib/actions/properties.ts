@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { DEAL_TYPES, PROPERTY_STATUSES, PROPERTY_TYPES, type PropertyStatus } from "@/lib/constants";
+import { DEAL_TYPES, MAINTENANCE_STATUSES, PROPERTY_STATUSES, PROPERTY_TYPES, type PropertyStatus } from "@/lib/constants";
 import { int, lines, num, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
 import { isPropertyPath } from "@/lib/storage";
 import type { ActionState } from "@/types";
@@ -11,6 +11,16 @@ import type { ActionState } from "@/types";
 function readPropertyForm(fd: FormData) {
   const deal_type = oneOf(fd, "deal_type", DEAL_TYPES, "거래 유형");
   const availableMode = str(fd, "available_mode");
+  const maintenanceStatus = MAINTENANCE_STATUSES.find((s) => s === str(fd, "maintenance_status")) ?? null;
+  const maintenanceItems =
+    maintenanceStatus === "있음"
+      ? [
+          ...new Set([
+            ...fd.getAll("maintenance_items").map(String),
+            ...(str(fd, "maintenance_custom") ?? "").split(",").map((s) => s.trim()),
+          ]),
+        ].filter(Boolean)
+      : [];
   return {
     title: requiredStr(fd, "title", "매물명"),
     address: requiredStr(fd, "address", "주소"),
@@ -20,7 +30,9 @@ function readPropertyForm(fd: FormData) {
     status: oneOf(fd, "status", PROPERTY_STATUSES, "상태"),
     price: int(fd, "price") ?? 0,
     monthly_rent: deal_type === "월세" ? int(fd, "monthly_rent") : null,
-    maintenance_fee: int(fd, "maintenance_fee"),
+    maintenance_status: maintenanceStatus,
+    maintenance_fee: maintenanceStatus === "있음" ? int(fd, "maintenance_fee") : null,
+    maintenance_items: maintenanceItems,
     area_m2: num(fd, "area_m2"),
     floor: int(fd, "floor"),
     total_floors: int(fd, "total_floors"),
@@ -33,6 +45,9 @@ function readPropertyForm(fd: FormData) {
     description: str(fd, "description"),
     highlights: lines(str(fd, "highlights")),
     internal_memo: str(fd, "internal_memo"),
+    landlord_phone: str(fd, "landlord_phone"),
+    caretaker_phone: str(fd, "caretaker_phone"),
+    tenant_phone: str(fd, "tenant_phone"),
   };
 }
 

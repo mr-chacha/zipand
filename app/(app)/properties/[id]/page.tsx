@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Compass, FileText, Layers, Lock, Maximize, Mic, Presentation, Upload, Users } from "lucide-react";
+import { Compass, FileText, Layers, Lock, Maximize, Mic, Phone, Presentation, Upload, Users } from "lucide-react";
+import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { DocStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +9,8 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSession } from "@/lib/auth";
-import { formatAvailableFrom, formatDate, formatDateTime, formatPrice, toPyeong } from "@/lib/format";
+import { formatAvailableFrom, formatDate, formatMaintenance, formatDateTime, formatPrice, toPyeong } from "@/lib/format";
+import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
 import type { VisitField } from "@/types";
@@ -34,7 +36,7 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
     .maybeSingle();
   if (!property) notFound();
 
-  const [photos, videos, visits, docs, links, events, customerOptions] = await Promise.all([
+  const [photos, videos, visits, docs, links, events, customerOptions, gate] = await Promise.all([
     supabase.from("property_photos").select("id, storage_path").eq("property_id", id).order("sort_order").order("created_at"),
     supabase
       .from("property_videos")
@@ -47,6 +49,7 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
     supabase.from("customer_properties").select("customer:customers(id, name, status, phone)").eq("property_id", id),
     supabase.from("property_events").select("id, message, created_at, actor:profiles(name)").eq("property_id", id).order("created_at", { ascending: false }).limit(30),
     getCustomerOptions(),
+    getOfficeGate(),
   ]);
 
   const photoRows = photos.data ?? [];
@@ -80,10 +83,16 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
           <Mic data-icon="inline-start" />
           임장 기록
         </Link>
-        <Link href={`/documents?property=${id}`} className={buttonVariants({ variant: "outline" })}>
+        <GatedLink
+          href={`/documents?property=${id}`}
+          kind="document"
+          blocked={gate.blocked.document}
+          isOwner={gate.isOwner}
+          className={buttonVariants({ variant: "outline" })}
+        >
           <Upload data-icon="inline-start" />
           서류 업로드
-        </Link>
+        </GatedLink>
         <Link href={`/properties/${id}/briefing`} className={buttonVariants()}>
           <Presentation data-icon="inline-start" />
           고객 브리핑
@@ -188,10 +197,16 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
                 <CardHeader>
                   <CardTitle>공부서류</CardTitle>
                   <CardAction>
-                    <Link href={`/documents?property=${id}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    <GatedLink
+                      href={`/documents?property=${id}`}
+                      kind="document"
+                      blocked={gate.blocked.document}
+                      isOwner={gate.isOwner}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
                       <Upload data-icon="inline-start" />
                       업로드
-                    </Link>
+                    </GatedLink>
                   </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-2">
@@ -262,7 +277,7 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
               <p className="text-3xl font-bold text-primary">{formatPrice(property)}</p>
               <dl className="space-y-2 text-sm">
                 {[
-                  ["관리비", property.maintenance_fee !== null ? `${property.maintenance_fee}만원` : "-"],
+                  ["관리비", formatMaintenance(property) ?? "-"],
                   ["방 / 욕실", `${property.rooms ?? "-"} / ${property.baths ?? "-"}`],
                   ["입주 가능일", formatAvailableFrom(property)],
                   ["담당자", property.manager?.name ?? "-"],
@@ -272,6 +287,41 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
                   <div key={label} className="flex justify-between gap-4">
                     <dt className="text-muted-foreground">{label}</dt>
                     <dd className="text-right">{value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card className="border-dashed">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-1.5 text-sm">
+                <Lock className="size-4" />
+                관계자 연락처
+              </CardTitle>
+              <CardDescription>고객 브리핑에 노출되지 않아요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-2.5 text-sm">
+                {(
+                  [
+                    ["임대인", property.landlord_phone],
+                    ["관리인", property.caretaker_phone],
+                    ["세입자", property.tenant_phone],
+                  ] as const
+                ).map(([label, phone]) => (
+                  <div key={label} className="flex items-center justify-between gap-4">
+                    <dt className="shrink-0 text-muted-foreground">{label}</dt>
+                    <dd className="min-w-0 text-right">
+                      {phone ? (
+                        <a href={`tel:${phone}`} className="inline-flex items-center gap-1 text-primary">
+                          <Phone className="size-3.5" />
+                          {phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </dd>
                   </div>
                 ))}
               </dl>

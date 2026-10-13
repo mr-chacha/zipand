@@ -1,6 +1,6 @@
 import { MapPin, Phone } from "lucide-react";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
-import { formatAvailableFrom, formatPrice, toPyeong } from "@/lib/format";
+import { formatAvailableFrom, formatMaintenance, formatPrice, toPyeong } from "@/lib/format";
 import type { BriefingSections } from "@/types";
 
 export interface BriefingData {
@@ -12,6 +12,8 @@ export interface BriefingData {
     price: number;
     monthly_rent: number | null;
     maintenance_fee: number | null;
+    maintenance_status?: string | null;
+    maintenance_items?: string[];
     area_m2: number | null;
     floor: number | null;
     total_floors: number | null;
@@ -55,7 +57,7 @@ export function BriefingView({
     { label: "층", value: p.floor ? `${p.floor}${p.total_floors ? `/${p.total_floors}` : ""}층` : null },
     { label: "방향", value: p.direction },
     { label: "방/욕실", value: p.rooms !== null ? `${p.rooms} / ${p.baths ?? "-"}` : null },
-    { label: "관리비", value: p.maintenance_fee !== null ? `${p.maintenance_fee}만원` : null },
+    { label: "관리비", value: formatMaintenance(p) },
     {
       label: "입주 가능일",
       value: p.available_negotiable || p.available_from ? formatAvailableFrom(p) : null,

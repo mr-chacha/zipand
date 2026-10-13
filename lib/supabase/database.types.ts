@@ -732,7 +732,9 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          registered_at: string | null
           registration_no: string | null
+          registry_data: Json | null
           representative: string | null
         }
         Insert: {
@@ -741,7 +743,9 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          registered_at?: string | null
           registration_no?: string | null
+          registry_data?: Json | null
           representative?: string | null
         }
         Update: {
@@ -750,7 +754,9 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          registered_at?: string | null
           registration_no?: string | null
+          registry_data?: Json | null
           representative?: string | null
         }
         Relationships: []
@@ -815,6 +821,7 @@ export type Database = {
           available_from: string | null
           available_negotiable: boolean
           baths: number | null
+          caretaker_phone: string | null
           created_at: string
           created_by: string | null
           deal_type: string
@@ -824,7 +831,10 @@ export type Database = {
           highlights: string[]
           id: string
           internal_memo: string | null
+          landlord_phone: string | null
           maintenance_fee: number | null
+          maintenance_items: string[]
+          maintenance_status: string | null
           manager_id: string | null
           monthly_rent: number | null
           office_id: string
@@ -833,6 +843,7 @@ export type Database = {
           region: string | null
           rooms: number | null
           status: string
+          tenant_phone: string | null
           title: string
           total_floors: number | null
           updated_at: string
@@ -843,6 +854,7 @@ export type Database = {
           available_from?: string | null
           available_negotiable?: boolean
           baths?: number | null
+          caretaker_phone?: string | null
           created_at?: string
           created_by?: string | null
           deal_type: string
@@ -852,7 +864,10 @@ export type Database = {
           highlights?: string[]
           id?: string
           internal_memo?: string | null
+          landlord_phone?: string | null
           maintenance_fee?: number | null
+          maintenance_items?: string[]
+          maintenance_status?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
           office_id?: string
@@ -861,6 +876,7 @@ export type Database = {
           region?: string | null
           rooms?: number | null
           status?: string
+          tenant_phone?: string | null
           title: string
           total_floors?: number | null
           updated_at?: string
@@ -871,6 +887,7 @@ export type Database = {
           available_from?: string | null
           available_negotiable?: boolean
           baths?: number | null
+          caretaker_phone?: string | null
           created_at?: string
           created_by?: string | null
           deal_type?: string
@@ -880,7 +897,10 @@ export type Database = {
           highlights?: string[]
           id?: string
           internal_memo?: string | null
+          landlord_phone?: string | null
           maintenance_fee?: number | null
+          maintenance_items?: string[]
+          maintenance_status?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
           office_id?: string
@@ -889,6 +909,7 @@ export type Database = {
           region?: string | null
           rooms?: number | null
           status?: string
+          tenant_phone?: string | null
           title?: string
           total_floors?: number | null
           updated_at?: string

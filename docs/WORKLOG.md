@@ -6,8 +6,9 @@
 ## 현재 상태
 - **단계**: Phase 2 — Supabase 연동 완료 (AI·앱·결제 제외 전 기능 동작), 가입·온보딩 UX 개선, 대시보드 캘린더
 - **완료**: 인증/사무소(간단 가입·단계별 시작하기), 매물·사진·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크, 고객·상담·후속 일정, 계약 준비(체크리스트·특약), 설정(사무소·구성원 초대·계정·구독 안내), 대시보드(일정 캘린더)
-- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261012200000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`)
+- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261013130000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 사무소 조회용 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털 인증키, 서버 전용) 필요
 - **다음 작업** (우선순위 순)
+  0. `.env.local`에 `DATA_GO_KR_SERVICE_KEY` 넣고 `/office/register`에서 실제 조회·등록 확인 (API 응답 필드명·정확 일치 검색 여부 검증). 미등록 상태에서 매물·고객 2건째, 문서·계약 진입 시 모달/안내 동작 점검
   1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행). 새 날짜 선택기(`components/form/date-picker.tsx`)는 브라우저 미확인 — 모든 날짜 입력 화면에서 확인·취소, 시간 선택, 폼 초기화 동작 점검
   2. 선택 입력 날짜(입주 희망일·계약일·잔금일·발급일)를 비우는 방법 필요 여부 결정 (현재 날짜 선택기에 확인·취소만 있음)
   2. 모바일 레이아웃 점검 — 특히 임장 기록·사진·동영상 업로드, 캘린더 (현장 사용)
@@ -42,6 +43,35 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-13 — 매물 연락처·금액/면적 입력, 관리비 항목, 파비콘, 사무소 등록 제한·공공데이터 조회
+**작업 요약**
+- 매물 관계자 연락처: 임대인·관리인·세입자 전화번호(이름 없음). 매물 상세 "관계자 연락처" 카드(`tel:` 링크), 공개 브리핑에는 미노출
+- 전화번호 입력 자동 포맷(010-0000-0000, 02·1588 대응) — `components/ui/input.tsx`의 `type="tel"` 공통 처리
+- 금액 입력: 콤마 포맷 + 입력칸 끝에 한글 금액(만원 단위, 10,000 → 일억원). 면적 입력: 끝에 평수(소수 둘째 자리) — `components/form/number-input.tsx`(`MoneyInput`, `AreaInput`)
+- 관리비: 있음/없음 드롭다운, 있음이면 금액 + 포함 항목 체크박스 복수 선택(전기·수도·가스·인터넷·TV·주차·공용관리비·직접 입력). 상세·브리핑에 "25만원 (전기·수도 포함)" 형식 표시
+- "거래 시작" → "계약 시작" 명칭 변경
+- 체크박스 선택 시 레이아웃 흔들림 수정(숨김 input이 `space-y` 마지막 자식이 되던 문제), 드롭다운 팝업이 항상 버튼 아래에 열리도록(`alignItemWithTrigger=false`)
+- 파비콘: lucide house 아이콘(`app/icon.svg`, `app/apple-icon.tsx`), 기존 `favicon.ico` 제거
+- 대시보드 첫 통계 "광고 중 매물" → "등록 매물"
+- **사무소 등록 제한**: 미등록 사무소는 매물·고객 1건까지, 문서·계약 등록 불가. DB 트리거(`enforce_office_registration`)로 강제하고, 화면에서는 진입 버튼에 확인 모달(취소 / 등록하기 → `/office/register?next=…`), 직접 URL 진입 시 안내 카드
+- **사무소 조회·등록** `/office/register`: 공공데이터포털 「전국공인중개사사무소표준데이터」 API로 사무소명·개설등록번호·대표자명 조회 → "이 사무소로 등록" 시 서버에서 등록번호로 재조회해 확인된 값으로 저장(대표만). 설정 사무소 탭에 등록 상태 표시, 등록 후 등록번호·대표자는 읽기 전용
+
+**변경 파일/화면**
+- 화면: `/properties/new`·`edit`·`[id]`, 공개 브리핑, `/customers`, `/customers/new`·`[id]`, `/contracts`, `/contracts/new`, `/documents`, `/dashboard`, `/settings`(사무소), `/office/register`(신규)
+- 마이그레이션(원격 적용·타입 재생성): `20261013100000_property_contacts`, `20261013110000_drop_property_contact_names`, `20261013120000_maintenance_items`(`get_briefing` 재정의), `20261013130000_office_registration`(`offices.registered_at`, `registry_data`, 등록 제한 트리거)
+- 신규: `lib/office-registry.ts`(API 클라이언트, server-only), `lib/actions/office.ts`, `lib/office-gate.ts`, `components/office-gate.tsx`(`GatedLink`, `OfficeRequiredDialog`, `OfficeRequiredNotice`), `components/form/number-input.tsx`, `lib/money.ts`, `lib/phone.ts`, `app/(app)/properties/maintenance-field.tsx`
+- 수정: `lib/actions/properties.ts`, `lib/actions/settings.ts`(등록 후 등록번호·대표자 덮어쓰기 금지), `lib/format.ts`(`formatMaintenance`), `lib/constants.ts`, `components/ui/select.tsx`, `proxy.ts`(matcher에 `apple-icon` 제외), `.env.example`(`DATA_GO_KR_SERVICE_KEY`)
+
+**결정 사항**
+- 사무소 정보 출처는 data.go.kr 표준데이터 API(VWorld는 도메인 등록 필요·명세 불명확으로 보류). 인증키는 서버 전용 환경변수
+- 제한 규칙은 UI가 아니라 DB 트리거가 기준(`lib/office-gate.ts`는 같은 규칙을 화면 표시용으로 계산)
+- 자격·대표자 인증은 추후 개발("준비중" 표시)
+
+**남은 TODO**
+- 실제 인증키로 API 조회 검증
+- 현재 offices UPDATE RLS상 대표가 `registered_at`을 직접 설정할 수 있음 → 인증 기능 개발 시 등록 처리를 security definer RPC로 옮기고 컬럼 직접 수정 차단
+- 기존 사무소는 모두 미등록 상태라 매물·고객이 이미 있으면 추가 등록이 막힘(사무소 등록 필요)
 
 ### 2026-10-12 — 임장 현장 정보 반영, 페이지별 검색, 고객 상태, 날짜 선택기
 **작업 요약**

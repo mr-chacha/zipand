@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormMessage } from "@/components/form/form-message";
+import { MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { DatePicker } from "@/components/form/date-picker";
@@ -74,11 +75,11 @@ export function CustomerForm({ action, members, defaultValues: d, currentUserId,
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="budget_min">예산 최소</Label>
-              <Input id="budget_min" name="budget_min" inputMode="numeric" defaultValue={d?.budget_min ?? ""} placeholder="30000" />
+              <MoneyInput id="budget_min" name="budget_min" defaultValue={d?.budget_min} placeholder="예) 30,000" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="budget_max">예산 최대</Label>
-              <Input id="budget_max" name="budget_max" inputMode="numeric" defaultValue={d?.budget_max ?? ""} placeholder="45000" />
+              <MoneyInput id="budget_max" name="budget_max" defaultValue={d?.budget_max} placeholder="예) 45,000" />
             </div>
           </div>
           <div className="space-y-2">

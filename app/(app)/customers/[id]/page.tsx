@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Phone } from "lucide-react";
 import { ComingSoonButton } from "@/components/coming-soon";
+import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { CustomerStatusBadge } from "@/components/status-badge";
 import { TaskBoard } from "@/components/tasks/task-board";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
 import { formatBudget, formatDate } from "@/lib/format";
+import { getOfficeGate } from "@/lib/office-gate";
 import { getOfficeMembers, getPropertyList, getTasks, todayRange, type PropertyListItem } from "@/lib/queries";
 import { ConsultationPanel, CustomerHeaderActions, CustomerProperties } from "./customer-actions";
 
@@ -55,7 +56,7 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
     .maybeSingle();
   if (!customer) notFound();
 
-  const [consultations, linkedRows, tasks, members, properties] = await Promise.all([
+  const [consultations, linkedRows, tasks, members, properties, gate] = await Promise.all([
     supabase
       .from("consultations")
       .select("id, channel, content, consulted_at, author:profiles!consultations_created_by_fkey(name)")
@@ -65,6 +66,7 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
     getTasks({ customerId: id }),
     getOfficeMembers(),
     getPropertyList(),
+    getOfficeGate(),
   ]);
 
   const linkedIds = new Set((linkedRows.data ?? []).map((r) => r.property_id));
@@ -182,9 +184,15 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
 
           <p className="text-center text-xs text-muted-foreground">
             최근 업데이트 {formatDate(customer.updated_at)} ·{" "}
-            <Link href={`/contracts/new?customer=${id}`} className="text-primary hover:underline">
-              거래 시작하기
-            </Link>
+            <GatedLink
+              href={`/contracts/new?customer=${id}`}
+              kind="deal"
+              blocked={gate.blocked.deal}
+              isOwner={gate.isOwner}
+              className="text-primary hover:underline"
+            >
+              계약 시작하기
+            </GatedLink>
           </p>
         </div>
       </div>

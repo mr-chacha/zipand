@@ -1,7 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Copy, Trash2, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, BadgeCheck, Copy, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
@@ -10,7 +11,7 @@ import { NativeSelect } from "@/components/form/native-select";
 import { PasswordInput } from "@/components/form/password-input";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ import { changePassword, createInvite, revokeInvite, updateMember, updateOffice,
 import { ROLE_LABELS, VERIFICATION_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { useFormAction } from "@/lib/use-form-action";
+import { cn } from "@/lib/utils";
 import type { ActionState, Office, Profile, ProfileNeed } from "@/types";
 
 function Field({
@@ -39,12 +41,41 @@ const toastOnSuccess = { onSuccess: (r: { message?: string }) => r.message && to
 
 export function OfficeForm({ office, readOnly }: { office: Office; readOnly: boolean }) {
   const { state, pending, onSubmit } = useFormAction(updateOffice, toastOnSuccess);
+  const registered = office.registered_at !== null;
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <div
+        className={cn(
+          "flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center",
+          registered ? "border-primary/30 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10"
+        )}
+      >
+        {registered ? (
+          <BadgeCheck className="size-5 shrink-0 text-primary" />
+        ) : (
+          <AlertTriangle className="size-5 shrink-0 text-amber-600" />
+        )}
+        <div className="flex-1 text-sm">
+          <p className="font-medium">{registered ? "공공데이터로 확인된 사무소예요" : "사무소 정보가 등록되지 않았어요"}</p>
+          <p className="text-xs text-muted-foreground">
+            {registered
+              ? `${formatDate(office.registered_at)} 등록 · 개설등록번호와 대표자는 조회 결과로만 변경할 수 있어요.`
+              : "등록 전에는 매물·고객을 1건까지만 등록할 수 있고, 문서·계약 관리는 사용할 수 없어요."}
+          </p>
+        </div>
+        {!readOnly && (
+          <Link
+            href="/office/register"
+            className={buttonVariants({ size: "sm", variant: registered ? "outline" : "default" })}
+          >
+            {registered ? "다시 조회" : "사무소 등록하기"}
+          </Link>
+        )}
+      </div>
       <fieldset disabled={readOnly} className="grid gap-4 sm:grid-cols-2">
         <Field label="사무소명 *" name="name" defaultValue={office.name} required />
-        <Field label="대표자" name="representative" defaultValue={office.representative} />
-        <Field label="개설등록번호" name="registration_no" defaultValue={office.registration_no} />
+        <Field label="대표자" name="representative" defaultValue={office.representative} readOnly={registered} className={cn(registered && "bg-muted")} />
+        <Field label="개설등록번호" name="registration_no" defaultValue={office.registration_no} readOnly={registered} className={cn(registered && "bg-muted")} />
         <Field label="대표 전화" name="phone" type="tel" defaultValue={office.phone} />
         <div className="sm:col-span-2">
           <Field label="주소" name="address" defaultValue={office.address} />

@@ -35,6 +35,9 @@ export const VERIFICATION_LABELS: Record<string, string> = {
 };
 
 /** 임장 기록 구조화 항목 (기획서 7.2) */
+export const MAINTENANCE_STATUSES = ["있음", "없음"] as const;
+export const MAINTENANCE_ITEMS = ["전기", "수도", "가스", "인터넷", "TV", "주차", "공용관리비"] as const;
+
 export const VISIT_FIELD_LABELS = ["방향", "채광", "수리 필요", "입주 가능일", "구조", "주차", "소음", "관리 상태"];
 
 export const VISIT_FIELD_PLACEHOLDERS: Record<string, string> = {

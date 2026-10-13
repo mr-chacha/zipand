@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { Plus } from "lucide-react";
+import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
+import { getOfficeGate } from "@/lib/office-gate";
 import { CustomerList } from "./customer-list";
 
 export const metadata: Metadata = { title: "고객 및 상담" };
@@ -12,6 +13,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim() : "";
   const { supabase } = await getSession();
+  const gate = await getOfficeGate();
   const { data } = await supabase
     .from("customers")
     .select(
@@ -32,10 +34,10 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
         title="고객 및 상담"
         description="고객 조건과 상담 이력을 기록하고, 후속 연락과 추천 매물을 관리해요."
         actions={
-          <Link href="/customers/new" className={buttonVariants()}>
+          <GatedLink href="/customers/new" kind="customer" blocked={gate.blocked.customer} isOwner={gate.isOwner} className={buttonVariants()}>
             <Plus data-icon="inline-start" />
             고객 등록
-          </Link>
+          </GatedLink>
         }
       />
       <CustomerList key={query} customers={customers} initialQuery={query} />

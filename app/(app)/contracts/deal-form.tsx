@@ -2,10 +2,10 @@
 
 import { toast } from "sonner";
 import { FormMessage } from "@/components/form/form-message";
+import { MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { DatePicker } from "@/components/form/date-picker";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createDeal, updateDeal } from "@/lib/actions/deals";
@@ -53,7 +53,7 @@ export function DealForm({ properties, customers, defaultPropertyId, defaultCust
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="amount">거래 금액 (만원)</Label>
-        <Input id="amount" name="amount" inputMode="numeric" defaultValue={deal?.amount ?? ""} />
+        <MoneyInput id="amount" name="amount" defaultValue={deal?.amount} placeholder="예) 52,000" />
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5">
@@ -71,7 +71,7 @@ export function DealForm({ properties, customers, defaultPropertyId, defaultCust
       </div>
       <FormMessage state={state} />
       <div className="flex justify-end">
-        <SubmitButton pending={pending}>{deal ? "저장" : "거래 시작"}</SubmitButton>
+        <SubmitButton pending={pending}>{deal ? "저장" : "계약 시작"}</SubmitButton>
       </div>
     </form>
   );

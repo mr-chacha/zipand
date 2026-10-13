@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText, ShieldCheck } from "lucide-react";
 import { ComingSoonPanel } from "@/components/coming-soon";
+import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { DocStatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
 import { formatDate, formatDateTime, formatFileSize } from "@/lib/format";
+import { getOfficeGate } from "@/lib/office-gate";
 import { getPropertyOptions } from "@/lib/queries";
 import { DocumentUploader } from "./document-uploader";
 
@@ -22,7 +24,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
     .select("id, doc_type, file_name, file_size, status, issued_at, created_at, property:properties(id, title)")
     .order("created_at", { ascending: false });
   if (typeof status === "string" && status) query = query.eq("status", status);
-  const [{ data: allDocuments }, propertyOptions] = await Promise.all([query, getPropertyOptions()]);
+  const [{ data: allDocuments }, propertyOptions, gate] = await Promise.all([query, getPropertyOptions(), getOfficeGate()]);
   const documents = keyword
     ? (allDocuments ?? []).filter((d) => `${d.doc_type} ${d.file_name} ${d.property?.title ?? ""}`.includes(keyword))
     : allDocuments;
@@ -48,11 +50,15 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
             <CardDescription>PDF, JPG, PNG · 최대 20MB</CardDescription>
           </CardHeader>
           <CardContent>
-            <DocumentUploader
-              officeId={office.id}
-              properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
-              defaultPropertyId={typeof property === "string" ? property : undefined}
-            />
+            {gate.blocked.document ? (
+              <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next="/documents" />
+            ) : (
+              <DocumentUploader
+                officeId={office.id}
+                properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
+                defaultPropertyId={typeof property === "string" ? property : undefined}
+              />
+            )}
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
