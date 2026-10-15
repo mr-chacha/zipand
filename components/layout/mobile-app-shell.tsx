@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronLeft } from "lucide-react";
+import { BusyOverlay } from "@/components/busy-overlay";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
@@ -35,9 +36,18 @@ export function MobileAppShell({ officeName, children }: { officeName: string; c
   const isTabRoot = appTabItems.some((t) => t.href === pathname);
   const typing = useTyping();
 
+  // 포털(다이얼로그·팝오버)도 앱 전용 스타일(app:)을 받도록 html에도 표시한다
+  useEffect(() => {
+    document.documentElement.dataset.app = "";
+    return () => {
+      delete document.documentElement.dataset.app;
+    };
+  }, []);
+
   // 문서 전체가 아니라 본문만 스크롤해 상단 바·하단 탭이 오버스크롤·키보드에 밀리지 않게 한다
   return (
-    <div className="fixed inset-0 flex flex-col bg-muted/30">
+    <div data-app="" className="fixed inset-0 flex flex-col bg-muted/30">
+      <BusyOverlay />
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3">
         {isTabRoot ? (
           <div className="flex min-w-0 items-center gap-2">
@@ -54,11 +64,11 @@ export function MobileAppShell({ officeName, children }: { officeName: string; c
         </Link>
       </header>
 
-      <main className="w-full min-h-0 flex-1 overflow-y-auto overscroll-none p-4">{children}</main>
+      <main className="w-full min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-none p-4">{children}</main>
 
       <nav
         className={cn(
-          "z-30 grid shrink-0 grid-cols-4 border-t bg-background pb-[env(safe-area-inset-bottom)]",
+          "z-30 grid shrink-0 grid-cols-5 border-t bg-background pb-[env(safe-area-inset-bottom)]",
           typing && "hidden"
         )}
       >

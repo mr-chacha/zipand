@@ -34,5 +34,6 @@ export const appTabItems: NavItem[] = [
   { title: "홈", href: "/dashboard", icon: LayoutDashboard },
   { title: "매물", href: "/properties", icon: Building2 },
   { title: "고객·상담", href: "/customers", icon: Users },
+  { title: "계약", href: "/contracts", icon: FileSignature },
   { title: "마이", href: "/mypage", icon: UserRound },
 ];

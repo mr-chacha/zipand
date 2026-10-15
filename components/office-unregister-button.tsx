@@ -6,6 +6,7 @@ import { AlertTriangle, Search } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmDialog } from "@/components/dialogs";
 import { Button } from "@/components/ui/button";
+import { useBusy } from "@/lib/busy";
 import { unregisterOffice } from "@/lib/actions/office";
 
 /** 등록된 사무소를 취소하고 다시 조회·인증하게 한다 */
@@ -13,6 +14,7 @@ export function OfficeUnregisterButton({ label = "다른 사무소 찾기", onDo
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
 
   return (
     <ConfirmDialog

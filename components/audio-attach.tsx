@@ -137,12 +137,19 @@ export function AudioAttach({
           )}
         </div>
         {failed && !uploading ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => upload(failed)}>
+          <Button type="button" variant="outline" size="sm" className="app:h-11 app:w-full app:text-base" onClick={() => upload(failed)}>
             <RotateCcw data-icon="inline-start" />
             다시 업로드
           </Button>
         ) : (
-          <Button type="button" variant="outline" size="sm" disabled={uploading || recorder.recording} onClick={() => fileRef.current?.click()}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="app:h-11 app:w-full app:text-base"
+            disabled={uploading || recorder.recording}
+            onClick={() => fileRef.current?.click()}
+          >
             {uploading ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <FileAudio data-icon="inline-start" />}
             {fileLabel}
           </Button>

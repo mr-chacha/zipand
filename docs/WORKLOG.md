@@ -5,9 +5,11 @@
 
 ## 현재 상태
 - **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
-  - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
+  - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·계약·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
   - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
+  - 실기기(갤럭시) 테스트 피드백 반영 완료: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 준비 탭
   - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
+- **실기기 테스트 방법**: USB 디버깅 연결 → `CAP_SERVER_URL=http://localhost:3000 npx cap sync android` → `./gradlew assembleDebug`(JDK 21) → `adb -s <기기> install -r` → `npm run app:serve`(production, 3100) + `npm run app:usb`(`adb reverse tcp:3000 tcp:3100`). 사무실 Wi‑Fi는 기기 간 통신이 막혀 LAN IP 방식 불가
 - **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·앱·결제 제외 전 기능 동작
 - **완료**: 인증/사무소(간단 가입·단계별 시작하기·사무소/사업자 인증·서류 심사 신청), 매물·사진(최대 10장)·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크(사진 슬라이드), 매물 리스트 공유 링크, 고객·상담·후속 일정(거래 연동 상태), 계약 준비 5단계·임대인/임차인 공유 링크·계약 취소, 설정, 대시보드(일정 캘린더)
 - **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261016090000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 서버 전용 환경변수 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털), `OFFICE_REGISTRATION_SECRET` 필요
@@ -59,6 +61,36 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-15 — 안드로이드 앱: 실기기 테스트 피드백 반영 (앱 전용 UI·속도·로딩·삭제 컨펌·계약 탭)
+**작업 요약**
+- 앱 아이콘·스플래시: 파비콘 로고(파란 배경 + 흰 집)로 교체. `mobile/generate-assets.mjs`로 `assets/` 원본 생성 → `@capacitor/assets`로 안드로이드 리소스 생성
+- 실기기 설치: 사무실 Wi‑Fi 기기 간 차단으로 LAN 접속 불가 → USB `adb reverse` 방식으로 전환. 앱 테스트는 production 서버(`app:serve`, 3100)로 — 개발 모드는 페이지마다 컴파일·프리페치 없음으로 느림
+- **앱 전용 스타일**: `@custom-variant app`(`[data-app]`, MobileAppShell이 html·셸에 표시). 웹 화면은 그대로
+  - 버튼 44px(아이콘 버튼 포함), 흰 버튼·입력 테두리 진하게, 입력·선택·탭·필터·날짜 선택기 확대
+  - `components/form/form-actions.tsx`: 웹은 오른쪽 정렬 한 줄, 앱은 저장(위)·취소(아래) 가로 꽉 채움 — 매물·고객·임장·계약·특약·할 일·설정 폼, 상담 기록·통화 녹음 선택 버튼
+  - 일정·할 일 추가 창에서 종류·일시 한 줄씩, 고객 상세 "계약 시작하기"를 큰 버튼으로
+  - 날짜 선택기: 앱에서는 화면 가운데 표시(시간 선택은 달력 아래). `scrollIntoView`가 화면 전체를 밀던 문제 수정(웹 포함)
+- **전체 화면 로딩**(앱 전용): `lib/busy.ts` `useBusy` + `components/busy-overlay.tsx`. 폼 저장(`useFormAction`), 삭제 확인, 연결·업로드 등 서버 작업 중 "저장 중입니다… / 삭제 중입니다… / 처리 중입니다…"
+- **삭제 컨펌**: `ConfirmAction`에 `appOnly` 추가(앱은 "삭제하면 되돌릴 수 없어요" 모달, 웹은 기존처럼 바로 삭제) — 상담 기록, 할 일, 매물 사진, 문서 추출 항목·확인 사항, 계약 확인 항목·특약. 마우스 오버로만 보이던 삭제 버튼은 앱에서 항상 표시
+- **속도**: 서명 URL을 서버 메모리에 재사용(같은 사진 같은 URL → 브라우저 캐시), 썸네일 lazy loading, 앱에서 올리는 매물 사진은 긴 변 1920px JPEG로 축소(`lib/image.ts`)
+- 계약 준비: 앱 하단 탭에 "계약" 추가(5개), 계약 상세에서 진행 단계 카드를 위로, 상단 탭 축약
+- 매물 리스트 공유 화면 좌우 스크롤 수정(그리드 `minmax(0,1fr)`), 앱 본문 가로 스크롤 차단
+
+**변경 파일/화면**
+- 공용: `app/globals.css`, `components/ui/{button,input,select,tabs,textarea,popover}.tsx`, `components/form/{form-actions,confirm-action,date-picker,native-select}.tsx`, `components/{busy-overlay,audio-attach,property-thumbnail}.tsx`, `components/layout/{mobile-app-shell,nav-items}.ts(x)`
+- lib: `busy.ts`, `use-is-app.ts`, `image.ts`, `storage.ts`, `upload-client.ts`, `use-form-action.ts`
+- 화면: 고객·매물·임장·사진·문서·계약·특약·설정·시작하기·브리핑·리스트 공유
+- 앱: `assets/`, `mobile/generate-assets.mjs`, `android/app/src/main/res/{mipmap,drawable}-*`, `next.config.ts`(LAN IP `allowedDevOrigins`), `package.json`(`app:serve`, `app:usb`)
+
+**결정 사항**
+- 앱/웹 분기는 서버 `isAppRequest()`(UA `ZipandApp`), 클라이언트 `useIsApp()`, 스타일 `app:` 변형 세 가지로 한다. 앱 요청 사항은 웹 화면을 바꾸지 않는다
+- 사진 축소는 앱 업로드에만 적용(웹 업로드·기존 사진은 원본). Supabase 이미지 변환(유료)은 미사용
+
+**남은 TODO**
+- 실기기에서 이번 변경 전체 확인(로그인 후 화면은 미확인): 버튼 크기·테두리, 날짜 선택기 가운데 표시, 전체 화면 로딩, 삭제 컨펌, 계약 탭
+- 웹 업로드 사진도 축소할지, 매물·고객 "연결 해제"에도 컨펌을 붙일지 결정
+- 3단계 AI 요약(제공사 선택 필요)
 
 ### 2026-10-15 — 안드로이드 앱 2단계: 녹음 업로드·백그라운드 녹음, 하단 탭 고정
 **작업 요약**

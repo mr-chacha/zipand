@@ -116,9 +116,9 @@ function PrevLink({ dealId, step }: { dealId: string; step: number }) {
 function StepButtons({ dealId, step, pending, saveable = true }: { dealId: string; step: number; pending: boolean; saveable?: boolean }) {
   const nextTitle = STEP_TITLES[step];
   return (
-    <div className="flex items-center justify-between gap-2 border-t pt-4">
+    <div className="flex items-center justify-between gap-2 border-t pt-4 app:flex-col-reverse app:items-stretch app:*:w-full">
       <PrevLink dealId={dealId} step={step} />
-      <div className="flex gap-2">
+      <div className="flex gap-2 app:flex-col-reverse app:*:h-11 app:*:w-full">
         {saveable && (
           <SubmitButton name="intent" value="save" variant="outline" pending={pending}>
             저장
@@ -362,9 +362,9 @@ export function CompleteStep({ deal }: { deal: Deal }) {
       </Section>
 
       <FormMessage state={state?.error ? state : null} />
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 app:flex-col-reverse app:items-stretch app:*:w-full">
         <PrevLink dealId={deal.id} step={5} />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 app:flex-col-reverse app:*:h-11 app:*:w-full">
           <SubmitButton name="intent" value="save" variant="outline" pending={pending}>
             저장
           </SubmitButton>

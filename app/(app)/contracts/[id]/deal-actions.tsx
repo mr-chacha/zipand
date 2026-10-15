@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { useBusy } from "@/lib/busy";
 import {
   addChecklistItem,
   addDealClause,
@@ -47,6 +48,7 @@ type Result = { error?: string; message?: string };
 
 function useRunner() {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const run = (fn: () => Promise<Result>, onDone?: () => void) =>
     startTransition(async () => {
       const result = await fn();
@@ -130,6 +132,7 @@ interface ShareLink {
 export function DealShareLinks({ dealId, links, siteUrl, disabled }: { dealId: string; links: ShareLink[]; siteUrl: string; disabled?: boolean }) {
   const [days, setDays] = useState("14");
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const linkUrl = (token: string) => `${typeof window !== "undefined" ? window.location.origin : siteUrl}/d/${token}`;
 
   const copy = async (token: string) => {
@@ -243,7 +246,6 @@ export function DealChecklist({
   stage: DealChecklistStage;
   items: DealChecklistItem[];
 }) {
-  const { pending, run } = useRunner();
   const { state, pending: adding, onSubmit } = useFormAction(addChecklistItem.bind(null, dealId, stage), {
     onSuccess: (_r, form) => form.reset(),
   });
@@ -286,16 +288,22 @@ export function DealChecklist({
                   aria-label={item.label}
                 />
                 <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>{item.label}</span>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label="항목 삭제"
-                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                  disabled={pending}
-                  onClick={() => run(() => deleteChecklistItem(item.id, dealId))}
-                >
-                  <Trash2 />
-                </Button>
+                <ConfirmAction
+                  appOnly
+                  action={() => deleteChecklistItem(item.id, dealId)}
+                  title="확인 항목을 삭제할까요?"
+                  description="삭제하면 되돌릴 수 없어요."
+                  trigger={
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label="항목 삭제"
+                      className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 app:opacity-100"
+                    >
+                      <Trash2 />
+                    </Button>
+                  }
+                />
               </div>
             ))}
         </div>
@@ -378,15 +386,17 @@ export function DealClauses({
                   <Button size="icon-xs" variant="ghost" aria-label="수정" onClick={() => setEditing({ id: clause.id, body: clause.body })}>
                     <Pencil />
                   </Button>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label="삭제"
-                    disabled={pending}
-                    onClick={() => run(() => deleteDealClause(clause.id, dealId))}
-                  >
-                    <Trash2 />
-                  </Button>
+                  <ConfirmAction
+                    appOnly
+                    action={() => deleteDealClause(clause.id, dealId)}
+                    title="특약을 삭제할까요?"
+                    description="삭제하면 되돌릴 수 없어요."
+                    trigger={
+                      <Button size="icon-xs" variant="ghost" aria-label="삭제" disabled={pending}>
+                        <Trash2 />
+                      </Button>
+                    }
+                  />
                 </div>
               </>
             )}

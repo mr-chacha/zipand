@@ -63,8 +63,8 @@ export default async function DealDetailPage({ params, searchParams }: PageProps
         actions={<DealHeaderActions dealId={id} cancellable={!closed} />}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-3">
+        <div className="min-w-0 space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -112,7 +112,7 @@ export default async function DealDetailPage({ params, searchParams }: PageProps
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6 app:order-first">
           <Card>
             <CardHeader>
               <CardTitle>진행 단계</CardTitle>

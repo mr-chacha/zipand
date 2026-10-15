@@ -90,10 +90,16 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
       />
 
       <Tabs defaultValue={tab === "clauses" ? "clauses" : "deals"}>
-        <TabsList>
-          <TabsTrigger value="deals">진행 중 계약 ({active.length})</TabsTrigger>
-          <TabsTrigger value="closed">종료된 계약 ({closed.length})</TabsTrigger>
-          <TabsTrigger value="clauses">특약 라이브러리</TabsTrigger>
+        <TabsList className="app:w-full">
+          <TabsTrigger value="deals" className="app:px-1 app:text-sm">
+            진행 중<span className="app:hidden"> 계약</span> ({active.length})
+          </TabsTrigger>
+          <TabsTrigger value="closed" className="app:px-1 app:text-sm">
+            종료<span className="app:hidden">된 계약</span> ({closed.length})
+          </TabsTrigger>
+          <TabsTrigger value="clauses" className="app:px-1 app:text-sm">
+            특약 라이브러리
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="deals" className="pt-4">
           {renderDeals(active, "진행 중인 계약 내역이 없어요.")}

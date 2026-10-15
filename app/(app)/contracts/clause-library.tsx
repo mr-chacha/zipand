@@ -5,6 +5,7 @@ import { Copy, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -186,9 +187,9 @@ function OfficeClauseDialog() {
             <Textarea id="clause-body" name="body" rows={5} required />
           </div>
           <FormMessage state={state} />
-          <div className="flex justify-end">
+          <FormActions>
             <SubmitButton pending={pending}>저장</SubmitButton>
-          </div>
+          </FormActions>
         </form>
       </DialogContent>
     </Dialog>

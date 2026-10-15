@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { BUSY_LABELS, useBusy } from "@/lib/busy";
 import { toErrorMessage } from "@/lib/errors";
 import type { ActionState } from "@/types";
 
@@ -17,10 +18,13 @@ export function useFormAction(
     onSuccess?: (state: ActionState, form: HTMLFormElement) => void;
     /** 액션 전에 실행 (파일 업로드 등). FormData에 값을 추가할 수 있고, 던지면 오류로 표시한다. */
     prepare?: (fd: FormData) => Promise<void>;
+    /** 앱에서 진행 중 전체 화면에 보일 문구 */
+    busyLabel?: string;
   } = {}
 ) {
   const [state, setState] = useState<ActionState | null>(options.initialState ?? null);
   const [pending, startTransition] = useTransition();
+  useBusy(pending, options.busyLabel ?? BUSY_LABELS.save);
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();

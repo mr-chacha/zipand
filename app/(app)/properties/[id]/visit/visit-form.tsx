@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
 import { ComingSoonButton } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { SubmitButton } from "@/components/form/submit-button";
 import { DatePicker } from "@/components/form/date-picker";
 import { Button } from "@/components/ui/button";
@@ -194,11 +195,11 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
       </Card>
 
       <FormMessage state={state?.error ? state : null} />
-      <div className="flex justify-end">
+      <FormActions>
         <SubmitButton pending={pending} disabled={audioBusy} pendingText="저장 중…">
           임장 기록 저장
         </SubmitButton>
-      </div>
+      </FormActions>
     </form>
   );
 }

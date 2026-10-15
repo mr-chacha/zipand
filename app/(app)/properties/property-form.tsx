@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ComingSoonPanel } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { AreaInput, MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
@@ -327,14 +328,14 @@ export function PropertyForm({
       </Card>
 
       <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
+      <FormActions>
         <Link href={cancelHref} className={buttonVariants({ variant: "outline" })}>
           {cancelLabel}
         </Link>
         <SubmitButton pending={pending} pendingText={uploadStatus ?? "저장 중…"}>
           {submitLabel ?? (d ? "변경 저장" : "매물 저장")}
         </SubmitButton>
-      </div>
+      </FormActions>
     </form>
   );
 }

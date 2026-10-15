@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
@@ -102,14 +103,14 @@ export function CustomerForm({ action, members, defaultValues: d, currentUserId,
       </Card>
 
       <FormMessage state={state} />
-      <div className="flex justify-end gap-2">
+      <FormActions>
         <Link href={cancelHref} className={buttonVariants({ variant: "outline" })}>
           취소
         </Link>
         <SubmitButton pending={pending} pendingText="저장 중…">
           {d ? "변경 저장" : "고객 저장"}
         </SubmitButton>
-      </div>
+      </FormActions>
     </form>
   );
 }

@@ -89,8 +89,10 @@ export function DatePicker({
   useEffect(() => {
     if (!open || !withTime) return;
     const frame = requestAnimationFrame(() => {
+      // scrollIntoView는 화면(조상 스크롤)까지 움직이므로 목록 안에서만 스크롤한다
       for (const col of [hourColRef.current, minuteColRef.current]) {
-        col?.querySelector<HTMLElement>("[data-selected=true]")?.scrollIntoView({ block: "center" });
+        const cell = col?.querySelector<HTMLElement>("[data-selected=true]");
+        if (col && cell) col.scrollTop = cell.offsetTop - col.offsetTop - (col.clientHeight - cell.offsetHeight) / 2;
       }
     });
     return () => cancelAnimationFrame(frame);
@@ -136,17 +138,22 @@ export function DatePicker({
         id={id}
         disabled={disabled}
         aria-label={ariaLabel}
-        className="flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 text-left text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 dark:bg-input/30"
+        className="flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 text-left text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 app:h-11 app:border-foreground/30 app:px-3 app:text-base app:focus-visible:border-ring dark:bg-input/30"
       >
         <span className={cn("flex-1 truncate", !current && "text-muted-foreground")}>
           {current ? formatDisplay(current, withTime) : (placeholder ?? (withTime ? "날짜·시간 선택" : "날짜 선택"))}
         </span>
-        <CalendarDays className="size-4 shrink-0 text-muted-foreground" />
+        <CalendarDays className="size-4 shrink-0 text-muted-foreground app:size-5" />
       </PopoverTrigger>
       </div>
-      <PopoverContent align="start" className={cn("w-auto p-3", withTime && "max-w-[calc(100vw-1rem)]")}>
-        <div className="flex gap-3">
-          <div className="w-64">
+      <PopoverContent
+        align="start"
+        // 앱에서는 버튼 아래로 펼치면 화면 밖으로 나가므로 화면 가운데에 띄운다
+        positionerClassName="app:fixed! app:top-1/2! app:left-1/2! app:z-[60] app:[transform:translate(-50%,-50%)]!"
+        className={cn("w-auto p-3 app:max-h-[calc(100dvh-2rem)] app:overflow-y-auto app:shadow-2xl app:ring-foreground/15", withTime && "max-w-[calc(100vw-1rem)]")}
+      >
+        <div className="flex gap-3 app:flex-col">
+          <div className="w-64 app:w-[min(20rem,calc(100vw-4rem))]">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-semibold">
                 {vy}년 {vm}월
@@ -177,7 +184,7 @@ export function DatePicker({
                     if (!c.inMonth) setView(c.key.slice(0, 7));
                   }}
                   className={cn(
-                    "flex h-8 items-center justify-center rounded-md text-sm transition-colors hover:bg-muted",
+                    "flex h-8 items-center justify-center rounded-md text-sm transition-colors hover:bg-muted app:h-10 app:text-base",
                     !c.inMonth && "text-muted-foreground/50",
                     c.key === today && "ring-1 ring-foreground/30 ring-inset",
                     c.key === draft.date && "bg-primary font-semibold text-primary-foreground hover:bg-primary"
@@ -189,7 +196,7 @@ export function DatePicker({
             </div>
           </div>
           {withTime && (
-            <div className="flex h-[17.5rem] gap-1 border-l pl-3">
+            <div className="flex h-[17.5rem] gap-1 border-l pl-3 app:h-44 app:border-t app:border-l-0 app:pt-3 app:pl-0">
               <TimeColumn refEl={hourColRef} label="시">
                 {HOURS.map((h) => (
                   <TimeCell key={h} selected={draft.hour % 12 === h % 12} onClick={() => setHour12(h)}>
@@ -216,10 +223,10 @@ export function DatePicker({
           )}
         </div>
         <div className="flex justify-end gap-2 border-t pt-3">
-          <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>
+          <Button type="button" variant="outline" size="sm" className="app:flex-1" onClick={() => setOpen(false)}>
             취소
           </Button>
-          <Button type="button" size="sm" onClick={confirm} disabled={!draft.date}>
+          <Button type="button" size="sm" className="app:flex-1" onClick={confirm} disabled={!draft.date}>
             확인
           </Button>
         </div>
@@ -238,7 +245,7 @@ function TimeColumn({
   children: React.ReactNode;
 }) {
   return (
-    <div ref={refEl} role="listbox" aria-label={label} className="flex w-12 flex-col gap-0.5 overflow-y-auto [scrollbar-width:none]">
+    <div ref={refEl} role="listbox" aria-label={label} className="flex w-12 flex-col gap-0.5 overflow-y-auto [scrollbar-width:none] app:flex-1">
       {children}
     </div>
   );
@@ -253,7 +260,7 @@ function TimeCell({ selected, onClick, children }: { selected: boolean; onClick:
       data-selected={selected}
       onClick={onClick}
       className={cn(
-        "flex h-8 shrink-0 items-center justify-center rounded-md text-sm transition-colors hover:bg-muted",
+        "flex h-8 shrink-0 items-center justify-center rounded-md text-sm transition-colors hover:bg-muted app:h-10 app:text-base",
         selected && "bg-primary font-semibold text-primary-foreground hover:bg-primary"
       )}
     >

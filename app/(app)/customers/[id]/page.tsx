@@ -194,14 +194,17 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
             </CardContent>
           </Card>
 
-          <p className="text-center text-xs text-muted-foreground">
-            최근 업데이트 {formatDate(customer.updated_at)} ·{" "}
+          <p className="text-center text-xs text-muted-foreground app:flex app:flex-col-reverse app:gap-3">
+            <span>
+              최근 업데이트 {formatDate(customer.updated_at)}
+              <span className="app:hidden"> · </span>
+            </span>
             <GatedLink
               href={`/contracts/new?customer=${id}`}
               kind="deal"
               blocked={gate.blocked.deal}
               isOwner={gate.isOwner}
-              className="text-primary hover:underline"
+              className="text-primary hover:underline app:inline-flex app:h-11 app:w-full app:items-center app:justify-center app:rounded-lg app:bg-primary app:text-base app:font-medium app:text-primary-foreground app:no-underline"
             >
               계약 시작하기
             </GatedLink>
