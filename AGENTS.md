@@ -21,9 +21,10 @@ This version has breaking changes — APIs, conventions, and file structure may 
    - **현재 상태**: 진행 단계, 다음 작업(구체적인 시작 지점)
    - **기록**: 맨 위에 날짜별 항목 추가 — 작업 요약, 변경 파일/화면, 결정 사항, 남은 TODO
 2. 갱신한 `docs/WORKLOG.md`를 같은 커밋에 포함한다.
+   - `develop`으로 PR을 올릴 때는 `README.md`의 **업데이트 내역** 맨 위에 `### 날짜 — 제목 ([#번호](PR 링크))` 항목과 사용자 관점 변경 요약을 추가하고, 기능·환경변수·구조가 바뀌었으면 README 해당 섹션도 고친다. PR 번호는 생성 후 확인해 README를 한 번 더 커밋한다.
 3. 커밋 메시지는 `type: 요약` 형식(feat, fix, docs, style, refactor, chore)으로 한국어로 작성한다.
 4. PR 생성 시 본문은 `.github/pull_request_template.md` 형식을 따르고, 내용은 WORKLOG의 해당 작업 기록을 바탕으로 채운다. (`gh pr create` 사용)
-5. 브랜치: `main`에 직접 푸쉬하지 않고 `feat/...`, `fix/...`, `docs/...` 브랜치에서 작업 후 PR을 올린다. 사용자가 명시하면 예외.
+5. 브랜치: `main`에 직접 푸쉬하지 않고 `feat/...`, `fix/...`, `docs/...` 브랜치에서 작업 후 `develop`으로 PR을 올린다. 사용자가 명시하면 예외.
 
 ## 코드 규칙
 - Next.js 16 (App Router, Turbopack). `params`, `searchParams`는 Promise이므로 `await` 하고 `PageProps<'/route/[id]'>` 헬퍼를 사용한다.

@@ -27,6 +27,7 @@ npm run dev
 - [ ] `npm run lint` 통과
 - [ ] `npm run build` 통과
 - [ ] `docs/WORKLOG.md` 갱신
+- [ ] `README.md` 업데이트 내역 추가
 - [ ] 실제 개인정보·민감 데이터가 목업/코드에 포함되지 않음
 - [ ] AI 결과 UI에 원문 근거·검토 상태 표시 (해당 시)
 
