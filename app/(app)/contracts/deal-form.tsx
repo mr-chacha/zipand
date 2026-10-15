@@ -2,10 +2,8 @@
 
 import { toast } from "sonner";
 import { FormMessage } from "@/components/form/form-message";
-import { MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
-import { DatePicker } from "@/components/form/date-picker";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createDeal, updateDeal } from "@/lib/actions/deals";
@@ -21,13 +19,11 @@ interface DealFormProps {
   deal?: {
     id: string;
     customer_id: string | null;
-    contract_date: string | null;
-    balance_date: string | null;
-    amount: number | null;
     memo: string | null;
   };
 }
 
+/** 거래 생성(매물·고객) / 기본 정보 수정. 금액·날짜 등은 단계별 화면에서 입력한다 */
 export function DealForm({ properties, customers, defaultPropertyId, defaultCustomerId, deal }: DealFormProps) {
   const { state, pending, onSubmit } = useFormAction(deal ? updateDeal.bind(null, deal.id) : createDeal, {
     onSuccess: (result) => result.message && toast.success(result.message),
@@ -52,22 +48,8 @@ export function DealForm({ properties, customers, defaultPropertyId, defaultCust
         />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="amount">거래 금액 (만원)</Label>
-        <MoneyInput id="amount" name="amount" defaultValue={deal?.amount} placeholder="예) 52,000" />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="contract_date">계약일</Label>
-          <DatePicker id="contract_date" name="contract_date" defaultValue={deal?.contract_date ?? ""} />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="balance_date">잔금일</Label>
-          <DatePicker id="balance_date" name="balance_date" defaultValue={deal?.balance_date ?? ""} />
-        </div>
-      </div>
-      <div className="space-y-1.5">
         <Label htmlFor="memo">메모</Label>
-        <Textarea id="memo" name="memo" rows={3} defaultValue={deal?.memo ?? ""} placeholder="협의 조건, 특이 사항" />
+        <Textarea id="memo" name="memo" rows={3} defaultValue={deal?.memo ?? ""} placeholder="거래 관련 내부 메모" />
       </div>
       <FormMessage state={state} />
       <div className="flex justify-end">

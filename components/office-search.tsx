@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Building2, Loader2, MapPin, Phone, Search, UserRound } from "lucide-react";
+import { NoticeDialog } from "@/components/dialogs";
 import { FormMessage } from "@/components/form/form-message";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Badge } from "@/components/ui/badge";
@@ -29,10 +31,29 @@ export function OfficeSearch({
 }) {
   const search = useFormAction(searchOfficeRegistry);
   const result = search.state as RegistrySearchState | null;
+  const [emptyNotice, setEmptyNotice] = useState(false);
+
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const fd = new FormData(e.currentTarget);
+    const filled = ["name", "reg_no", "representative"].some((key) => String(fd.get(key) ?? "").trim());
+    if (!filled) {
+      e.preventDefault();
+      setEmptyNotice(true);
+      return;
+    }
+    search.onSubmit(e);
+  };
 
   return (
     <div className="space-y-4">
-      <form onSubmit={search.onSubmit} className="space-y-3">
+      <NoticeDialog
+        open={emptyNotice}
+        onOpenChange={setEmptyNotice}
+        icon={<Search />}
+        title="조회할 정보를 입력해 주세요"
+        description="사무소명, 개설등록번호, 대표자명 중 하나 이상 입력해야 조회할 수 있어요."
+      />
+      <form onSubmit={onSubmit} className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <Label htmlFor="registry-name">사무소명</Label>

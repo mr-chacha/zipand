@@ -42,12 +42,13 @@ export function SignalBadge({ level }: { level: string }) {
 }
 
 const dealStageStyle: Record<string, string> = {
-  "조건 협의": "bg-muted text-muted-foreground",
-  "서류 확인": "bg-primary/10 text-primary",
+  "서류 확인": "bg-muted text-muted-foreground",
+  "조건 협의": "bg-primary/10 text-primary",
   "계약 준비": "bg-warning/15 text-warning",
   "잔금 대기": "bg-warning/15 text-warning",
   완료: "bg-success/15 text-success",
   취소: "bg-destructive/10 text-destructive",
+  "진행 중": "bg-primary/10 text-primary",
 };
 
 export function DealStageBadge({ stage }: { stage: string }) {

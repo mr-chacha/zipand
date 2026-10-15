@@ -87,8 +87,6 @@ export async function updateProfile(_prev: ActionState | null, fd: FormData): Pr
       .update({
         name: requiredStr(fd, "name", "이름"),
         phone: str(fd, "phone"),
-        // 자격번호 칸은 사무소 등록 후에만 보이므로, 칸이 없으면 기존 값을 유지한다
-        ...(fd.has("license_no") && { license_no: str(fd, "license_no") }),
       })
       .eq("id", profile.id);
     if (error) throw error;

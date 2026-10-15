@@ -1,5 +1,5 @@
 import { MapPin, Phone } from "lucide-react";
-import { PropertyThumbnail } from "@/components/property-thumbnail";
+import { PhotoSlider } from "@/components/photo-slider";
 import { formatAvailableFrom, formatMaintenance, formatPrice, toPyeong } from "@/lib/format";
 import type { BriefingSections } from "@/types";
 
@@ -51,7 +51,6 @@ export function BriefingView({
   comment: string | null;
 }) {
   const p = data.property;
-  const [cover, ...rest] = data.photoUrls;
   const specs = [
     { label: "전용면적", value: p.area_m2 ? `${p.area_m2}㎡ (${toPyeong(p.area_m2)}평)` : null },
     { label: "층", value: p.floor ? `${p.floor}${p.total_floors ? `/${p.total_floors}` : ""}층` : null },
@@ -66,14 +65,7 @@ export function BriefingView({
 
   return (
     <article className="overflow-hidden rounded-xl border bg-white text-neutral-900 shadow-sm print:rounded-none print:border-0 print:shadow-none">
-      {sections.photos && (
-        <div className="grid grid-cols-3 gap-1">
-          <PropertyThumbnail type={p.property_type} src={cover} className="col-span-3 aspect-[2/1] w-full" />
-          {rest.slice(0, 3).map((url) => (
-            <PropertyThumbnail key={url} type={p.property_type} src={url} className="aspect-[4/3] w-full" />
-          ))}
-        </div>
-      )}
+      {sections.photos && <PhotoSlider urls={data.photoUrls} type={p.property_type} />}
       <div className="space-y-5 p-6">
         <div className="space-y-1">
           <span className="inline-block rounded-full bg-neutral-100 px-2.5 py-0.5 text-xs font-medium">

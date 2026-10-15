@@ -1,31 +1,31 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { FormMessage } from "@/components/form/form-message";
+import { useState } from "react";
+import { OfficeDocumentRequestNotice, type VerificationRequest } from "@/components/office-document-request";
+import { OfficeRegisterForm } from "@/components/office-register-form";
 import { OfficeSearch } from "@/components/office-search";
-import { registerOffice } from "@/lib/actions/office";
+import type { RegistryOffice } from "@/lib/office-registry";
 
-export function OfficeLookup({ next, currentRegNo }: { next: string | null; currentRegNo: string | null }) {
-  const [registering, startRegister] = useTransition();
-  const [selected, setSelected] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function OfficeLookup({
+  next,
+  currentRegNo,
+  documentRequest,
+}: {
+  next: string | null;
+  currentRegNo: string | null;
+  /** 미등록 사무소일 때만: 서류 심사 신청 안내 */
+  documentRequest: { officeId: string; request: VerificationRequest | null } | null;
+}) {
+  const [selected, setSelected] = useState<RegistryOffice | null>(null);
 
   return (
-    <div className="space-y-3">
-      {error && <FormMessage state={{ error }} />}
-      <OfficeSearch
-        selectLabel="이 사무소로 등록"
-        currentRegNo={currentRegNo}
-        busyRegNo={registering ? selected : null}
-        onSelect={(o) => {
-          setSelected(o.regNo);
-          setError(null);
-          startRegister(async () => {
-            const res = await registerOffice(o.regNo, next);
-            if (res?.error) setError(res.error);
-          });
-        }}
-      />
+    <div className="space-y-4">
+      {selected ? (
+        <OfficeRegisterForm office={selected} next={next ?? "/settings?tab=office"} onBack={() => setSelected(null)} />
+      ) : (
+        <OfficeSearch selectLabel="이 사무소 선택" currentRegNo={currentRegNo} onSelect={setSelected} />
+      )}
+      {documentRequest && <OfficeDocumentRequestNotice {...documentRequest} />}
     </div>
   );
 }

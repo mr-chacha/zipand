@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 
-export type Bucket = "property-photos" | "property-videos" | "visit-audio" | "documents";
+export type Bucket = "property-photos" | "property-videos" | "visit-audio" | "documents" | "office-verification";
 
 /** 버킷 설정(supabase/migrations)과 맞춘 업로드 제한 */
 export const MEDIA_LIMITS = {
-  photo: { accept: "image/jpeg,image/png,image/webp,image/heic", maxBytes: 10 * 1024 * 1024, maxCount: 20 },
+  photo: { accept: "image/jpeg,image/png,image/webp,image/heic", maxBytes: 10 * 1024 * 1024, maxCount: 10 },
   video: { accept: "video/mp4,video/quicktime,video/webm", maxBytes: 50 * 1024 * 1024, maxCount: 5 },
 } as const;
 

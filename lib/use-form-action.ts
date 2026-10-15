@@ -25,7 +25,8 @@ export function useFormAction(
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
-    const fd = new FormData(form);
+    // 누른 submit 버튼의 name/value(예: intent=next)도 함께 보낸다
+    const fd = new FormData(form, (e.nativeEvent as SubmitEvent).submitter);
     startTransition(async () => {
       if (options.prepare) {
         try {

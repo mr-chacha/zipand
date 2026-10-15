@@ -8,7 +8,10 @@ export const CUSTOMER_STATUSES = ["연락 전", "연락 완료", "진행 중", "
 export const CUSTOMER_CLOSED_STATUSES = ["계약 완료", "중개 완료", "종료"] as const;
 export const CONSULT_CHANNELS = ["방문", "전화", "메시지", "기타"] as const;
 export const TASK_TYPES = ["임장", "상담", "문서", "계약", "중도금", "잔금", "연락", "기타"] as const;
-export const DEAL_STAGES = ["조건 협의", "서류 확인", "계약 준비", "잔금 대기", "완료", "취소"] as const;
+export const DEAL_STAGES = ["서류 확인", "조건 협의", "계약 준비", "잔금 대기", "완료", "취소"] as const;
+/** 다음 버튼으로 순서대로 진행하는 단계. 마지막(완료·취소)은 별도 처리 */
+export const DEAL_STEPS = ["서류 확인", "조건 협의", "계약 준비", "잔금 대기"] as const;
+export const DEAL_CHECKLIST_STAGES = ["서류 확인", "계약 준비", "잔금 대기"] as const;
 export const DIRECTIONS = ["남향", "남동향", "남서향", "동향", "서향", "북향", "북동향", "북서향"] as const;
 
 export type DealType = (typeof DEAL_TYPES)[number];
@@ -71,20 +74,36 @@ export const DOC_FIELD_PRESETS: Record<DocType, string[]> = {
   기타: ["항목"],
 };
 
-export const DEFAULT_DEAL_CHECKLIST: { category: string; label: string }[] = [
-  { category: "서류 확인", label: "등기사항증명서 최신본 발급·확인" },
-  { category: "서류 확인", label: "건축물대장 확인 (위반건축물 여부)" },
-  { category: "서류 확인", label: "토지이용계획확인서 확인" },
-  { category: "서류 확인", label: "임대인/매도인 신분증·위임장 확인" },
-  { category: "권리 확인", label: "선순위 채권·근저당 금액 확인" },
-  { category: "권리 확인", label: "국세·지방세 체납 여부 확인 요청" },
-  { category: "계약 준비", label: "중개대상물 확인·설명서 작성" },
-  { category: "계약 준비", label: "특약 사항 정리 및 당사자 협의" },
-  { category: "계약 준비", label: "계약금 입금 계좌 명의 확인" },
-  { category: "잔금·인도", label: "잔금일 등기 재확인" },
-  { category: "잔금·인도", label: "관리비·공과금 정산" },
-  { category: "잔금·인도", label: "전입신고·확정일자 안내" },
+export type DealChecklistStage = (typeof DEAL_CHECKLIST_STAGES)[number];
+export type DealStep = (typeof DEAL_STEPS)[number];
+
+/** 거래 생성 시 만드는 단계별 기본 체크리스트. loanOnly는 매매·전세 거래에만 추가 */
+export const DEFAULT_DEAL_CHECKLIST: { stage: DealChecklistStage; category: string; label: string; loanOnly?: boolean }[] = [
+  { stage: "서류 확인", category: "서류 확인", label: "등기사항증명서 최신본 발급·확인" },
+  { stage: "서류 확인", category: "서류 확인", label: "건축물대장 확인 (위반건축물 여부)" },
+  { stage: "서류 확인", category: "서류 확인", label: "토지이용계획확인서 확인" },
+  { stage: "서류 확인", category: "서류 확인", label: "임대인/매도인 신분증·위임장 확인" },
+  { stage: "서류 확인", category: "권리 확인", label: "선순위 채권·근저당 금액 확인" },
+  { stage: "서류 확인", category: "권리 확인", label: "국세·지방세 체납 여부 확인 요청" },
+  { stage: "계약 준비", category: "확인 서류·권리분석", label: "등기부등본 최종 확인" },
+  { stage: "계약 준비", category: "확인 서류·권리분석", label: "건축물대장 최종 확인" },
+  { stage: "계약 준비", category: "확인 서류·권리분석", label: "토지대장 확인" },
+  { stage: "계약 준비", category: "확인 서류·권리분석", label: "권리분석 결과 정리" },
+  { stage: "계약 준비", category: "서류 작업", label: "임대인(매도인) 인적사항 확인" },
+  { stage: "계약 준비", category: "서류 작업", label: "입금 통장계좌 명의 확인" },
+  { stage: "계약 준비", category: "서류 작업", label: "임차인(매수인) 인적사항 확인" },
+  { stage: "계약 준비", category: "서류 작업", label: "입주날짜 재확인" },
+  { stage: "계약 준비", category: "서류 작업", label: "은행 대출 가능 여부 확인", loanOnly: true },
+  { stage: "계약 준비", category: "서류 작업", label: "중개대상물 확인·설명서 작성" },
+  { stage: "잔금 대기", category: "잔금·인도", label: "잔금 입금 확인" },
+  { stage: "잔금 대기", category: "잔금·인도", label: "잔금일 등기 재확인" },
+  { stage: "잔금 대기", category: "잔금·인도", label: "관리비·공과금 정산" },
+  { stage: "잔금 대기", category: "잔금·인도", label: "열쇠·출입카드 인도" },
+  { stage: "잔금 대기", category: "잔금·인도", label: "전입신고·확정일자 안내" },
 ];
+
+/** 거래 유형별 금액 항목 이름 */
+export const DEAL_AMOUNT_LABEL: Record<string, string> = { 매매: "매매금", 전세: "전세금", 월세: "보증금" };
 
 export const PLANS = [
   { id: "free", name: "Free", price: 0, description: "매물 기록과 기본 브리핑", features: ["매물·고객 관리", "기본 브리핑 링크", "문서 보관 1GB"] },

@@ -3,9 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { FormError, requiredStr, str, toErrorMessage } from "@/lib/form";
-import { verifiedOfficeUpdate } from "@/lib/office-registry";
-import { DEFAULT_OFFICE_NAME } from "@/lib/profile";
+import { requiredStr, str, toErrorMessage } from "@/lib/form";
 import type { ActionState } from "@/types";
 
 /** 다음 단계 주소. /setup 밖으로는 보내지 않는다. */
@@ -21,39 +19,8 @@ export async function saveSetupProfile(_prev: ActionState | null, fd: FormData):
       .from("profiles")
       .update({
         name: requiredStr(fd, "name", "이름"),
-        phone: requiredStr(fd, "phone", "휴대폰 번호"),
-        ...(fd.has("license_no") && { license_no: str(fd, "license_no") }),
-      })
+        phone: requiredStr(fd, "phone", "휴대폰 번호"),      })
       .eq("id", profile.id);
-    if (error) throw error;
-  } catch (e) {
-    return { error: toErrorMessage(e) };
-  }
-  revalidatePath("/", "layout");
-  redirect(nextPath(fd));
-}
-
-export async function saveSetupOffice(_prev: ActionState | null, fd: FormData): Promise<ActionState> {
-  const { supabase, profile, office } = await getSession();
-  if (profile.role !== "owner") return { error: "대표만 사무소 정보를 변경할 수 있어요." };
-  try {
-    const phone = requiredStr(fd, "phone", "대표 번호");
-    const registryRegNo = str(fd, "registry_reg_no");
-    let update;
-    if (registryRegNo) {
-      update = await verifiedOfficeUpdate(registryRegNo, phone);
-    } else {
-      const name = requiredStr(fd, "name", "사무소 이름");
-      if (name === DEFAULT_OFFICE_NAME) throw new FormError("실제 사무소 이름을 입력해 주세요.");
-      const registered = office.registered_at !== null;
-      update = {
-        name,
-        phone,
-        address: str(fd, "address"),
-        ...(!registered && { representative: str(fd, "representative"), registration_no: str(fd, "registration_no") }),
-      };
-    }
-    const { error } = await supabase.from("offices").update(update).eq("id", office.id);
     if (error) throw error;
   } catch (e) {
     return { error: toErrorMessage(e) };

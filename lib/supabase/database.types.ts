@@ -293,6 +293,7 @@ export type Database = {
           label: string
           office_id: string
           sort_order: number
+          stage: string
         }
         Insert: {
           category?: string
@@ -303,6 +304,7 @@ export type Database = {
           label: string
           office_id?: string
           sort_order?: number
+          stage?: string
         }
         Update: {
           category?: string
@@ -313,6 +315,7 @@ export type Database = {
           label?: string
           office_id?: string
           sort_order?: number
+          stage?: string
         }
         Relationships: [
           {
@@ -373,47 +376,153 @@ export type Database = {
           },
         ]
       }
+      deal_shares: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          expires_at: string
+          id: string
+          office_id: string
+          token: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          expires_at?: string
+          id?: string
+          office_id?: string
+          token?: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          expires_at?: string
+          id?: string
+          office_id?: string
+          token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_shares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_shares_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_shares_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "offices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deals: {
         Row: {
           amount: number | null
           balance_date: string | null
+          balance_note: string | null
+          cancel_reason: string | null
+          closing_note: string | null
+          commission: number | null
+          commission_paid: boolean
           contract_date: string | null
           created_at: string
           created_by: string | null
           customer_id: string | null
+          down_payment: number | null
+          down_payment_date: string | null
           id: string
+          lessee_name: string | null
+          lessee_phone: string | null
+          lessor_account: string | null
+          lessor_name: string | null
+          lessor_phone: string | null
+          loan_note: string | null
           memo: string | null
+          monthly_rent: number | null
+          move_in_date: string | null
           office_id: string
+          prep_note: string | null
           property_id: string
           stage: string
+          terms_note: string | null
           updated_at: string
         }
         Insert: {
           amount?: number | null
           balance_date?: string | null
+          balance_note?: string | null
+          cancel_reason?: string | null
+          closing_note?: string | null
+          commission?: number | null
+          commission_paid?: boolean
           contract_date?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          down_payment?: number | null
+          down_payment_date?: string | null
           id?: string
+          lessee_name?: string | null
+          lessee_phone?: string | null
+          lessor_account?: string | null
+          lessor_name?: string | null
+          lessor_phone?: string | null
+          loan_note?: string | null
           memo?: string | null
+          monthly_rent?: number | null
+          move_in_date?: string | null
           office_id?: string
+          prep_note?: string | null
           property_id: string
           stage?: string
+          terms_note?: string | null
           updated_at?: string
         }
         Update: {
           amount?: number | null
           balance_date?: string | null
+          balance_note?: string | null
+          cancel_reason?: string | null
+          closing_note?: string | null
+          commission?: number | null
+          commission_paid?: boolean
           contract_date?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string | null
+          down_payment?: number | null
+          down_payment_date?: string | null
           id?: string
+          lessee_name?: string | null
+          lessee_phone?: string | null
+          lessor_account?: string | null
+          lessor_name?: string | null
+          lessor_phone?: string | null
+          loan_note?: string | null
           memo?: string | null
+          monthly_rent?: number | null
+          move_in_date?: string | null
           office_id?: string
+          prep_note?: string | null
           property_id?: string
           stage?: string
+          terms_note?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -725,9 +834,70 @@ export type Database = {
           },
         ]
       }
+      office_verification_requests: {
+        Row: {
+          business_doc_path: string
+          business_no: string | null
+          created_at: string
+          id: string
+          license_doc_path: string
+          office_id: string
+          office_name: string
+          registration_no: string | null
+          requested_by: string
+          review_memo: string | null
+          reviewed_at: string | null
+          status: string
+        }
+        Insert: {
+          business_doc_path: string
+          business_no?: string | null
+          created_at?: string
+          id?: string
+          license_doc_path: string
+          office_id?: string
+          office_name: string
+          registration_no?: string | null
+          requested_by?: string
+          review_memo?: string | null
+          reviewed_at?: string | null
+          status?: string
+        }
+        Update: {
+          business_doc_path?: string
+          business_no?: string | null
+          created_at?: string
+          id?: string
+          license_doc_path?: string
+          office_id?: string
+          office_name?: string
+          registration_no?: string | null
+          requested_by?: string
+          review_memo?: string | null
+          reviewed_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "office_verification_requests_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "offices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "office_verification_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       offices: {
         Row: {
           address: string | null
+          business_no: string | null
           created_at: string
           id: string
           name: string
@@ -739,6 +909,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          business_no?: string | null
           created_at?: string
           id?: string
           name: string
@@ -750,6 +921,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          business_no?: string | null
           created_at?: string
           id?: string
           name?: string
@@ -983,6 +1155,113 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_list_items: {
+        Row: {
+          id: string
+          list_id: string
+          office_id: string
+          property_id: string
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          list_id: string
+          office_id?: string
+          property_id: string
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          list_id?: string
+          office_id?: string
+          property_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "property_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_list_items_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "offices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_list_items_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_lists: {
+        Row: {
+          comment: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          expires_at: string
+          id: string
+          office_id: string
+          title: string
+          token: string
+          view_count: number
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          expires_at?: string
+          id?: string
+          office_id?: string
+          title: string
+          token?: string
+          view_count?: number
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          expires_at?: string
+          id?: string
+          office_id?: string
+          title?: string
+          token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_lists_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_lists_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_lists_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "offices"
             referencedColumns: ["id"]
           },
         ]
@@ -1227,6 +1506,7 @@ export type Database = {
       current_office_id: { Args: never; Returns: string }
       current_role_is: { Args: { target: string }; Returns: boolean }
       get_briefing: { Args: { briefing_token: string }; Returns: Json }
+      get_deal_share: { Args: { share_token: string }; Returns: Json }
       get_invite: {
         Args: { invite_token: string }
         Returns: {
@@ -1235,10 +1515,25 @@ export type Database = {
           role: string
         }[]
       }
+      get_property_list: { Args: { list_token: string }; Returns: Json }
       is_public_briefing_photo: {
         Args: { object_name: string }
         Returns: boolean
       }
+      register_office: {
+        Args: {
+          p_address: string
+          p_business_no: string
+          p_name: string
+          p_phone: string
+          p_registration_no: string
+          p_registry: Json
+          p_representative: string
+          p_secret: string
+        }
+        Returns: undefined
+      }
+      unregister_office: { Args: never; Returns: undefined }
       update_member: {
         Args: { member_id: string; new_active: boolean; new_role: string }
         Returns: undefined

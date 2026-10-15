@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Plus } from "lucide-react";
+import { ListChecks, Plus } from "lucide-react";
 import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
@@ -20,10 +20,22 @@ export default async function PropertiesPage({ searchParams }: PageProps<"/prope
         title="매물 관리"
         description={`전체 ${properties.length}개 매물`}
         actions={
-          <GatedLink href="/properties/new" kind="property" blocked={gate.blocked.property} isOwner={gate.isOwner} className={buttonVariants()}>
-            <Plus data-icon="inline-start" />
-            매물 등록
-          </GatedLink>
+          <>
+            <GatedLink
+              href="/properties/share"
+              kind="briefing"
+              blocked={gate.blocked.briefing}
+              isOwner={gate.isOwner}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <ListChecks data-icon="inline-start" />
+              매물 리스트 공유
+            </GatedLink>
+            <GatedLink href="/properties/new" kind="property" blocked={gate.blocked.property} isOwner={gate.isOwner} className={buttonVariants()}>
+              <Plus data-icon="inline-start" />
+              매물 등록
+            </GatedLink>
+          </>
         }
       />
       <PropertyList key={query} properties={properties} initialQuery={query} />

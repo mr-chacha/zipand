@@ -1,14 +1,25 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { BookOpen, Check, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useOptimistic, useState, useTransition } from "react";
+import { Ban, BookOpen, Check, Copy, ExternalLink, EyeOff, Link2, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
+import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,14 +27,17 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   addChecklistItem,
   addDealClause,
+  cancelDeal,
+  createDealShare,
   deleteChecklistItem,
   deleteDeal,
   deleteDealClause,
+  deleteDealShare,
   toggleChecklistItem,
   updateDealClause,
-  updateDealStage,
 } from "@/lib/actions/deals";
-import { DEAL_STAGES, type DealStage } from "@/lib/constants";
+import type { DealChecklistStage } from "@/lib/constants";
+import { formatDate } from "@/lib/format";
 import { useFormAction } from "@/lib/use-form-action";
 import { cn } from "@/lib/utils";
 import type { DealChecklistItem, DealClause } from "@/types";
@@ -45,7 +59,166 @@ function useRunner() {
   return { pending, run };
 }
 
-export function DealHeaderActions({ dealId }: { dealId: string }) {
+/** 상단 계약 취소: 사유를 입력하면 계약이 취소로 마무리된다 */
+function DealCancelButton({ dealId }: { dealId: string }) {
+  const [open, setOpen] = useState(false);
+  const { state, pending, onSubmit, setState } = useFormAction(cancelDeal.bind(null, dealId), {
+    onSuccess: (result) => {
+      setOpen(false);
+      if (result.message) toast.success(result.message);
+    },
+  });
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (pending) return;
+        setOpen(next);
+        if (!next) setState(null);
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button variant="outline" className="text-destructive">
+            <Ban data-icon="inline-start" />
+            계약 취소
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>계약을 취소할까요?</DialogTitle>
+          <DialogDescription>
+            취소 사유를 남기면 계약이 &lsquo;취소&rsquo;로 마무리되고, 매물 상태는 &lsquo;광고 중&rsquo;으로 돌아가요. 임대인·임차인 공유
+            링크도 함께 닫혀요.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <Textarea name="cancel_reason" rows={3} placeholder="예) 임차인 대출 불가로 계약 해제" aria-label="계약 취소 사유" required autoFocus />
+          <FormMessage state={state} />
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" disabled={pending} />}>닫기</DialogClose>
+            <SubmitButton variant="destructive" pending={pending} pendingText="취소하는 중…">
+              계약 취소
+            </SubmitButton>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function DealHeaderActions({ dealId, cancellable }: { dealId: string; cancellable: boolean }) {
+  return (
+    <div className="flex gap-2">
+      {cancellable && <DealCancelButton dealId={dealId} />}
+      <DealDeleteButton dealId={dealId} />
+    </div>
+  );
+}
+
+interface ShareLink {
+  id: string;
+  token: string;
+  expires_at: string;
+  view_count: number;
+  created_at: string;
+  expired: boolean;
+}
+
+/** 임대인·임차인에게 보낼 계약 진행 공유 링크 */
+export function DealShareLinks({ dealId, links, siteUrl, disabled }: { dealId: string; links: ShareLink[]; siteUrl: string; disabled?: boolean }) {
+  const [days, setDays] = useState("14");
+  const [pending, startTransition] = useTransition();
+  const linkUrl = (token: string) => `${typeof window !== "undefined" ? window.location.origin : siteUrl}/d/${token}`;
+
+  const copy = async (token: string) => {
+    await navigator.clipboard.writeText(linkUrl(token));
+    toast.success("링크를 복사했어요. 임대인·임차인에게 메시지로 보내주세요.");
+  };
+
+  const create = () =>
+    startTransition(async () => {
+      const result = await createDealShare(dealId, Number(days));
+      if (result.error || !result.token) {
+        toast.error(result.error ?? "링크를 만들지 못했어요.");
+        return;
+      }
+      await copy(result.token).catch(() => toast.success(result.message));
+    });
+
+  return (
+    <div className="space-y-3">
+      <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+        <EyeOff className="mt-0.5 size-3.5 shrink-0" />
+        거래 조건·일정, 당사자 이름, 입금 계좌, 확인 사항, 특약이 보여요. 연락처·중개수수료·내부 메모는 보이지 않아요.
+      </p>
+      <div className="flex items-end gap-2">
+        <NativeSelect
+          aria-label="유효 기간"
+          value={days}
+          onChange={(e) => setDays(e.target.value)}
+          className="flex-1"
+          options={[
+            { value: "3", label: "3일" },
+            { value: "7", label: "7일" },
+            { value: "14", label: "14일" },
+            { value: "30", label: "30일" },
+          ]}
+        />
+        <Button onClick={create} disabled={pending || disabled}>
+          {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Link2 data-icon="inline-start" />}
+          링크 생성·복사
+        </Button>
+      </div>
+      {links.length > 0 && (
+        <div className="divide-y rounded-lg border">
+          {links.map((link) => (
+            <div key={link.id} className="flex items-center gap-1 px-3 py-2 text-xs">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-mono">/d/{link.token.slice(0, 10)}…</p>
+                <p className="text-muted-foreground">
+                  조회 {link.view_count}회 · {formatDate(link.expires_at)}까지
+                </p>
+              </div>
+              {link.expired ? (
+                <Badge variant="outline">만료</Badge>
+              ) : (
+                <>
+                  <Button size="icon-sm" variant="ghost" aria-label="링크 복사" onClick={() => copy(link.token)}>
+                    <Copy />
+                  </Button>
+                  <a
+                    href={`/d/${link.token}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex size-7 items-center justify-center rounded-md hover:bg-muted"
+                    aria-label="열기"
+                  >
+                    <ExternalLink className="size-4" />
+                  </a>
+                </>
+              )}
+              <ConfirmAction
+                action={() => deleteDealShare(link.id, dealId)}
+                title="공유 링크를 삭제할까요?"
+                description="삭제하면 이 링크로 더 이상 계약 내용을 볼 수 없어요."
+                successMessage="링크를 삭제했어요."
+                trigger={
+                  <Button size="icon-sm" variant="ghost" aria-label="링크 삭제">
+                    <Trash2 />
+                  </Button>
+                }
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DealDeleteButton({ dealId }: { dealId: string }) {
   return (
     <ConfirmAction
       action={() => deleteDeal(dealId)}
@@ -61,49 +234,30 @@ export function DealHeaderActions({ dealId }: { dealId: string }) {
   );
 }
 
-export function DealStageSelect({ dealId, stage }: { dealId: string; stage: string }) {
+export function DealChecklist({
+  dealId,
+  stage,
+  items: serverItems,
+}: {
+  dealId: string;
+  stage: DealChecklistStage;
+  items: DealChecklistItem[];
+}) {
   const { pending, run } = useRunner();
-  const currentIndex = DEAL_STAGES.indexOf(stage as DealStage);
-  return (
-    <ol className="space-y-1">
-      {DEAL_STAGES.map((s, i) => {
-        const active = s === stage;
-        const passed = s !== "취소" && stage !== "취소" && i < currentIndex;
-        return (
-          <li key={s}>
-            <button
-              type="button"
-              disabled={pending || active}
-              onClick={() => run(() => updateDealStage(dealId, s))}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors",
-                active ? "bg-primary text-primary-foreground" : "hover:bg-muted",
-                s === "취소" && !active && "text-muted-foreground"
-              )}
-            >
-              <span
-                className={cn(
-                  "flex size-5 items-center justify-center rounded-full border text-[10px]",
-                  active && "border-primary-foreground",
-                  passed && "border-success bg-success text-white"
-                )}
-              >
-                {passed ? <Check className="size-3" /> : i + 1}
-              </span>
-              {s}
-            </button>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-export function DealChecklist({ dealId, items }: { dealId: string; items: DealChecklistItem[] }) {
-  const { pending, run } = useRunner();
-  const { state, pending: adding, onSubmit } = useFormAction(addChecklistItem.bind(null, dealId), {
+  const { state, pending: adding, onSubmit } = useFormAction(addChecklistItem.bind(null, dealId, stage), {
     onSuccess: (_r, form) => form.reset(),
   });
+  // 체크는 서버 응답을 기다리지 않고 바로 반영한다. 실패하면 서버 값으로 되돌아간다
+  const [items, setOptimisticDone] = useOptimistic(serverItems, (state, update: { id: string; done: boolean }) =>
+    state.map((i) => (i.id === update.id ? { ...i, done: update.done } : i))
+  );
+  const [, startToggle] = useTransition();
+  const toggle = (id: string, done: boolean) =>
+    startToggle(async () => {
+      setOptimisticDone({ id, done });
+      const result = await toggleChecklistItem(id, dealId, done);
+      if (result.error) toast.error(result.error);
+    });
   const done = items.filter((i) => i.done).length;
   const categories = [...new Set(items.map((i) => i.category))];
 
@@ -128,8 +282,7 @@ export function DealChecklist({ dealId, items }: { dealId: string; items: DealCh
               <div key={item.id} className="group flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/50">
                 <Checkbox
                   checked={item.done}
-                  disabled={pending}
-                  onCheckedChange={(v) => run(() => toggleChecklistItem(item.id, dealId, Boolean(v)))}
+                  onCheckedChange={(v) => toggle(item.id, Boolean(v))}
                   aria-label={item.label}
                 />
                 <span className={cn("flex-1 text-sm", item.done && "text-muted-foreground line-through")}>{item.label}</span>

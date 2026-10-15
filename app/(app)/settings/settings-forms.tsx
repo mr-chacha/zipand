@@ -63,6 +63,10 @@ export function OfficeInfo({ office, isOwner }: { office: Office; isOwner: boole
     { label: "사무소명", value: office.name },
     { label: "대표자", value: office.representative },
     { label: "개설등록번호", value: office.registration_no },
+    {
+      label: "사업자등록번호",
+      value: office.business_no?.replace(/^(\d{3})(\d{2})(\d{5})$/, "$1-$2-$3") ?? null,
+    },
     { label: "대표 전화", value: office.phone },
     { label: "주소", value: office.address },
   ];
@@ -70,7 +74,7 @@ export function OfficeInfo({ office, isOwner }: { office: Office; isOwner: boole
     <div className="space-y-4">
       <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
         <BadgeCheck className="size-4 shrink-0 text-primary" />
-        <span className="flex-1">공공데이터로 확인된 사무소 · {formatDate(office.registered_at)} 등록</span>
+        <span className="flex-1">개설등록·사업자등록 정보로 인증된 사무소 · {formatDate(office.registered_at)} 등록</span>
       </div>
       <dl className="divide-y rounded-lg border">
         {rows.map((row) => (
@@ -92,7 +96,7 @@ export function OfficeInfo({ office, isOwner }: { office: Office; isOwner: boole
   );
 }
 
-export function AccountForms({ profile, officeRegistered }: { profile: Profile; officeRegistered: boolean }) {
+export function AccountForms({ profile }: { profile: Profile }) {
   const info = useFormAction(updateProfile, toastOnSuccess);
   const password = useFormAction(changePassword, {
     onSuccess: (r, form) => {
@@ -115,14 +119,6 @@ export function AccountForms({ profile, officeRegistered }: { profile: Profile; 
           <form onSubmit={info.onSubmit} className="space-y-4">
             <Field label="이름 *" name="name" defaultValue={profile.name} required />
             <Field label="휴대폰 번호" name="phone" type="tel" defaultValue={profile.phone} />
-            {officeRegistered && (
-              <div className="space-y-1.5">
-                <Field label="중개사 자격번호" name="license_no" defaultValue={profile.license_no} />
-                <p className="text-xs text-muted-foreground">
-                  자격 인증: {VERIFICATION_LABELS[profile.verification_status]} · 인증 심사는 서비스 준비중이에요
-                </p>
-              </div>
-            )}
             <FormMessage state={info.state} />
             <div className="flex justify-end">
               <SubmitButton pending={info.pending}>저장</SubmitButton>

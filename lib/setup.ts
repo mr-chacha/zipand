@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth";
-import { hasDefaultName, hasDefaultOfficeName } from "@/lib/profile";
+import { hasDefaultName } from "@/lib/profile";
 
 export type SetupStepKey = "profile" | "office" | "property" | "briefing" | "invite";
 
@@ -40,8 +40,8 @@ export async function getSetupProgress() {
     {
       key: "office",
       title: "사무소 정보",
-      prompt: "공공데이터에서 우리 사무소를 찾아 사무소 정보를 등록해 주세요.",
-      done: !hasDefaultOfficeName(office) && Boolean(office.phone),
+      prompt: "우리 사무소를 조회하고 사업자등록정보로 인증해서 사무소 등록을 완료해 주세요.",
+      done: office.registered_at !== null,
       locked: false,
     },
     {

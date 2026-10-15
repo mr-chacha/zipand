@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { DEAL_TYPES, MAINTENANCE_STATUSES, PROPERTY_STATUSES, PROPERTY_TYPES, type PropertyStatus } from "@/lib/constants";
-import { int, lines, num, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
-import { isPropertyPath } from "@/lib/storage";
+import { FormError, int, lines, num, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
+import { isPropertyPath, MEDIA_LIMITS } from "@/lib/storage";
 import type { ActionState } from "@/types";
 
 function readPropertyForm(fd: FormData) {
@@ -79,6 +79,9 @@ export async function createProperty(_prev: ActionState | null, fd: FormData): P
   const videoSizes = fd.getAll("video_sizes").map(Number);
 
   try {
+    if (photoPaths.length > MEDIA_LIMITS.photo.maxCount) {
+      throw new FormError(`사진은 매물당 최대 ${MEDIA_LIMITS.photo.maxCount}장까지 등록할 수 있어요.`);
+    }
     const values = readPropertyForm(fd);
     const { error } = await supabase
       .from("properties")
@@ -178,6 +181,10 @@ export async function addPropertyPhotos(propertyId: string, paths: string[]): Pr
     .from("property_photos")
     .select("id", { count: "exact", head: true })
     .eq("property_id", propertyId);
+  if ((count ?? 0) + paths.length > MEDIA_LIMITS.photo.maxCount) {
+    await supabase.storage.from("property-photos").remove(paths);
+    return { error: `사진은 매물당 최대 ${MEDIA_LIMITS.photo.maxCount}장까지 등록할 수 있어요.` };
+  }
 
   const { error } = await supabase.from("property_photos").insert(
     paths.map((storage_path, i) => ({ property_id: propertyId, storage_path, sort_order: (count ?? 0) + i }))

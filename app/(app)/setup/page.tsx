@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createProperty } from "@/lib/actions/properties";
 import { getSession } from "@/lib/auth";
 import type { RegistryOffice } from "@/lib/office-registry";
-import { hasDefaultName, hasDefaultOfficeName } from "@/lib/profile";
+import { hasDefaultName } from "@/lib/profile";
 import { getOfficeMembers, getPropertyOptions } from "@/lib/queries";
 import { getSetupProgress, type SetupStep } from "@/lib/setup";
 import { cn } from "@/lib/utils";
@@ -83,26 +83,46 @@ export default async function SetupPage({ searchParams }: PageProps<"/setup">) {
           {...nav}
           name={hasDefaultName(profile) ? "" : profile.name}
           phone={profile.phone ?? ""}
-          licenseNo={profile.license_no ?? ""}
-          showLicense={office.registered_at !== null}
         />
       );
       break;
-    case "office":
+    case "office": {
+      const { data: request } = await supabase
+        .from("office_verification_requests")
+        .select("status, created_at, review_memo")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const registry =
+        office.registered_at && office.registry_data
+          ? (office.registry_data as unknown as RegistryOffice & {
+              businessStatus?: string | null;
+              businessStartDate?: string | null;
+              verifiedAt?: string | null;
+            })
+          : null;
       content = (
         <OfficeStep
           {...nav}
-          office={{
-            name: hasDefaultOfficeName(office) ? "" : office.name,
-            phone: office.phone ?? profile.phone ?? "",
-            representative: office.representative ?? profile.name,
-            registration_no: office.registration_no ?? "",
-            address: office.address ?? "",
-          }}
-          registry={office.registered_at && office.registry_data ? (office.registry_data as unknown as RegistryOffice) : null}
+          officeId={office.id}
+          phone={office.phone ?? profile.phone ?? ""}
+          representative={office.representative ?? (hasDefaultName(profile) ? "" : profile.name)}
+          registry={registry}
+          business={
+            registry && office.business_no
+              ? {
+                  no: office.business_no,
+                  status: registry.businessStatus ?? null,
+                  startDate: registry.businessStartDate ?? null,
+                  verifiedAt: registry.verifiedAt ?? null,
+                }
+              : null
+          }
+          request={request}
         />
       );
       break;
+    }
     case "property": {
       if (step.done) {
         const properties = await getPropertyOptions();

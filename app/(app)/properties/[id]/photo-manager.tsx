@@ -7,8 +7,12 @@ import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { Button } from "@/components/ui/button";
 import { addPropertyPhotos, deletePropertyPhoto, setCoverPhoto } from "@/lib/actions/properties";
 import { toErrorMessage } from "@/lib/errors";
+import { formatFileSize } from "@/lib/format";
+import { MEDIA_LIMITS } from "@/lib/storage";
 import { uploadToStorage } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
+
+const LIMIT = MEDIA_LIMITS.photo;
 
 interface Photo {
   id: string;
@@ -28,13 +32,35 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos }: Pho
   const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState(0);
   const current = photos[Math.min(selected, photos.length - 1)];
+  const remaining = LIMIT.maxCount - photos.length;
 
-  const onFiles = async (files: FileList | null) => {
-    if (!files?.length) return;
+  const onFiles = async (fileList: FileList | null) => {
+    if (!fileList?.length) return;
+    const accepted = LIMIT.accept.split(",");
+    const files = Array.from(fileList).filter((file) => {
+      if (!accepted.includes(file.type)) {
+        toast.error(`${file.name}: 지원하지 않는 사진 형식이에요.`);
+        return false;
+      }
+      if (file.size > LIMIT.maxBytes) {
+        toast.error(`${file.name}: ${formatFileSize(LIMIT.maxBytes)} 이하만 올릴 수 있어요.`);
+        return false;
+      }
+      return true;
+    });
+    if (files.length > remaining) {
+      toast.error(`사진은 최대 ${LIMIT.maxCount}장까지 올릴 수 있어요. ${remaining}장만 추가할게요.`);
+      files.splice(remaining);
+    }
+    if (!files.length) {
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
     setUploading(true);
     try {
       const paths: string[] = [];
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         paths.push(await uploadToStorage("property-photos", officeId, propertyId, file));
       }
       const result = await addPropertyPhotos(propertyId, paths);
@@ -58,7 +84,7 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos }: Pho
   return (
     <div className="space-y-2">
       <div className="group relative overflow-hidden rounded-xl border bg-muted">
-        <PropertyThumbnail type={propertyType} src={current?.url} className="aspect-[16/9] w-full" />
+        <PropertyThumbnail type={propertyType} src={current?.url} className="aspect-[16/9] w-full object-contain" />
         {current && (
           <div className="absolute top-2 right-2 flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
             {selected !== 0 && (
@@ -99,24 +125,22 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos }: Pho
             )}
           </button>
         ))}
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-          className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
-        >
-          {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-          {uploading ? "업로드 중" : "사진 추가"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic"
-          multiple
-          className="hidden"
-          onChange={(e) => onFiles(e.target.files)}
-        />
+        {remaining > 0 && (
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+            className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
+          >
+            {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+            {uploading ? "업로드 중" : "사진 추가"}
+          </button>
+        )}
+        <input ref={inputRef} type="file" accept={LIMIT.accept} multiple className="hidden" onChange={(e) => onFiles(e.target.files)} />
       </div>
+      <p className="text-xs text-muted-foreground">
+        사진 {photos.length}/{LIMIT.maxCount} · 첫 번째 사진이 대표 사진
+      </p>
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { Link2, Link2Off, Pencil, Plus, Trash2 } from "lucide-react";
+import { Link2, Link2Off, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -31,6 +31,10 @@ import { useFormAction } from "@/lib/use-form-action";
 export function CustomerHeaderActions({ customerId }: { customerId: string }) {
   return (
     <>
+      <Link href={`/properties/share?customer=${customerId}`} className={buttonVariants({ variant: "outline" })}>
+        <ListChecks data-icon="inline-start" />
+        매물 리스트 보내기
+      </Link>
       <Link href={`/customers/${customerId}/edit`} className={buttonVariants({ variant: "outline" })}>
         <Pencil data-icon="inline-start" />
         수정

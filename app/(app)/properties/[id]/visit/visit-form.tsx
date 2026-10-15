@@ -77,12 +77,13 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
   const chunksRef = useRef<Blob[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const nextKey = useRef(100);
-  const [visitedAt] = useState(() => isoToKstLocal(null));
+  const [visitedAt, setVisitedAt] = useState(() => isoToKstLocal(null));
 
   const { state, pending, onSubmit } = useFormAction(createVisit.bind(null, propertyId), {
-    onSuccess: (result, form) => {
-      form.reset();
+    onSuccess: (result) => {
+      // 체크박스 등 내부 상태가 있는 입력은 form.reset()으로 초기화되지 않아 폼을 다시 마운트한다
       setFields(initialFields());
+      setVisitedAt(isoToKstLocal(null));
       setGeneration((g) => g + 1);
       setChecklist(DEFAULT_VISIT_CHECKLIST);
       setAudio(null);
@@ -146,7 +147,7 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
   };
 
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
+    <form key={generation} onSubmit={onSubmit} className="space-y-6">
       <input type="hidden" name="audio_path" value={audio?.path ?? ""} />
 
       <Card>
@@ -233,7 +234,7 @@ export function VisitForm({ officeId, propertyId }: { officeId: string; property
           </div>
           {fields.map((field) => (
             <VisitFieldRow
-              key={`${generation}-${field.key}`}
+              key={field.key}
               initialLabel={field.label}
               onRemove={() => setFields((f) => f.filter((x) => x.key !== field.key))}
             />

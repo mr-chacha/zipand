@@ -65,7 +65,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </TabsContent>
 
         <TabsContent value="account" className="pt-4">
-          <AccountForms profile={profile} officeRegistered={office.registered_at !== null} />
+          <AccountForms profile={profile} />
         </TabsContent>
 
         <TabsContent value="subscription" className="space-y-4 pt-4">

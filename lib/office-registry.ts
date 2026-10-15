@@ -67,20 +67,12 @@ function normalize(item: RawItem): RegistryOffice | null {
   };
 }
 
-/** 개설등록번호로 다시 조회해 확인된 사무소 정보로 offices 업데이트 값을 만든다 */
-export async function verifiedOfficeUpdate(regNo: string, phone: string | null) {
+/** 개설등록번호로 다시 조회해 공공데이터에 있는 사무소인지 확인한다 */
+export async function findRegistryOffice(regNo: string) {
   const { items } = await searchRegistry({ regNo });
   const found = items.find((o) => o.regNo === regNo);
   if (!found) throw new FormError("공공데이터에서 해당 사무소를 찾지 못했어요. 다시 조회해 주세요.");
-  return {
-    name: found.name,
-    registration_no: found.regNo,
-    representative: found.representative,
-    address: found.roadAddress ?? found.lotAddress,
-    phone: phone ?? found.phone,
-    registered_at: new Date().toISOString(),
-    registry_data: found as unknown as Record<string, string | null>,
-  };
+  return found;
 }
 
 /** 등록된 공인중개사사무소를 조회한다. 조건은 정확히 일치하는 값으로 검색된다. */

@@ -78,9 +78,11 @@ export async function addConsultation(customerId: string, _prev: ActionState | n
     });
     if (error) throw error;
     await supabase.from("customers").update({ updated_at: new Date().toISOString() }).eq("id", customerId);
+    await supabase.from("customers").update({ status: "연락 완료" }).eq("id", customerId).eq("status", "연락 전");
   } catch (e) {
     return { error: toErrorMessage(e) };
   }
+  revalidatePath("/customers");
   revalidatePath(`/customers/${customerId}`);
   return { message: "상담 기록을 저장했어요." };
 }

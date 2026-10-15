@@ -19,7 +19,7 @@ export default async function NewDealPage({ searchParams }: PageProps<"/contract
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title="계약 시작"
-        description="거래를 만들면 기본 확인 체크리스트가 함께 생성되고, 매물 상태가 '계약 진행'으로 바뀌어요."
+        description="거래를 만들면 서류 확인 → 조건 협의 → 계약 준비 → 잔금 대기 → 완료 순서로 진행해요. 매물 상태는 '계약 진행'으로 바뀌어요."
         backHref="/contracts"
         backLabel="계약 준비"
       />
