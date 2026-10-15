@@ -9,7 +9,7 @@ import { getSession } from "@/lib/auth";
 import { PLANS } from "@/lib/constants";
 import { isPast } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { AccountForms, MemberManager, OfficeForm } from "./settings-forms";
+import { AccountForms, MemberManager, OfficeInfo } from "./settings-forms";
 
 export const metadata: Metadata = { title: "설정" };
 
@@ -44,11 +44,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <CardHeader>
               <CardTitle>사무소 정보</CardTitle>
               <CardDescription>
-                {isOwner ? "고객 브리핑의 연락처에 표시돼요." : "사무소 정보는 대표만 변경할 수 있어요."}
+                {isOwner ? "공공데이터에서 조회해 등록한 사무소 정보예요. 고객 브리핑의 연락처에 표시돼요." : "사무소 정보는 대표만 등록할 수 있어요."}
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <OfficeForm office={office} readOnly={!isOwner} />
+              <OfficeInfo office={office} isOwner={isOwner} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -60,11 +60,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             currentUserId={profile.id}
             isOwner={isOwner}
             siteUrl={process.env.NEXT_PUBLIC_SITE_URL ?? ""}
+            inviteBlocked={office.registered_at === null}
           />
         </TabsContent>
 
         <TabsContent value="account" className="pt-4">
-          <AccountForms profile={profile} />
+          <AccountForms profile={profile} officeRegistered={office.registered_at !== null} />
         </TabsContent>
 
         <TabsContent value="subscription" className="space-y-4 pt-4">

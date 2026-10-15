@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
+import { useOfficeGuard, type GateInfo } from "@/components/office-gate";
 import { SubmitButton } from "@/components/form/submit-button";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { PropertyStatusBadge } from "@/components/status-badge";
@@ -57,8 +58,17 @@ interface ConsultationItem {
   author: { name: string } | null;
 }
 
-export function ConsultationPanel({ customerId, consultations }: { customerId: string; consultations: ConsultationItem[] }) {
+export function ConsultationPanel({
+  customerId,
+  consultations,
+  gate,
+}: {
+  customerId: string;
+  consultations: ConsultationItem[];
+  gate: GateInfo;
+}) {
   const [pending, startTransition] = useTransition();
+  const officeGuard = useOfficeGuard("consultation", gate);
   const { state, pending: saving, onSubmit } = useFormAction(addConsultation.bind(null, customerId), {
     onSuccess: (result, form) => {
       form.reset();
@@ -68,7 +78,16 @@ export function ConsultationPanel({ customerId, consultations }: { customerId: s
 
   return (
     <div className="space-y-4">
-      <form onSubmit={onSubmit} className="space-y-2 rounded-lg border p-3">
+      {officeGuard.dialog}
+      <form
+        onSubmit={(e) => {
+          if (officeGuard.blocked) {
+            e.preventDefault();
+            officeGuard.guard();
+          } else onSubmit(e);
+        }}
+        className="space-y-2 rounded-lg border p-3"
+      >
         <div className="flex flex-wrap gap-2">
           <NativeSelect name="channel" options={CONSULT_CHANNELS} defaultValue="전화" className="w-28" />
           <DatePicker name="consulted_at" withTime defaultValue={isoToKstLocal(null)} className="w-56" aria-label="상담 일시" />
@@ -142,28 +161,29 @@ export function CustomerProperties({
   linked,
   recommendations,
   options,
+  gate,
 }: {
   customerId: string;
   linked: PropertyListItem[];
   recommendations: (PropertyListItem & { reasons: string[] })[];
   options: { value: string; label: string }[];
+  gate: GateInfo;
 }) {
   const [pending, startTransition] = useTransition();
+  const officeGuard = useOfficeGuard("link", gate);
   const run = (fn: () => Promise<{ error?: string; message?: string }>) =>
     startTransition(async () => {
       const result = await fn();
       if (result.error) toast.error(result.error);
       else if (result.message) toast.success(result.message);
     });
+  const link = (propertyId: string) => officeGuard.guard(() => run(() => linkCustomerProperty(customerId, propertyId)));
 
   return (
     <div className="space-y-5">
+      {officeGuard.dialog}
       {options.length > 0 && (
-        <Select
-          value={null}
-          disabled={pending}
-          onValueChange={(propertyId) => propertyId && run(() => linkCustomerProperty(customerId, propertyId as string))}
-        >
+        <Select value={null} disabled={pending} onValueChange={(propertyId) => propertyId && link(propertyId as string)}>
           <SelectTrigger className="w-full sm:w-80">
             <Link2 className="size-4 text-muted-foreground" />
             <SelectValue placeholder="매물 연결하기" />
@@ -213,7 +233,7 @@ export function CustomerProperties({
                   variant="outline"
                   className="ml-1 h-6"
                   disabled={pending}
-                  onClick={() => run(() => linkCustomerProperty(customerId, p.id))}
+                  onClick={() => link(p.id)}
                 >
                   <Link2 data-icon="inline-start" />
                   연결

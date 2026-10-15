@@ -6,9 +6,10 @@
 ## 현재 상태
 - **단계**: Phase 2 — Supabase 연동 완료 (AI·앱·결제 제외 전 기능 동작), 가입·온보딩 UX 개선, 대시보드 캘린더
 - **완료**: 인증/사무소(간단 가입·단계별 시작하기), 매물·사진·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크, 고객·상담·후속 일정, 계약 준비(체크리스트·특약), 설정(사무소·구성원 초대·계정·구독 안내), 대시보드(일정 캘린더)
-- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261013130000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 사무소 조회용 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털 인증키, 서버 전용) 필요
+- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261015090000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 사무소 조회용 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털 인증키, 서버 전용) 설정 완료·동작 확인
 - **다음 작업** (우선순위 순)
-  0. `.env.local`에 `DATA_GO_KR_SERVICE_KEY` 넣고 `/office/register`에서 실제 조회·등록 확인 (API 응답 필드명·정확 일치 검색 여부 검증). 미등록 상태에서 매물·고객 2건째, 문서·계약 진입 시 모달/안내 동작 점검
+  0. 브라우저 점검: 시작하기 2단계 사무소 조회→선택→저장(등록), 미등록 상태에서 각 제한 기능(매물·고객 2건째, 문서, 계약, 구성원 초대, 브리핑 공유, 상담 기록, 고객-매물 연결) 모달 동작, 시작하기 4·5단계 잠김 표시, 설정 사무소 정보 표시
+  0. 대표자 본인 확인(휴대폰 본인인증 실명 ↔ 공공데이터 대표자명 비교 또는 등록증 업로드 심사) 설계 — 공공데이터에는 대표자 이름만 있음
   1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행). 새 날짜 선택기(`components/form/date-picker.tsx`)는 브라우저 미확인 — 모든 날짜 입력 화면에서 확인·취소, 시간 선택, 폼 초기화 동작 점검
   2. 선택 입력 날짜(입주 희망일·계약일·잔금일·발급일)를 비우는 방법 필요 여부 결정 (현재 날짜 선택기에 확인·취소만 있음)
   2. 모바일 레이아웃 점검 — 특히 임장 기록·사진·동영상 업로드, 캘린더 (현장 사용)
@@ -43,6 +44,32 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-15 — 사무소 조회를 시작하기에 연결, 등록 전 제한 확대, 공통 모달
+**작업 요약**
+- 공공데이터 API 실제 키로 동작 확인(전국 76,714건). 실제 응답이 `{ header, body }` 최상위 구조라 파서 수정(기존엔 모든 조회가 실패 처리됐을 것), 키 오류 JSON(`OpenAPI_ServiceResponse`)도 처리. 검색은 정확 일치만 됨(부분 검색 불가)
+- 시작하기 2단계 사무소 정보: 공공데이터 조회 → 사무소 선택 → 대표 전화 확인 후 저장. 저장 시 서버에서 등록번호로 재조회한 값만 저장하고 등록 처리. 검색 안 될 때 "직접 입력"(미등록으로 저장) 유지
+- 개설등록번호 입력칸에 "등록증에 적힌 그대로 '-'까지 입력" 안내
+- 등록 전 제한 확대: 구성원 초대, 고객 브리핑 공유, 상담 기록, 고객-매물 연결 불가(기존: 매물·고객 1건, 문서·계약 불가). DB 트리거 + 화면 모달
+- 공통 모달 `components/dialogs.tsx`: `NoticeDialog`(확인 모달, 확인 버튼 하나), `ConfirmDialog`(컨펌 모달, 취소/실행). `ConfirmAction`·사무소 등록 안내 모달이 이를 사용. 대표는 컨펌(취소/등록하기), 구성원은 확인 모달
+- 링크가 아닌 동작용 `useOfficeGuard(kind, gate)` 훅(guard(fn) + dialog)
+- 시작하기: 미등록이면 4단계(브리핑)·5단계(초대)를 잠김(자물쇠)으로 표시하고 건너뛰기 가능
+- 설정 사무소 정보: 입력 폼 제거 → 등록된 값 읽기 전용 표시 + 다시 조회, 미등록이면 "사무소 등록하기"만. 내 정보(설정·시작하기 1단계)의 중개사 자격번호는 사무소 등록 후에만 표시(숨김 상태로 저장해도 기존 값 유지)
+
+**변경 파일/화면**
+- 화면: `/setup`(1·2·4·5단계), `/office/register`, `/settings`(사무소 정보·구성원·계정), `/customers/[id]`, `/properties/[id]`, `/properties/[id]/briefing`, 대시보드 시작하기 카드
+- 마이그레이션(원격 적용): `20261015090000_office_registration_more`(`enforce_office_registration` 메시지 확장, `office_invites`·`briefings`·`consultations`·`customer_properties` 트리거)
+- 신규: `components/dialogs.tsx`, `components/office-search.tsx`(검색 UI, 시작하기·사무소 등록 공용)
+- 수정: `lib/office-registry.ts`(파서, `verifiedOfficeUpdate`), `lib/actions/setup.ts`, `lib/actions/office.ts`, `lib/actions/settings.ts`(`updateOffice` 제거, 자격번호 조건부 저장), `lib/office-gate.ts`(제한 종류 추가, `gateFor`), `lib/setup.ts`(`locked`), `components/office-gate.tsx`, `components/form/confirm-action.tsx`
+
+**결정 사항**
+- 사무소 정보는 공공데이터 조회·등록으로만 입력(설정에서 직접 수정 불가, 대표 전화도 재조회/시작하기에서만 변경)
+- 공공데이터에는 대표자 이름만 있고 연락처·생년월일 없음 → 대표자 본인 확인은 별도 인증 필요
+
+**남은 TODO**
+- 원격 트리거 적용 여부 조회 확인(`supabase db query`가 응답 없이 멈춰 미확인, push는 성공)
+- 대표 전화만 따로 수정하는 기능 필요 여부 결정
+- `office_name` 수정 경로(`CompleteProfileDialog`)는 이제 초대 전 사무소 등록이 필수라 사실상 미사용 — 정리 검토
 
 ### 2026-10-13 — 매물 연락처·금액/면적 입력, 관리비 항목, 파비콘, 사무소 등록 제한·공공데이터 조회
 **작업 요약**

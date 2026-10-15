@@ -79,28 +79,6 @@ export async function completeProfileFields(_prev: ActionState | null, fd: FormD
   return { message: "정보를 저장했어요." };
 }
 
-export async function updateOffice(_prev: ActionState | null, fd: FormData): Promise<ActionState> {
-  const { supabase, profile, office } = await getSession();
-  if (profile.role !== "owner") return { error: OWNER_ONLY };
-  try {
-    const registered = office.registered_at !== null;
-    const { error } = await supabase
-      .from("offices")
-      .update({
-        name: requiredStr(fd, "name", "사무소명"),
-        ...(!registered && { registration_no: str(fd, "registration_no"), representative: str(fd, "representative") }),
-        phone: str(fd, "phone"),
-        address: str(fd, "address"),
-      })
-      .eq("id", office.id);
-    if (error) throw error;
-  } catch (e) {
-    return { error: toErrorMessage(e) };
-  }
-  revalidatePath("/", "layout");
-  return { message: "사무소 정보를 저장했어요." };
-}
-
 export async function updateProfile(_prev: ActionState | null, fd: FormData): Promise<ActionState> {
   const { supabase, profile } = await getSession();
   try {
@@ -109,7 +87,8 @@ export async function updateProfile(_prev: ActionState | null, fd: FormData): Pr
       .update({
         name: requiredStr(fd, "name", "이름"),
         phone: str(fd, "phone"),
-        license_no: str(fd, "license_no"),
+        // 자격번호 칸은 사무소 등록 후에만 보이므로, 칸이 없으면 기존 값을 유지한다
+        ...(fd.has("license_no") && { license_no: str(fd, "license_no") }),
       })
       .eq("id", profile.id);
     if (error) throw error;

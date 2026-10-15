@@ -2,17 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/dialogs";
 import type { ActionState } from "@/types";
 
 interface ConfirmActionProps {
@@ -24,6 +14,7 @@ interface ConfirmActionProps {
   trigger: React.ReactElement;
 }
 
+/** 서버 액션을 실행하기 전에 컨펌 모달을 띄운다 (기본: 삭제) */
 export function ConfirmAction({
   action,
   title,
@@ -48,20 +39,16 @@ export function ConfirmAction({
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger render={trigger} />
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>취소</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={onConfirm} disabled={pending}>
-            {pending ? "처리 중…" : confirmLabel}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={open}
+      onOpenChange={setOpen}
+      trigger={trigger}
+      title={title}
+      description={description}
+      confirmLabel={confirmLabel}
+      destructive
+      pending={pending}
+      onConfirm={onConfirm}
+    />
   );
 }

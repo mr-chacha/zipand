@@ -93,10 +93,16 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
           <Upload data-icon="inline-start" />
           서류 업로드
         </GatedLink>
-        <Link href={`/properties/${id}/briefing`} className={buttonVariants()}>
+        <GatedLink
+          href={`/properties/${id}/briefing`}
+          kind="briefing"
+          blocked={gate.blocked.briefing}
+          isOwner={gate.isOwner}
+          className={buttonVariants()}
+        >
           <Presentation data-icon="inline-start" />
           고객 브리핑
-        </Link>
+        </GatedLink>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -234,7 +240,12 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
             <TabsContent value="customers" className="mt-4">
               <Card>
                 <CardContent>
-                  <LinkedCustomers propertyId={id} linked={linkedCustomers} options={customerOptions} />
+                  <LinkedCustomers
+                    propertyId={id}
+                    linked={linkedCustomers}
+                    options={customerOptions}
+                    gate={{ blocked: gate.blocked.link, isOwner: gate.isOwner }}
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

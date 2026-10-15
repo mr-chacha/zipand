@@ -2,12 +2,13 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { AlertTriangle, BadgeCheck, Copy, Trash2, UserPlus } from "lucide-react";
+import { BadgeCheck, Building2, Copy, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
+import { useOfficeGuard } from "@/components/office-gate";
 import { PasswordInput } from "@/components/form/password-input";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +17,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { changePassword, createInvite, revokeInvite, updateMember, updateOffice, updateProfile } from "@/lib/actions/settings";
+import { changePassword, createInvite, revokeInvite, updateMember, updateProfile } from "@/lib/actions/settings";
 import { ROLE_LABELS, VERIFICATION_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
 import { useFormAction } from "@/lib/use-form-action";
-import { cn } from "@/lib/utils";
 import type { ActionState, Office, Profile, ProfileNeed } from "@/types";
 
 function Field({
@@ -39,59 +39,60 @@ function Field({
 
 const toastOnSuccess = { onSuccess: (r: { message?: string }) => r.message && toast.success(r.message) };
 
-export function OfficeForm({ office, readOnly }: { office: Office; readOnly: boolean }) {
-  const { state, pending, onSubmit } = useFormAction(updateOffice, toastOnSuccess);
-  const registered = office.registered_at !== null;
-  return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div
-        className={cn(
-          "flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center",
-          registered ? "border-primary/30 bg-primary/5" : "border-amber-300 bg-amber-50 dark:border-amber-500/40 dark:bg-amber-500/10"
-        )}
-      >
-        {registered ? (
-          <BadgeCheck className="size-5 shrink-0 text-primary" />
-        ) : (
-          <AlertTriangle className="size-5 shrink-0 text-amber-600" />
-        )}
-        <div className="flex-1 text-sm">
-          <p className="font-medium">{registered ? "공공데이터로 확인된 사무소예요" : "사무소 정보가 등록되지 않았어요"}</p>
-          <p className="text-xs text-muted-foreground">
-            {registered
-              ? `${formatDate(office.registered_at)} 등록 · 개설등록번호와 대표자는 조회 결과로만 변경할 수 있어요.`
-              : "등록 전에는 매물·고객을 1건까지만 등록할 수 있고, 문서·계약 관리는 사용할 수 없어요."}
-          </p>
-        </div>
-        {!readOnly && (
-          <Link
-            href="/office/register"
-            className={buttonVariants({ size: "sm", variant: registered ? "outline" : "default" })}
-          >
-            {registered ? "다시 조회" : "사무소 등록하기"}
+/** 사무소 정보는 공공데이터 조회·등록으로만 입력되고, 여기서는 등록된 값을 보여준다 */
+export function OfficeInfo({ office, isOwner }: { office: Office; isOwner: boolean }) {
+  if (!office.registered_at) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8 text-center">
+        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <Building2 className="size-5" />
+        </span>
+        <p className="font-medium">등록된 사무소 정보가 없어요</p>
+        {isOwner ? (
+          <Link href="/office/register?next=%2Fsettings%3Ftab%3Doffice" className={buttonVariants()}>
+            사무소 등록하기
           </Link>
+        ) : (
+          <p className="text-sm text-muted-foreground">사무소 대표가 사무소를 등록하면 표시돼요.</p>
         )}
       </div>
-      <fieldset disabled={readOnly} className="grid gap-4 sm:grid-cols-2">
-        <Field label="사무소명 *" name="name" defaultValue={office.name} required />
-        <Field label="대표자" name="representative" defaultValue={office.representative} readOnly={registered} className={cn(registered && "bg-muted")} />
-        <Field label="개설등록번호" name="registration_no" defaultValue={office.registration_no} readOnly={registered} className={cn(registered && "bg-muted")} />
-        <Field label="대표 전화" name="phone" type="tel" defaultValue={office.phone} />
-        <div className="sm:col-span-2">
-          <Field label="주소" name="address" defaultValue={office.address} />
-        </div>
-      </fieldset>
-      <FormMessage state={state} />
-      {!readOnly && (
-        <div className="flex justify-end">
-          <SubmitButton pending={pending}>저장</SubmitButton>
+    );
+  }
+
+  const rows = [
+    { label: "사무소명", value: office.name },
+    { label: "대표자", value: office.representative },
+    { label: "개설등록번호", value: office.registration_no },
+    { label: "대표 전화", value: office.phone },
+    { label: "주소", value: office.address },
+  ];
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
+        <BadgeCheck className="size-4 shrink-0 text-primary" />
+        <span className="flex-1">공공데이터로 확인된 사무소 · {formatDate(office.registered_at)} 등록</span>
+      </div>
+      <dl className="divide-y rounded-lg border">
+        {rows.map((row) => (
+          <div key={row.label} className="flex gap-4 px-3 py-2.5 text-sm">
+            <dt className="w-24 shrink-0 text-muted-foreground">{row.label}</dt>
+            <dd className="min-w-0 flex-1 break-words">{row.value || "-"}</dd>
+          </div>
+        ))}
+      </dl>
+      {isOwner && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">사무소 정보가 바뀌었다면 다시 조회해 변경할 수 있어요.</p>
+          <Link href="/office/register?next=%2Fsettings%3Ftab%3Doffice" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            다시 조회
+          </Link>
         </div>
       )}
-    </form>
+    </div>
   );
 }
 
-export function AccountForms({ profile }: { profile: Profile }) {
+export function AccountForms({ profile, officeRegistered }: { profile: Profile; officeRegistered: boolean }) {
   const info = useFormAction(updateProfile, toastOnSuccess);
   const password = useFormAction(changePassword, {
     onSuccess: (r, form) => {
@@ -114,12 +115,14 @@ export function AccountForms({ profile }: { profile: Profile }) {
           <form onSubmit={info.onSubmit} className="space-y-4">
             <Field label="이름 *" name="name" defaultValue={profile.name} required />
             <Field label="휴대폰 번호" name="phone" type="tel" defaultValue={profile.phone} />
-            <div className="space-y-1.5">
-              <Field label="중개사 자격번호" name="license_no" defaultValue={profile.license_no} />
-              <p className="text-xs text-muted-foreground">
-                자격 인증: {VERIFICATION_LABELS[profile.verification_status]} · 인증 심사는 서비스 준비중이에요
-              </p>
-            </div>
+            {officeRegistered && (
+              <div className="space-y-1.5">
+                <Field label="중개사 자격번호" name="license_no" defaultValue={profile.license_no} />
+                <p className="text-xs text-muted-foreground">
+                  자격 인증: {VERIFICATION_LABELS[profile.verification_status]} · 인증 심사는 서비스 준비중이에요
+                </p>
+              </div>
+            )}
             <FormMessage state={info.state} />
             <div className="flex justify-end">
               <SubmitButton pending={info.pending}>저장</SubmitButton>
@@ -180,14 +183,17 @@ export function MemberManager({
   currentUserId,
   isOwner,
   siteUrl,
+  inviteBlocked,
 }: {
   members: MemberItem[];
   invites: InviteItem[];
   currentUserId: string;
   isOwner: boolean;
   siteUrl: string;
+  inviteBlocked: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const officeGuard = useOfficeGuard("invite", { blocked: inviteBlocked, isOwner }, "/settings?tab=members");
   const [needs, setNeeds] = useState<ProfileNeed[]>([]);
   const inviteForm = useRef<HTMLFormElement>(null);
   const invite = useFormAction(async (prev: ActionState | null, fd: FormData) => {
@@ -287,7 +293,22 @@ export function MemberManager({
               title="사무소 이름을 먼저 정해주세요"
               description="초대받은 분이 어느 사무소에 합류하는지 알 수 있도록 사무소 이름이 필요해요."
             />
-            <form ref={inviteForm} onSubmit={invite.onSubmit} className="flex flex-col gap-2 sm:flex-row">
+            {officeGuard.dialog}
+            {officeGuard.blocked && (
+              <p className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                구성원 초대는 사무소 정보를 등록한 후에 사용할 수 있어요.
+              </p>
+            )}
+            <form
+              ref={inviteForm}
+              onSubmit={(e) => {
+                if (officeGuard.blocked) {
+                  e.preventDefault();
+                  officeGuard.guard();
+                } else invite.onSubmit(e);
+              }}
+              className="flex flex-col gap-2 sm:flex-row"
+            >
               <Input name="email" type="email" placeholder="초대할 이메일" required className="flex-1" />
               <NativeSelect
                 name="role"

@@ -2,12 +2,13 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, ExternalLink, Link2, Loader2, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BadgeCheck, Copy, ExternalLink, Link2, Loader2, Search, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_SECTIONS } from "@/components/briefing-view";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
+import { OfficeSearch, RegistryOfficeInfo } from "@/components/office-search";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +16,7 @@ import { createBriefing } from "@/lib/actions/briefings";
 import { createInvite } from "@/lib/actions/settings";
 import { finishSetup, saveSetupOffice, saveSetupProfile } from "@/lib/actions/setup";
 import { ROLE_LABELS } from "@/lib/constants";
+import type { RegistryOffice } from "@/lib/office-registry";
 import { useFormAction } from "@/lib/use-form-action";
 
 function Field({
@@ -79,9 +81,10 @@ export function ProfileStep({
   name,
   phone,
   licenseNo,
+  showLicense,
   prevHref,
   nextHref,
-}: StepNav & { name: string; phone: string; licenseNo: string }) {
+}: StepNav & { name: string; phone: string; licenseNo: string; showLicense: boolean }) {
   const { state, pending, onSubmit } = useFormAction(saveSetupProfile);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -97,7 +100,9 @@ export function ProfileStep({
         hint="고객 브리핑에 담당자 연락처로 표시돼요."
         required
       />
-      <Field label="중개사 자격번호" name="license_no" defaultValue={licenseNo} hint="입력하면 자격 확인 후 인증 배지가 표시돼요." />
+      {showLicense && (
+        <Field label="중개사 자격번호" name="license_no" defaultValue={licenseNo} hint="입력하면 자격 확인 후 인증 배지가 표시돼요." />
+      )}
       <FormMessage state={state} />
       <div className="flex items-center justify-between gap-2 pt-2">
         <PrevLink href={prevHref} />
@@ -109,25 +114,87 @@ export function ProfileStep({
 
 export function OfficeStep({
   office,
+  registry,
   prevHref,
   nextHref,
 }: StepNav & {
   office: { name: string; phone: string; representative: string; registration_no: string; address: string };
+  /** 이미 공공데이터로 등록된 사무소면 그 정보 */
+  registry: RegistryOffice | null;
 }) {
   const { state, pending, onSubmit } = useFormAction(saveSetupOffice);
+  const [selected, setSelected] = useState<RegistryOffice | null>(registry);
+  const [manual, setManual] = useState(false);
+
+  const phoneField = (defaultValue: string) => (
+    <Field
+      label="대표 전화"
+      name="phone"
+      type="tel"
+      defaultValue={defaultValue}
+      placeholder="02-000-0000"
+      hint="휴대폰 번호를 대표 번호로 써도 돼요."
+      required
+    />
+  );
+
+  if (selected) {
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <input type="hidden" name="next" value={nextHref ?? "/setup"} />
+        <input type="hidden" name="registry_reg_no" value={selected.regNo} />
+        <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-primary">
+            <BadgeCheck className="size-4" />
+            공공데이터에서 확인된 사무소
+          </div>
+          <RegistryOfficeInfo office={selected} />
+          <Button type="button" variant="outline" size="sm" onClick={() => setSelected(null)}>
+            <Search data-icon="inline-start" />
+            다른 사무소 찾기
+          </Button>
+        </div>
+        <div key={selected.regNo}>{phoneField(office.phone || selected.phone || "")}</div>
+        <FormMessage state={state} />
+        <div className="flex items-center justify-between gap-2 pt-2">
+          <PrevLink href={prevHref} />
+          <SubmitButton pending={pending}>저장하고 다음</SubmitButton>
+        </div>
+      </form>
+    );
+  }
+
+  if (!manual) {
+    return (
+      <div className="space-y-4">
+        <OfficeSearch onSelect={setSelected} selectLabel="이 사무소 선택" defaultRepresentative={office.representative} />
+        <p className="text-center text-xs text-muted-foreground">
+          검색되지 않나요?{" "}
+          <button type="button" className="text-primary underline-offset-4 hover:underline" onClick={() => setManual(true)}>
+            직접 입력하기
+          </button>
+        </p>
+        <div className="flex items-center justify-between gap-2 pt-2">
+          <PrevLink href={prevHref} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={onSubmit} className="space-y-4">
       <input type="hidden" name="next" value={nextHref ?? "/setup"} />
+      <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+        <p className="flex-1">
+          직접 입력하면 미등록 사무소로 저장돼요. 매물·고객은 1건까지만 등록할 수 있고 문서·계약 관리는 사무소 조회·등록 후 사용할 수 있어요.{" "}
+          <button type="button" className="font-medium underline underline-offset-4" onClick={() => setManual(false)}>
+            공공데이터로 조회하기
+          </button>
+        </p>
+      </div>
       <Field label="사무소 이름" name="name" defaultValue={office.name} placeholder="○○ 공인중개사사무소" required autoFocus />
-      <Field
-        label="대표 전화"
-        name="phone"
-        type="tel"
-        defaultValue={office.phone}
-        placeholder="02-000-0000"
-        hint="휴대폰 번호를 대표 번호로 써도 돼요."
-        required
-      />
+      {phoneField(office.phone)}
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="대표자" name="representative" defaultValue={office.representative} />
         <Field label="개설등록번호" name="registration_no" defaultValue={office.registration_no} />

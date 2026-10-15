@@ -8,6 +8,7 @@ import { ComingSoonButton } from "@/components/coming-soon";
 import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { NativeSelect } from "@/components/form/native-select";
+import { useOfficeGuard, type GateInfo } from "@/components/office-gate";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,9 +44,11 @@ interface BriefingBuilderProps {
   defaultComment: string;
   links: BriefingLink[];
   siteUrl: string;
+  gate: GateInfo;
 }
 
-export function BriefingBuilder({ propertyId, data, defaultComment, links, siteUrl }: BriefingBuilderProps) {
+export function BriefingBuilder({ propertyId, data, defaultComment, links, siteUrl, gate }: BriefingBuilderProps) {
+  const officeGuard = useOfficeGuard("briefing", gate);
   const [sections, setSections] = useState<BriefingSections>(DEFAULT_SECTIONS);
   const [comment, setComment] = useState(defaultComment);
   const [days, setDays] = useState("14");
@@ -75,6 +78,7 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
 
   return (
     <div className="grid gap-6 lg:grid-cols-5">
+      {officeGuard.dialog}
       <CompleteProfileDialog
         needs={needs}
         onOpenChange={(open) => !open && setNeeds([])}
@@ -138,7 +142,7 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
                   ]}
                 />
               </div>
-              <Button onClick={create} disabled={pending}>
+              <Button onClick={() => officeGuard.guard(create)} disabled={pending}>
                 {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Link2 data-icon="inline-start" />}
                 링크 생성·복사
               </Button>

@@ -100,7 +100,11 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
               <CardDescription>상담 내용과 다음 행동을 남겨두면 팀원도 이어서 응대할 수 있어요</CardDescription>
             </CardHeader>
             <CardContent>
-              <ConsultationPanel customerId={id} consultations={consultations.data ?? []} />
+              <ConsultationPanel
+                customerId={id}
+                consultations={consultations.data ?? []}
+                gate={{ blocked: gate.blocked.consultation, isOwner: gate.isOwner }}
+              />
             </CardContent>
           </Card>
 
@@ -115,6 +119,7 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
                 linked={linked}
                 recommendations={recommendations.map((r) => ({ ...r.property, reasons: r.reasons }))}
                 options={properties.filter((p) => !linkedIds.has(p.id)).map((p) => ({ value: p.id, label: p.title }))}
+                gate={{ blocked: gate.blocked.link, isOwner: gate.isOwner }}
               />
             </CardContent>
           </Card>

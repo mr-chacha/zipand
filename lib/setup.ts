@@ -9,6 +9,8 @@ export interface SetupStep {
   /** 대시보드에서 이 단계를 안내할 문구 */
   prompt: string;
   done: boolean;
+  /** 사무소 등록 전이라 진행할 수 없는 단계. 건너뛰고 다음 단계로 갈 수 있다 */
+  locked: boolean;
 }
 
 /**
@@ -18,6 +20,7 @@ export interface SetupStep {
 export async function getSetupProgress() {
   const { supabase, profile, office } = await getSession();
   const isOwner = profile.role === "owner";
+  const unregistered = office.registered_at === null;
 
   const [properties, briefings, invites, members] = await Promise.all([
     supabase.from("properties").select("id", { count: "exact", head: true }),
@@ -32,34 +35,39 @@ export async function getSetupProgress() {
       title: "내 정보",
       prompt: "내 정보를 입력해서 프로필 설정을 완료해 주세요.",
       done: !hasDefaultName(profile) && Boolean(profile.phone),
+      locked: false,
     },
     {
       key: "office",
       title: "사무소 정보",
-      prompt: "사무소 이름과 대표 번호를 입력해서 사무소 설정을 완료해 주세요.",
+      prompt: "공공데이터에서 우리 사무소를 찾아 사무소 정보를 등록해 주세요.",
       done: !hasDefaultOfficeName(office) && Boolean(office.phone),
+      locked: false,
     },
     {
       key: "property",
       title: "첫 매물 등록",
       prompt: "첫 매물을 등록해 보세요. 필수 정보만 입력해도 돼요.",
       done: (properties.count ?? 0) > 0,
+      locked: false,
     },
     {
       key: "briefing",
       title: "고객 브리핑 공유",
       prompt: "등록한 매물로 고객에게 보낼 브리핑 링크를 만들어 보세요.",
       done: (briefings.count ?? 0) > 0,
+      locked: unregistered,
     },
     {
       key: "invite",
       title: "구성원 초대",
       prompt: "함께 일하는 소속중개사·중개보조원을 초대해 보세요.",
       done: (members?.count ?? 0) > 1 || (invites?.count ?? 0) > 0,
+      locked: unregistered,
     },
   ].filter((step): step is SetupStep => isOwner || (step.key !== "office" && step.key !== "invite"));
 
-  const firstOpen = steps.findIndex((step) => !step.done);
+  const firstOpen = steps.findIndex((step) => !step.done && !step.locked);
 
   return {
     steps,

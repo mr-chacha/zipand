@@ -62,7 +62,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
     { label: "등록 매물", value: propertyOptions.length, href: "/properties" },
     { label: "관리 중 고객", value: customerCount.count ?? 0, href: "/customers" },
     { label: "검토 필요 문서", value: pendingDocs.data?.length ?? 0, href: "/documents?status=검토 필요" },
-    { label: "진행 중 거래", value: activeDeals.data?.length ?? 0, href: "/contracts" },
+    { label: "진행 중 계약", value: activeDeals.data?.length ?? 0, href: "/contracts" },
   ];
   const today = todayKst();
   const todayEvents = events.filter((e) => e.date === today && !e.done).length;
@@ -154,7 +154,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>진행 중 거래</CardTitle>
+            <CardTitle>진행 중 계약</CardTitle>
             <CardDescription>잔금일이 가까운 순서</CardDescription>
             <CardAction>
               <Link href="/contracts" className={buttonVariants({ variant: "ghost", size: "sm" })}>

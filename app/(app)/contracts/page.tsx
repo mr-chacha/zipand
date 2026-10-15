@@ -91,25 +91,25 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
 
       <Tabs defaultValue={tab === "clauses" ? "clauses" : "deals"}>
         <TabsList>
-          <TabsTrigger value="deals">진행 중 거래 ({active.length})</TabsTrigger>
-          <TabsTrigger value="closed">종료된 거래 ({closed.length})</TabsTrigger>
+          <TabsTrigger value="deals">진행 중 계약 ({active.length})</TabsTrigger>
+          <TabsTrigger value="closed">종료된 계약 ({closed.length})</TabsTrigger>
           <TabsTrigger value="clauses">특약 라이브러리</TabsTrigger>
         </TabsList>
         <TabsContent value="deals" className="pt-4">
-          {renderDeals(active, "진행 중인 거래가 없어요. 계약이 시작되면 거래를 만들어 체크리스트를 관리하세요.")}
+          {renderDeals(active, "진행 중인 계약 내역이 없어요.")}
         </TabsContent>
         <TabsContent value="closed" className="pt-4">
-          {renderDeals(closed, "종료된 거래가 없어요.")}
+          {renderDeals(closed, "종료된 계약 내역이 없어요.")}
         </TabsContent>
         <TabsContent value="clauses" className="space-y-4 pt-4">
           <ComingSoonPanel
             title="AI 특약 추천 · 계약서 초안"
-            description="거래 조건에 맞는 특약 추천과 계약서·확인설명서 초안 작성은 서비스 준비중이에요. 지금은 예시 문구와 사무소 특약을 직접 골라 쓸 수 있어요."
+            description="계약 조건에 맞는 특약 추천과 계약서·확인설명서 초안 작성은 서비스 준비중이에요. 지금은 예시 문구와 사무소 특약을 직접 골라 쓸 수 있어요."
           />
           <Card>
             <CardHeader>
               <CardTitle>특약 문구</CardTitle>
-              <CardDescription>예시 문구는 거래 조건에 맞게 수정해서 사용하세요</CardDescription>
+              <CardDescription>예시 문구는 계약 조건에 맞게 수정해서 사용하세요</CardDescription>
             </CardHeader>
             <CardContent>
               <ClauseLibrary officeClauses={officeClauses ?? []} />

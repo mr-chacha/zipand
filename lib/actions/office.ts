@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { FormError, str, toErrorMessage } from "@/lib/form";
-import { searchRegistry, type RegistryOffice } from "@/lib/office-registry";
+import { searchRegistry, verifiedOfficeUpdate, type RegistryOffice } from "@/lib/office-registry";
 import type { ActionState } from "@/types";
 
 export type RegistrySearchState = ActionState & { items?: RegistryOffice[]; total?: number; searched?: boolean };
@@ -29,20 +29,9 @@ export async function registerOffice(regNo: string, next: string | null): Promis
   const { supabase, profile, office } = await getSession();
   if (profile.role !== "owner") return { error: "사무소 등록은 대표만 할 수 있어요." };
   try {
-    const { items } = await searchRegistry({ regNo });
-    const found = items.find((o) => o.regNo === regNo);
-    if (!found) throw new FormError("공공데이터에서 해당 사무소를 찾지 못했어요. 다시 조회해 주세요.");
     const { error } = await supabase
       .from("offices")
-      .update({
-        name: found.name,
-        registration_no: found.regNo,
-        representative: found.representative,
-        address: found.roadAddress ?? found.lotAddress,
-        phone: office.phone ?? found.phone,
-        registered_at: new Date().toISOString(),
-        registry_data: found as unknown as never,
-      })
+      .update(await verifiedOfficeUpdate(regNo, office.phone))
       .eq("id", office.id);
     if (error) throw error;
   } catch (e) {

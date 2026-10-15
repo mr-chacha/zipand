@@ -4,6 +4,7 @@ import type { BriefingData } from "@/components/briefing-view";
 import { PageHeader } from "@/components/page-header";
 import { getSession } from "@/lib/auth";
 import { isPast } from "@/lib/format";
+import { gateFor } from "@/lib/office-gate";
 import { signedUrls } from "@/lib/storage";
 import { BriefingBuilder } from "./briefing-builder";
 
@@ -64,6 +65,7 @@ export default async function BriefingPage({ params }: PageProps<"/properties/[i
         defaultComment={property.description ?? ""}
         links={(briefings.data ?? []).map((b) => ({ ...b, expired: isPast(b.expires_at) }))}
         siteUrl={process.env.NEXT_PUBLIC_SITE_URL ?? ""}
+        gate={await gateFor("briefing")}
       />
     </div>
   );

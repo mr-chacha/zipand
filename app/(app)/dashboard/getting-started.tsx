@@ -21,7 +21,11 @@ export async function GettingStarted() {
             집앤 시작하기 · {steps.length}단계 중 {currentIndex + 1}단계
           </p>
           <p className="font-semibold">
-            {allDone ? "모든 단계를 마쳤어요. 시작하기를 완료해 주세요." : step.prompt}
+            {allDone
+              ? steps.some((s) => s.locked && !s.done)
+                ? "사무소 정보를 등록하면 브리핑 공유·구성원 초대도 할 수 있어요. 시작하기를 완료해 주세요."
+                : "모든 단계를 마쳤어요. 시작하기를 완료해 주세요."
+              : step.prompt}
           </p>
           <div className="flex gap-1">
             {steps.map((s, i) => (

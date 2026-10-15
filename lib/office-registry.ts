@@ -63,7 +63,23 @@ function normalize(item: RawItem): RegistryOffice | null {
     phone: clean(item.telno),
     registeredOn: clean(item.estblRegYmd),
     baseDate: clean(item.crtrYmd),
-    provider: clean(item.instt_nm),
+    provider: clean(item.insttNm ?? item.instt_nm),
+  };
+}
+
+/** 개설등록번호로 다시 조회해 확인된 사무소 정보로 offices 업데이트 값을 만든다 */
+export async function verifiedOfficeUpdate(regNo: string, phone: string | null) {
+  const { items } = await searchRegistry({ regNo });
+  const found = items.find((o) => o.regNo === regNo);
+  if (!found) throw new FormError("공공데이터에서 해당 사무소를 찾지 못했어요. 다시 조회해 주세요.");
+  return {
+    name: found.name,
+    registration_no: found.regNo,
+    representative: found.representative,
+    address: found.roadAddress ?? found.lotAddress,
+    phone: phone ?? found.phone,
+    registered_at: new Date().toISOString(),
+    registry_data: found as unknown as Record<string, string | null>,
   };
 }
 
@@ -87,11 +103,12 @@ export async function searchRegistry(query: RegistryQuery) {
     throw new FormError("공공데이터 서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.");
   }
 
-  let json: {
-    response?: {
-      header?: { resultCode?: string };
-      body?: { items?: RawItem[] | { item?: RawItem | RawItem[] } | ""; totalCount?: string | number };
-    };
+  type Envelope = {
+    header?: { resultCode?: string };
+    body?: { items?: RawItem[] | { item?: RawItem | RawItem[] } | ""; totalCount?: string | number } | null;
+  };
+  let json: Envelope & {
+    response?: Envelope;
     OpenAPI_ServiceResponse?: { cmmMsgHeader?: { returnReasonCode?: string } };
   };
   try {
@@ -104,7 +121,9 @@ export async function searchRegistry(query: RegistryQuery) {
     throw new FormError(RESULT_MESSAGES[code ?? ""] || "공공데이터 조회에 실패했어요. 잠시 후 다시 시도해 주세요.");
   }
 
-  const code = json.OpenAPI_ServiceResponse?.cmmMsgHeader?.returnReasonCode ?? json.response?.header?.resultCode;
+  // 실제 응답은 { header, body } 최상위 구조, 문서상 { response: { header, body } }도 허용
+  const envelope = json.response ?? json;
+  const code = json.OpenAPI_ServiceResponse?.cmmMsgHeader?.returnReasonCode ?? envelope.header?.resultCode;
   if (!code) {
     console.error("[office registry]", text.slice(0, 300));
     throw new FormError("공공데이터 조회에 실패했어요. 잠시 후 다시 시도해 주세요.");
@@ -115,7 +134,7 @@ export async function searchRegistry(query: RegistryQuery) {
     throw new FormError(RESULT_MESSAGES[code] || "공공데이터 조회에 실패했어요. 잠시 후 다시 시도해 주세요.");
   }
 
-  const body = json.response?.body;
+  const body = envelope.body;
   const raw = body?.items;
   const list: RawItem[] = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw.item ?? []].flat() : [];
   return {

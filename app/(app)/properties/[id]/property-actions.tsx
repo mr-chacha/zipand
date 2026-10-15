@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Link2, Link2Off, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
+import { useOfficeGuard, type GateInfo } from "@/components/office-gate";
 import { CustomerStatusBadge } from "@/components/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -79,12 +80,15 @@ export function LinkedCustomers({
   propertyId,
   linked,
   options,
+  gate,
 }: {
   propertyId: string;
   linked: LinkedCustomer[];
   options: { id: string; name: string }[];
+  gate: GateInfo;
 }) {
   const [pending, startTransition] = useTransition();
+  const officeGuard = useOfficeGuard("link", gate);
   const available = options.filter((o) => !linked.some((l) => l.id === o.id));
 
   const run = (fn: () => Promise<{ error?: string; message?: string }>) =>
@@ -95,11 +99,14 @@ export function LinkedCustomers({
 
   return (
     <div className="space-y-3">
+      {officeGuard.dialog}
       {available.length > 0 && (
         <Select
           value={null}
           disabled={pending}
-          onValueChange={(customerId) => customerId && run(() => linkCustomerProperty(customerId as string, propertyId))}
+          onValueChange={(customerId) =>
+            customerId && officeGuard.guard(() => run(() => linkCustomerProperty(customerId as string, propertyId)))
+          }
         >
           <SelectTrigger className="w-full sm:w-72">
             <Link2 className="size-4 text-muted-foreground" />
