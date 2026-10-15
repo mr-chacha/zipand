@@ -4,14 +4,14 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
+- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 + 일정 알림 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
   - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·계약·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
   - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
-  - 실기기(갤럭시) 테스트 피드백 반영 완료: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 탭, '계약관리' 명칭 변경, 날짜별 일정 상세 페이지(`/schedule/[date]`)
+  - 실기기 피드백·UX: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 탭, '계약관리' 명칭, 날짜별 일정 상세(`/schedule/[date]`), **일정 10분 전 알림**(웹·앱)
   - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
-- **실기기 테스트 방법**: USB 디버깅 연결 → `CAP_SERVER_URL=http://localhost:3000 npx cap sync android` → `./gradlew assembleDebug`(JDK 21) → `adb -s <기기> install -r` → `npm run app:serve`(production, 3100) + `npm run app:usb`(`adb reverse tcp:3000 tcp:3100`). 사무실 Wi‑Fi는 기기 간 통신이 막혀 LAN IP 방식 불가
-- **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·앱·결제 제외 전 기능 동작
-- **완료**: 인증/사무소(간단 가입·단계별 시작하기·사무소/사업자 인증·서류 심사 신청), 매물·사진(최대 10장)·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크(사진 슬라이드), 매물 리스트 공유 링크, 고객·상담·후속 일정(거래 연동 상태), 계약 준비 5단계·임대인/임차인 공유 링크·계약 취소, 설정, 대시보드(일정 캘린더)
+- **실기기 테스트 방법**: USB 디버깅 연결 → `CAP_SERVER_URL=http://localhost:3000 npx cap sync android` → `./gradlew assembleDebug`(JDK 21) → `adb -s <기기> install -r` → `npm run app:serve`(production, 3100) + `npm run app:usb`(`adb reverse tcp:3000 tcp:3100`). 사무실 Wi‑Fi는 기기 간 통신이 막혀 LAN IP 방식 불가. 알림 플러그인 반영 시 APK 재빌드 필요
+- **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·결제 제외 전 기능 동작. 앱·일정 알림은 `feat/android-app` PR
+- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리 5단계·공유 링크, 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림
 - **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261016090000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 서버 전용 환경변수 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털), `OFFICE_REGISTRATION_SECRET` 필요
 
 > ⚠️ **웹 개발 재개 시 사용자에게 먼저 알릴 것 — 아직 진행하지 못한 서비스**
@@ -61,6 +61,28 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-16 — 일정 알림 (웹·앱, 10분 전 / 계약·잔금 당일 9시)
+**작업 요약**
+- `/notifications`를 준비중 → **다가오는 일정 목록**으로 교체. 알림 권한 허용 UI
+- 알림 대상: 미완료 할 일(`tasks`) + 계약일·잔금일. 계약·잔금은 **당일 오전 9시** 기준, 알림은 모두 일정 **10분 전**
+- **앱**: `@capacitor/local-notifications`로 OS 로컬 알림 스케줄 (백그라운드 가능). `SCHEDULE_EXACT_ALARM` 등 권한
+- **웹**: Notification API + 탭이 열려 있을 때 `setTimeout` (탭 닫으면 울리지 않음)
+- 로그인 레이아웃에 `NotificationScheduler` 마운트. 일정·계약 저장/완료/삭제 시 스케줄 재동기화
+
+**변경 파일**
+- `lib/reminders.ts`, `lib/reminder-types.ts`, `lib/notifications-client.ts`, `lib/actions/reminders.ts`
+- `components/notifications/notification-scheduler.tsx`, `app/(app)/notifications/page.tsx`, `app/(app)/layout.tsx`
+- `capacitor.config.ts`, `android/.../AndroidManifest.xml`, `package.json`(`@capacitor/local-notifications`)
+- 연동: `task-board`, `schedule-calendar`, `deal-steps`, `tasks`/`deals` 액션 revalidate
+
+**결정 사항**
+- 임장·상담 기록(과거 기록)은 알림 대상 아님
+- 거래 단계명 '계약 준비'는 DB 값이라 변경하지 않음(이전 커밋과 동일)
+
+**남은 TODO**
+- 실기기에서 알림 권한·10분 전 발화·알림 탭 시 상세 이동 확인 (APK 재설치 후)
+- 웹: 탭이 닫혀 있을 때 알림이 필요하면 Service Worker/푸시 검토
 
 ### 2026-10-15 — '계약관리' 명칭 변경, 대시보드 일정 스크롤, 날짜별 일정 상세 페이지
 **작업 요약**

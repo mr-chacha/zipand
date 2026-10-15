@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useBusy } from "@/lib/busy";
 import { createTask, deleteTask, toggleTask } from "@/lib/actions/tasks";
+import { notifyRemindersChanged } from "@/lib/reminder-types";
 import { TASK_TYPES } from "@/lib/constants";
 import { formatDateTime, formatTime, isoToKstLocal } from "@/lib/format";
 import { useFormAction } from "@/lib/use-form-action";
@@ -72,6 +73,7 @@ export function TaskBoard({
     startTransition(async () => {
       const result = await fn();
       if (result.error) toast.error(result.error);
+      else notifyRemindersChanged();
     });
 
   return (
@@ -124,7 +126,11 @@ export function TaskBoard({
               </div>
               <ConfirmAction
                 appOnly
-                action={() => deleteTask(task.id)}
+                action={async () => {
+                  const result = await deleteTask(task.id);
+                  if (!result.error) notifyRemindersChanged();
+                  return result;
+                }}
                 title="할 일을 삭제할까요?"
                 description="삭제하면 되돌릴 수 없어요."
                 trigger={
@@ -170,6 +176,7 @@ export function TaskDialog({
   const { state, pending, onSubmit, setState } = useFormAction(createTask, {
     onSuccess: (result) => {
       toast.success(result.message);
+      notifyRemindersChanged();
       setOpen(false);
     },
   });

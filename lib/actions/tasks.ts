@@ -8,6 +8,7 @@ import type { ActionState } from "@/types";
 
 function revalidateTaskPaths(customerId?: string | null) {
   revalidatePath("/dashboard");
+  revalidatePath("/notifications");
   if (customerId) revalidatePath(`/customers/${customerId}`);
 }
 

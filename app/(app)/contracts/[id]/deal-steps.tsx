@@ -17,6 +17,7 @@ import { completeDeal, saveDealStep } from "@/lib/actions/deals";
 import { DEAL_AMOUNT_LABEL, type DealStep } from "@/lib/constants";
 import { STEP_TITLES, stageIndex } from "@/lib/deal-steps";
 import { formatDate, formatManwon } from "@/lib/format";
+import { notifyRemindersChanged } from "@/lib/reminder-types";
 import { useFormAction } from "@/lib/use-form-action";
 import { cn } from "@/lib/utils";
 import type { Deal } from "@/types";
@@ -135,7 +136,10 @@ function StepButtons({ dealId, step, pending, saveable = true }: { dealId: strin
 
 function useStepForm(dealId: string, step: DealStep) {
   return useFormAction(saveDealStep.bind(null, dealId, step), {
-    onSuccess: (result) => result.message && toast.success(result.message),
+    onSuccess: (result) => {
+      if (result.message) toast.success(result.message);
+      notifyRemindersChanged();
+    },
   });
 }
 

@@ -152,6 +152,8 @@ export async function saveDealStep(id: string, step: DealStep, _prev: ActionStat
   revalidatePath(`/contracts/${id}`);
   revalidatePath("/contracts");
   revalidatePath("/customers");
+  revalidatePath("/dashboard");
+  revalidatePath("/notifications");
   if (intent === "next") redirect(`/contracts/${id}?step=${index + 2}`);
   return { message: "저장했어요." };
 }
@@ -216,6 +218,8 @@ export async function cancelDeal(id: string, _prev: ActionState | null, fd: Form
   revalidatePath("/contracts");
   revalidatePath("/properties");
   revalidatePath("/customers");
+  revalidatePath("/dashboard");
+  revalidatePath("/notifications");
   return { message: "계약을 취소했어요." };
 }
 

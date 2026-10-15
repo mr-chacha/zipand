@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toggleTask } from "@/lib/actions/tasks";
 import type { CalendarEvent, CalendarKind } from "@/lib/calendar";
+import { notifyRemindersChanged } from "@/lib/reminder-types";
 import { cn } from "@/lib/utils";
 
 const KINDS: { kind: CalendarKind; label: string; dot: string; chip: string }[] = [
@@ -140,6 +141,7 @@ export function DayEventList({ events, emptyText = "일정이 없어요." }: { e
     startTransition(async () => {
       const result = await toggleTask(taskId, done);
       if (result.error) toast.error(result.error);
+      else notifyRemindersChanged();
     });
 
   if (events.length === 0) {
