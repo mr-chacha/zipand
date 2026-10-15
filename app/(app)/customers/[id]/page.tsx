@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getSession } from "@/lib/auth";
 import { formatBudget, formatDate } from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
+import { signedUrls } from "@/lib/storage";
 import { getOfficeMembers, getPropertyList, getTasks, todayRange, type PropertyListItem } from "@/lib/queries";
 import { ConsultationPanel, CustomerHeaderActions, CustomerProperties } from "./customer-actions";
 
@@ -47,7 +48,7 @@ function recommend(customer: MatchTarget, properties: PropertyListItem[], exclud
 
 export default async function CustomerDetailPage({ params }: PageProps<"/customers/[id]">) {
   const { id } = await params;
-  const { supabase } = await getSession();
+  const { supabase, office } = await getSession();
 
   const { data: customer } = await supabase
     .from("customers")
@@ -59,7 +60,7 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
   const [consultations, linkedRows, tasks, members, properties, gate] = await Promise.all([
     supabase
       .from("consultations")
-      .select("id, channel, content, consulted_at, author:profiles!consultations_created_by_fkey(name)")
+      .select("id, channel, content, consulted_at, audio_path, audio_name, audio_duration_sec, author:profiles!consultations_created_by_fkey(name)")
       .eq("customer_id", id)
       .order("consulted_at", { ascending: false }),
     supabase.from("customer_properties").select("property_id, created_at").eq("customer_id", id),
@@ -69,6 +70,11 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
     getOfficeGate(),
   ]);
 
+  const audioUrls = await signedUrls(
+    supabase,
+    "consultation-audio",
+    (consultations.data ?? []).flatMap((c) => (c.audio_path ? [c.audio_path] : []))
+  );
   const linkedIds = new Set((linkedRows.data ?? []).map((r) => r.property_id));
   const linked = properties.filter((p) => linkedIds.has(p.id));
   const recommendations = recommend(customer, properties, linkedIds);
@@ -101,8 +107,9 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
             </CardHeader>
             <CardContent>
               <ConsultationPanel
+                officeId={office.id}
                 customerId={id}
-                consultations={consultations.data ?? []}
+                consultations={(consultations.data ?? []).map((c) => ({ ...c, audioUrl: c.audio_path ? (audioUrls[c.audio_path] ?? null) : null }))}
                 gate={{ blocked: gate.blocked.consultation, isOwner: gate.isOwner }}
               />
             </CardContent>

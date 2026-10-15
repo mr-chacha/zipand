@@ -4,7 +4,7 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1단계 앱 UI 완료, 2단계 녹음 업로드 진행 중, 3단계 AI 요약 예정
+- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
   - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
   - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
   - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
@@ -59,6 +59,29 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-15 — 안드로이드 앱 2단계: 녹음 업로드·백그라운드 녹음, 하단 탭 고정
+**작업 요약**
+- 상담 녹음: 고객 상세 상담 기록 폼에서 녹음하기 / 통화 녹음 파일 선택(시스템 파일 선택기, 갤럭시 `Recordings/Call`) → Storage 업로드 → 상담 기록 저장. 녹음만 저장 가능(내용 선택), 기록 목록에 재생기·길이 표시, 기록 삭제 시 파일도 삭제
+- 공용 `components/audio-attach.tsx` + `lib/use-audio-recorder.ts`: 앱은 네이티브 녹음, 브라우저는 MediaRecorder. 업로드 실패 시 녹음 보관 후 "다시 업로드". 임장 기록 폼도 같은 컴포넌트 사용
+- 네이티브 `RecorderPlugin`(AAC 64kbps 모노 m4a, 캐시 폴더) + `RecordingService`(포그라운드 서비스, microphone 타입, "집앤 녹음 중" 알림). 화면을 끄거나 다른 앱으로 가도 녹음 유지(에뮬레이터 확인). 웹은 `Capacitor.convertFileSrc`로 파일을 읽어 업로드
+- 개발 앱(http://10.0.2.2)에서 `crypto.randomUUID` 없음 → 업로드 경로 생성 실패 수정(`lib/uuid.ts` `randomUuid`, 사진 업로드도 해당)
+- 권한 허용 직후 알림 채널 생성이 메인 스레드를 막아 ANR → 채널은 플러그인 로드 시 백그라운드에서 생성, 녹음 시작도 백그라운드 스레드
+- 앱 레이아웃: 문서 전체 대신 본문만 스크롤(`fixed inset-0` + `main overflow-y-auto`), WebView 오버스크롤 효과 끔 → 상단 바·하단 탭이 스크롤·오버스크롤에 움직이지 않음. 입력 중에는 하단 탭 숨김. 상단 바 검색 아이콘 제거(목록 화면 검색창 사용)
+
+**변경 파일/화면**
+- 마이그레이션(원격 적용·타입 재생성): `20261016100000_consultation_audio`(consultations 녹음 컬럼, `consultation-audio` 버킷 50MB, `visit-audio` 50MB·형식 확장)
+- Android: `RecorderPlugin.java`, `RecordingService.java`, `MainActivity.java`, `AndroidManifest.xml`(RECORD_AUDIO, FOREGROUND_SERVICE(_MICROPHONE), POST_NOTIFICATIONS)
+- 웹: `components/audio-attach.tsx`, `lib/{audio,native-recorder,use-audio-recorder,uuid}.ts`, `app/(app)/customers/[id]/*`, `visit-form.tsx`, `lib/actions/customers.ts`, `components/layout/mobile-app-shell.tsx`
+
+**결정 사항**
+- 앱이 통화 음성을 직접 녹음하지 않고 기본 전화 앱 녹음 파일을 선택해 올린다(`READ_CALL_LOG`·접근성 우회 X)
+- 녹음 파일 경로는 `{office_id}/{customer_id}/{uuid}.ext`, DB 제약으로 경로 검증
+
+**남은 TODO**
+- 3단계: 업로드된 녹음 STT·요약 → 상담 기록 저장(원문·신뢰도·검토 상태 표시)
+- 통화 종료 감지 후 "상담 기록 남길까요?" 알림, 오프라인 업로드 대기열, 이어 올리기(TUS)
+- 새 설치 상태에서 권한 허용 → 녹음 시작 ANR 재확인
 
 ### 2026-10-15 — 안드로이드 앱 1단계: Capacitor 셸·앱 UI
 **작업 요약**

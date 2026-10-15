@@ -18,6 +18,7 @@ import { useFormAction } from "@/lib/use-form-action";
 import { removeFromStorage, uploadToStorage } from "@/lib/upload-client";
 import type { ActionState, Property } from "@/types";
 import { MaintenanceField } from "./maintenance-field";
+import { randomUuid } from "@/lib/uuid";
 import { MediaPicker, type PickedMedia } from "./media-picker";
 
 function ChoiceGroup({
@@ -92,7 +93,7 @@ export function PropertyForm({
   /** 새 매물: id를 먼저 정하고 사진·동영상을 Storage에 올린 뒤 경로만 서버로 보낸다 */
   const uploadMedia = async (fd: FormData) => {
     if (d || !officeId || (!photos.length && !videos.length)) return;
-    const propertyId = crypto.randomUUID();
+    const propertyId = randomUuid();
     fd.set("id", propertyId);
     const total = photos.length + videos.length;
     let done = 0;

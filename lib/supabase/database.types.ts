@@ -102,6 +102,10 @@ export type Database = {
       }
       consultations: {
         Row: {
+          audio_duration_sec: number | null
+          audio_name: string | null
+          audio_path: string | null
+          audio_size: number | null
           channel: string
           consulted_at: string
           content: string
@@ -112,6 +116,10 @@ export type Database = {
           office_id: string
         }
         Insert: {
+          audio_duration_sec?: number | null
+          audio_name?: string | null
+          audio_path?: string | null
+          audio_size?: number | null
           channel?: string
           consulted_at?: string
           content: string
@@ -122,6 +130,10 @@ export type Database = {
           office_id?: string
         }
         Update: {
+          audio_duration_sec?: number | null
+          audio_name?: string | null
+          audio_path?: string | null
+          audio_size?: number | null
           channel?: string
           consulted_at?: string
           content?: string

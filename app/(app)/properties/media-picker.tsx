@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { formatFileSize } from "@/lib/format";
 import { MEDIA_LIMITS } from "@/lib/storage";
 import { cn } from "@/lib/utils";
+import { randomUuid } from "@/lib/uuid";
 
 export interface PickedMedia {
   key: string;
@@ -35,7 +36,7 @@ function pick(kind: Kind, files: FileList | null, current: number): PickedMedia[
       toast.error(`${KIND_LABEL[kind]}은(는) 최대 ${limit.maxCount}개까지 올릴 수 있어요.`);
       break;
     }
-    result.push({ key: crypto.randomUUID(), file, previewUrl: URL.createObjectURL(file) });
+    result.push({ key: randomUuid(), file, previewUrl: URL.createObjectURL(file) });
   }
   return result;
 }
