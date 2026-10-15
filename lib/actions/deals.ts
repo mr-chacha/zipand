@@ -61,7 +61,7 @@ export async function createDeal(_prev: ActionState | null, fd: FormData): Promi
       await supabase.from("properties").update({ status: "계약 진행" }).eq("id", propertyId);
     }
     await syncCustomerStatus(supabase, str(fd, "customer_id"));
-    await logPropertyEvent(propertyId, "계약 준비 시작");
+    await logPropertyEvent(propertyId, "계약관리 시작");
   } catch (e) {
     return { error: toErrorMessage(e) };
   }

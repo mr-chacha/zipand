@@ -15,7 +15,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <Logo className="[&>span:first-child]:bg-primary-foreground [&>span:first-child]:text-primary" />
         <div className="space-y-6">
           <h2 className="text-3xl leading-snug font-bold">
-            임장부터 계약 준비까지,
+            임장부터 계약관리까지,
             <br />
             중개사의 반복 업무를 줄여드려요
           </h2>

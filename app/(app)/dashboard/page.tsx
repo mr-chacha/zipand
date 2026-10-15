@@ -162,7 +162,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             <CardDescription>잔금일이 가까운 순서</CardDescription>
             <CardAction>
               <Link href="/contracts" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                계약 준비
+                계약관리
                 <ArrowRight data-icon="inline-end" />
               </Link>
             </CardAction>

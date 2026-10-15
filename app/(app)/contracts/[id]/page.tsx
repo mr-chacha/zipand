@@ -59,7 +59,7 @@ export default async function DealDetailPage({ params, searchParams }: PageProps
         title={property?.title ?? "거래"}
         description={`${property?.address ?? ""} · ${property ? `${property.deal_type} ${formatPrice(property)}` : ""}`}
         backHref="/contracts"
-        backLabel="계약 준비"
+        backLabel="계약관리"
         actions={<DealHeaderActions dealId={id} cancellable={!closed} />}
       />
 

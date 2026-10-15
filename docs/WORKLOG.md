@@ -7,7 +7,7 @@
 - **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
   - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·계약·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
   - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
-  - 실기기(갤럭시) 테스트 피드백 반영 완료: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 준비 탭
+  - 실기기(갤럭시) 테스트 피드백 반영 완료: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 탭, '계약관리' 명칭 변경, 날짜별 일정 상세 페이지(`/schedule/[date]`)
   - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
 - **실기기 테스트 방법**: USB 디버깅 연결 → `CAP_SERVER_URL=http://localhost:3000 npx cap sync android` → `./gradlew assembleDebug`(JDK 21) → `adb -s <기기> install -r` → `npm run app:serve`(production, 3100) + `npm run app:usb`(`adb reverse tcp:3000 tcp:3100`). 사무실 Wi‑Fi는 기기 간 통신이 막혀 LAN IP 방식 불가
 - **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·앱·결제 제외 전 기능 동작
@@ -61,6 +61,24 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-15 — '계약관리' 명칭 변경, 대시보드 일정 스크롤, 날짜별 일정 상세 페이지
+**작업 요약**
+- 기능명 '계약 준비' → **'계약관리'** (웹·앱 공통): 사이드바·페이지 제목·뒤로가기·대시보드 카드·캘린더 안내·로그인 화면 문구·이용약관·매물 이력(`계약관리 시작`)·README
+- 대시보드 캘린더 옆 날짜별 일정 목록: 큰 화면에서는 달력 높이를 넘지 않고 목록만 상하 스크롤, 작은 화면·앱은 최대 높이 후 스크롤. 일정이 있으면 '일정 자세히 보기' 버튼
+- 날짜별 일정 상세 페이지 `/schedule/[date]` 신규 (사이드바 메뉴에는 추가하지 않음): 달력 날짜 칸·목록 날짜 제목 클릭 시 이동. 일정 수·할 일 완료 요약, 전날·오늘·다음날 이동, 종류별 범례(건수), 시간순 일정 목록(할 일 바로 완료 처리), 해당 날짜 10:00로 일정 추가, 뒤로가기는 해당 월 대시보드
+
+**변경 파일**
+- `components/calendar/schedule-calendar.tsx` — 날짜 칸을 링크로, 선택 상태 제거(오늘/월 1일 기준 목록), `DayEventList`·`KindLegend`·`formatDayTitle`·`dayHref` 분리 export, 목록 스크롤
+- `app/(app)/schedule/[date]/page.tsx` (신규)
+- `components/layout/nav-items.ts`, `app/(app)/contracts/{page,new/page,[id]/page}.tsx`, `app/(app)/dashboard/page.tsx`, `app/(auth)/layout.tsx`, `app/(legal)/terms/page.tsx`, `lib/actions/deals.ts`, `README.md`
+
+**결정 사항**
+- 거래 단계명 '계약 준비'(서류 확인→조건 협의→계약 준비→잔금 대기)는 DB 값이라 변경하지 않음
+- 잘못된 날짜 주소는 404
+
+**남은 TODO**
+- 실기기에서 일정 상세 페이지·목록 스크롤 확인 (USB 재연결 후 `npm run app:usb`)
 
 ### 2026-10-15 — 안드로이드 앱: 실기기 테스트 피드백 반영 (앱 전용 UI·속도·로딩·삭제 컨펌·계약 탭)
 **작업 요약**

@@ -14,7 +14,7 @@ import { formatDate, formatManwon } from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
 import { ClauseLibrary } from "./clause-library";
 
-export const metadata: Metadata = { title: "계약 준비" };
+export const metadata: Metadata = { title: "계약관리" };
 
 export default async function ContractsPage({ searchParams }: PageProps<"/contracts">) {
   const { tab, q } = await searchParams;
@@ -79,7 +79,7 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
   return (
     <div className="space-y-6">
       <PageHeader
-        title="계약 준비"
+        title="계약관리"
         description="거래별 확인 체크리스트와 특약을 정리해요. 최종 계약서 작성 전 단계를 돕는 기능이에요."
         actions={
           <GatedLink href="/contracts/new" kind="deal" blocked={gate.blocked.deal} isOwner={gate.isOwner} className={buttonVariants()}>

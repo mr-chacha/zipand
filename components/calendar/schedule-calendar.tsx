@@ -125,9 +125,79 @@ function MonthPicker({ year, month }: { year: number; month: number }) {
   );
 }
 
-function formatDayTitle(date: string) {
+export function formatDayTitle(date: string, withYear = false) {
   const d = new Date(`${date}T00:00:00Z`);
-  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${WEEKDAYS[d.getUTCDay()]})`;
+  return `${withYear ? `${d.getUTCFullYear()}년 ` : ""}${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${WEEKDAYS[d.getUTCDay()]})`;
+}
+
+export const dayHref = (date: string) => `/schedule/${date}`;
+
+/** 하루치 일정 목록. 할 일은 바로 완료 처리할 수 있다 */
+export function DayEventList({ events, emptyText = "일정이 없어요." }: { events: CalendarEvent[]; emptyText?: string }) {
+  const [pending, startTransition] = useTransition();
+
+  const toggleDone = (taskId: string, done: boolean) =>
+    startTransition(async () => {
+      const result = await toggleTask(taskId, done);
+      if (result.error) toast.error(result.error);
+    });
+
+  if (events.length === 0) {
+    return <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">{emptyText}</p>;
+  }
+
+  return (
+    <ul className="space-y-2">
+      {events.map((e) => {
+        const body = (
+          <>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className={cn("size-2 rounded-full", STYLE[e.kind].dot)} />
+              {e.label}
+              {e.time && <span className="tabular-nums">· {e.time}</span>}
+            </p>
+            <p className={cn("truncate text-sm font-medium", e.done && "text-muted-foreground line-through")}>{e.title}</p>
+            {e.detail && <p className="line-clamp-2 text-xs text-muted-foreground">{e.detail}</p>}
+          </>
+        );
+        return (
+          <li key={e.id} className="flex items-start gap-2 rounded-lg border bg-card p-2.5">
+            {e.taskId && (
+              <Checkbox
+                className="mt-0.5"
+                checked={e.done}
+                disabled={pending}
+                onCheckedChange={(v) => toggleDone(e.taskId!, Boolean(v))}
+                aria-label="완료"
+              />
+            )}
+            {e.href ? (
+              <Link href={e.href} className="min-w-0 flex-1 space-y-0.5 hover:opacity-80">
+                {body}
+              </Link>
+            ) : (
+              <div className="min-w-0 flex-1 space-y-0.5">{body}</div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** 일정 종류별 색상 범례 */
+export function KindLegend({ counts }: { counts?: Partial<Record<CalendarKind, number>> }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {KINDS.map((k) => (
+        <span key={k.kind} className="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs">
+          <span className={cn("size-2 rounded-full", k.dot)} />
+          {k.label}
+          {counts && <span className="tabular-nums text-muted-foreground">{counts[k.kind] ?? 0}</span>}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export function ScheduleCalendar({
@@ -141,12 +211,9 @@ export function ScheduleCalendar({
   properties,
   customers,
 }: ScheduleCalendarProps) {
-  // 달을 옮겨도 필터가 유지되도록 컴포넌트를 다시 만들지 않고, 선택 날짜만 달 기준으로 다시 계산한다
-  const [picked, setPicked] = useState<{ month: string; date: string } | null>(null);
-  const selected = picked?.month === month ? picked.date : today.startsWith(month) ? today : `${month}-01`;
-  const setSelected = (date: string) => setPicked({ month, date });
+  // 날짜를 누르면 일정 상세(/schedule/[date])로 이동하고, 옆 목록은 오늘(다른 달이면 1일) 일정을 보여준다
+  const selected = today.startsWith(month) ? today : `${month}-01`;
   const hidden = useHiddenKinds();
-  const [pending, startTransition] = useTransition();
 
   const visible = events.filter((e) => !hidden.includes(e.kind));
   const byDate = new Map<string, CalendarEvent[]>();
@@ -157,14 +224,8 @@ export function ScheduleCalendar({
   const toggleKind = (kind: CalendarKind) =>
     saveHiddenKinds(hidden.includes(kind) ? hidden.filter((k) => k !== kind) : [...hidden, kind]);
 
-  const toggleDone = (taskId: string, done: boolean) =>
-    startTransition(async () => {
-      const result = await toggleTask(taskId, done);
-      if (result.error) toast.error(result.error);
-    });
-
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1">
@@ -215,17 +276,15 @@ export function ScheduleCalendar({
             {days.map((date, i) => {
               const dayEvents = byDate.get(date) ?? [];
               const inMonth = date.startsWith(month);
-              const isSelected = date === selected;
               const weekday = i % 7;
               return (
-                <button
+                <Link
                   key={date}
-                  type="button"
-                  onClick={() => setSelected(date)}
+                  href={dayHref(date)}
+                  aria-label={`${formatDayTitle(date)} 일정 ${dayEvents.length}건`}
                   className={cn(
-                    "flex min-h-16 flex-col gap-1 border-b border-r p-1 text-left transition-colors sm:min-h-24 [&:nth-child(7n)]:border-r-0",
-                    !inMonth && "bg-muted/30 text-muted-foreground/60",
-                    isSelected ? "bg-primary/5 ring-2 ring-primary ring-inset" : "hover:bg-muted/50"
+                    "flex min-h-16 flex-col gap-1 border-b border-r p-1 text-left transition-colors hover:bg-muted/50 sm:min-h-24 [&:nth-child(7n)]:border-r-0",
+                    !inMonth && "bg-muted/30 text-muted-foreground/60"
                   )}
                 >
                   <span
@@ -257,73 +316,44 @@ export function ScheduleCalendar({
                       ))}
                     </span>
                   )}
-                </button>
+                </Link>
               );
             })}
           </div>
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="font-semibold">{formatDayTitle(selected)}</p>
-          <TaskDialog
-            members={members}
-            properties={properties}
-            customers={customers}
-            defaultDue={`${selected}T10:00`}
-            title="일정 추가"
-            description="임장, 상담, 계약, 중도금·잔금, 연락 등 일정을 달력에 기록해요. 계약일·잔금일은 계약 준비에서 입력해도 표시돼요."
-            trigger={
-              <Button size="sm">
-                <Plus data-icon="inline-start" />
-                일정 추가
-              </Button>
-            }
-          />
+      {/* 큰 화면에서는 달력 높이를 넘지 않고 목록만 스크롤한다 */}
+      <div className="lg:relative">
+        <div className="flex flex-col gap-3 lg:absolute lg:inset-0">
+          <div className="flex items-center justify-between gap-2">
+            <Link href={dayHref(selected)} className="font-semibold hover:underline">
+              {formatDayTitle(selected)}
+            </Link>
+            <TaskDialog
+              members={members}
+              properties={properties}
+              customers={customers}
+              defaultDue={`${selected}T10:00`}
+              title="일정 추가"
+              description="임장, 상담, 계약, 중도금·잔금, 연락 등 일정을 달력에 기록해요. 계약일·잔금일은 계약관리에서 입력해도 표시돼요."
+              trigger={
+                <Button size="sm">
+                  <Plus data-icon="inline-start" />
+                  일정 추가
+                </Button>
+              }
+            />
+          </div>
+          <div className="max-h-96 min-h-0 flex-1 overflow-y-auto overscroll-contain lg:max-h-none">
+            <DayEventList events={selectedEvents} />
+          </div>
+          {selectedEvents.length > 0 && (
+            <Link href={dayHref(selected)} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full")}>
+              {formatDayTitle(selected)} 일정 자세히 보기
+            </Link>
+          )}
         </div>
-
-        {selectedEvents.length === 0 ? (
-          <p className="rounded-lg border border-dashed py-8 text-center text-sm text-muted-foreground">
-            일정이 없어요.
-          </p>
-        ) : (
-          <ul className="space-y-2">
-            {selectedEvents.map((e) => {
-              const body = (
-                <>
-                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <span className={cn("size-2 rounded-full", STYLE[e.kind].dot)} />
-                    {e.label}
-                    {e.time && <span className="tabular-nums">· {e.time}</span>}
-                  </p>
-                  <p className={cn("truncate text-sm font-medium", e.done && "text-muted-foreground line-through")}>{e.title}</p>
-                  {e.detail && <p className="line-clamp-2 text-xs text-muted-foreground">{e.detail}</p>}
-                </>
-              );
-              return (
-                <li key={e.id} className="flex items-start gap-2 rounded-lg border p-2.5">
-                  {e.taskId && (
-                    <Checkbox
-                      className="mt-0.5"
-                      checked={e.done}
-                      disabled={pending}
-                      onCheckedChange={(v) => toggleDone(e.taskId!, Boolean(v))}
-                      aria-label="완료"
-                    />
-                  )}
-                  {e.href ? (
-                    <Link href={e.href} className="min-w-0 flex-1 space-y-0.5 hover:opacity-80">
-                      {body}
-                    </Link>
-                  ) : (
-                    <div className="min-w-0 flex-1 space-y-0.5">{body}</div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
       </div>
     </div>
   );

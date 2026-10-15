@@ -23,7 +23,7 @@ export const navItems: NavItem[] = [
   { title: "매물 관리", href: "/properties", icon: Building2 },
   { title: "고객 및 상담", href: "/customers", icon: Users },
   { title: "문서 관리", href: "/documents", icon: FileSearch },
-  { title: "계약 준비", href: "/contracts", icon: FileSignature },
+  { title: "계약관리", href: "/contracts", icon: FileSignature },
   { title: "AI 실무 도우미", href: "/assistant", icon: Bot, comingSoon: true },
 ];
 
