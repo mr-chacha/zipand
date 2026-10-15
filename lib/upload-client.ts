@@ -1,11 +1,15 @@
+import { Capacitor } from "@capacitor/core";
 import { FormError, toErrorMessage } from "@/lib/errors";
+import { shrinkPhoto } from "@/lib/image";
 import { createClient } from "@/lib/supabase/client";
 import { buildStoragePath, type Bucket } from "@/lib/storage";
 
-/** 브라우저에서 Storage로 직접 업로드 (서버 액션 본문 크기 제한 회피) */
-export async function uploadToStorage(bucket: Bucket, officeId: string, propertyId: string, file: File) {
+/** 브라우저에서 Storage로 직접 업로드 (서버 액션 본문 크기 제한 회피). folderId는 매물 또는 고객 id */
+export async function uploadToStorage(bucket: Bucket, officeId: string, folderId: string, original: File) {
+  // 앱에서 찍은 사진은 원본이 커서 목록·상세 로딩이 느려지므로 줄여서 올린다
+  const file = bucket === "property-photos" && Capacitor.isNativePlatform() ? await shrinkPhoto(original) : original;
   const supabase = createClient();
-  const path = buildStoragePath(officeId, propertyId, file.name);
+  const path = buildStoragePath(officeId, folderId, file.name);
   const { error } = await supabase.storage.from(bucket).upload(path, file, {
     contentType: file.type || undefined,
     upsert: false,

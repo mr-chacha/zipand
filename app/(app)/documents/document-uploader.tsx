@@ -9,6 +9,7 @@ import { NativeSelect } from "@/components/form/native-select";
 import { DatePicker } from "@/components/form/date-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { useBusy } from "@/lib/busy";
 import { createDocument } from "@/lib/actions/documents";
 import { DOC_TYPES, type DocType } from "@/lib/constants";
 import { formatFileSize } from "@/lib/format";
@@ -33,6 +34,7 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
   const [docType, setDocType] = useState<DocType>("등기사항증명서");
   const [issuedAt, setIssuedAt] = useState("");
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
 
   if (properties.length === 0) {
     return (

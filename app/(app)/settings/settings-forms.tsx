@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { NativeSelect } from "@/components/form/native-select";
 import { useOfficeGuard } from "@/components/office-gate";
 import { PasswordInput } from "@/components/form/password-input";
@@ -17,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useBusy } from "@/lib/busy";
 import { changePassword, createInvite, revokeInvite, updateMember, updateProfile } from "@/lib/actions/settings";
 import { ROLE_LABELS, VERIFICATION_LABELS } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
@@ -120,9 +122,9 @@ export function AccountForms({ profile }: { profile: Profile }) {
             <Field label="이름 *" name="name" defaultValue={profile.name} required />
             <Field label="휴대폰 번호" name="phone" type="tel" defaultValue={profile.phone} />
             <FormMessage state={info.state} />
-            <div className="flex justify-end">
+            <FormActions>
               <SubmitButton pending={info.pending}>저장</SubmitButton>
-            </div>
+            </FormActions>
           </form>
         </CardContent>
       </Card>
@@ -143,9 +145,9 @@ export function AccountForms({ profile }: { profile: Profile }) {
               <PasswordInput id="password_confirm" name="password_confirm" autoComplete="new-password" required />
             </div>
             <FormMessage state={password.state} />
-            <div className="flex justify-end">
+            <FormActions>
               <SubmitButton pending={password.pending}>변경</SubmitButton>
-            </div>
+            </FormActions>
           </form>
         </CardContent>
       </Card>
@@ -189,6 +191,7 @@ export function MemberManager({
   inviteBlocked: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const officeGuard = useOfficeGuard("invite", { blocked: inviteBlocked, isOwner }, "/settings?tab=members");
   const [needs, setNeeds] = useState<ProfileNeed[]>([]);
   const inviteForm = useRef<HTMLFormElement>(null);

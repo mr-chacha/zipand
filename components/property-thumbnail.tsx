@@ -24,7 +24,7 @@ export function PropertyThumbnail({
   if (src) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- 서명 URL은 만료되므로 이미지 최적화 캐시를 쓰지 않는다
-      <img src={src} alt={alt} className={cn("object-cover", className)} />
+      <img src={src} alt={alt} loading="lazy" decoding="async" className={cn("object-cover", className)} />
     );
   }
   const Icon = iconMap[type] ?? Building2;

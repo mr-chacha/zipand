@@ -3,8 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import { ImagePlus, Loader2, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmAction } from "@/components/form/confirm-action";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
 import { Button } from "@/components/ui/button";
+import { useBusy } from "@/lib/busy";
 import { addPropertyPhotos, deletePropertyPhoto, setCoverPhoto } from "@/lib/actions/properties";
 import { toErrorMessage } from "@/lib/errors";
 import { formatFileSize } from "@/lib/format";
@@ -30,6 +32,8 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos }: Pho
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
+  useBusy(uploading, "사진을 올리는 중입니다…");
   const [selected, setSelected] = useState(0);
   const current = photos[Math.min(selected, photos.length - 1)];
   const remaining = LIMIT.maxCount - photos.length;
@@ -93,18 +97,21 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos }: Pho
                 대표 사진
               </Button>
             )}
-            <Button
-              size="icon-sm"
-              variant="destructive"
-              disabled={pending}
-              aria-label="사진 삭제"
-              onClick={() => {
-                setSelected(0);
-                run(() => deletePropertyPhoto(current.id));
+            <ConfirmAction
+              appOnly
+              action={async () => {
+                const result = await deletePropertyPhoto(current.id);
+                if (!result.error) setSelected(0);
+                return result;
               }}
-            >
-              <Trash2 />
-            </Button>
+              title="사진을 삭제할까요?"
+              description="삭제하면 되돌릴 수 없어요."
+              trigger={
+                <Button size="icon-sm" variant="destructive" disabled={pending} aria-label="사진 삭제">
+                  <Trash2 />
+                </Button>
+              }
+            />
           </div>
         )}
       </div>

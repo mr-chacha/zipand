@@ -15,6 +15,7 @@ import { OfficeUnregisterButton } from "@/components/office-unregister-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useBusy } from "@/lib/busy";
 import { createBriefing } from "@/lib/actions/briefings";
 import { createInvite } from "@/lib/actions/settings";
 import { finishSetup, saveSetupProfile } from "@/lib/actions/setup";
@@ -58,6 +59,7 @@ function PrevLink({ href }: { href?: string }) {
 
 function FinishButton({ label, variant = "default" }: { label: string; variant?: "default" | "ghost" }) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   return (
     <Button
       variant={variant}
@@ -223,6 +225,7 @@ export function BriefingStep({
   const [propertyId, setPropertyId] = useState(properties[0]?.id ?? "");
   const [token, setToken] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const url = token ? `${window.location.origin}/b/${token}` : "";
 
   const create = () =>

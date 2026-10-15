@@ -4,7 +4,9 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { DatePicker } from "@/components/form/date-picker";
@@ -14,7 +16,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useBusy } from "@/lib/busy";
 import { createTask, deleteTask, toggleTask } from "@/lib/actions/tasks";
+import { notifyRemindersChanged } from "@/lib/reminder-types";
 import { TASK_TYPES } from "@/lib/constants";
 import { formatDateTime, formatTime, isoToKstLocal } from "@/lib/format";
 import { useFormAction } from "@/lib/use-form-action";
@@ -56,6 +60,7 @@ export function TaskBoard({
   emptyText = "등록된 할 일이 없어요.",
 }: TaskBoardProps) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
 
   const groups = [
     { key: "overdue", label: "지연", items: tasks.filter((t) => !t.done && t.due_at < todayStart) },
@@ -68,6 +73,7 @@ export function TaskBoard({
     startTransition(async () => {
       const result = await fn();
       if (result.error) toast.error(result.error);
+      else notifyRemindersChanged();
     });
 
   return (
@@ -118,16 +124,26 @@ export function TaskBoard({
                     .flatMap((node, i) => (i === 0 ? [node] : [" · ", node]))}
                 </p>
               </div>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="삭제"
-                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                disabled={pending}
-                onClick={() => run(() => deleteTask(task.id))}
-              >
-                <Trash2 />
-              </Button>
+              <ConfirmAction
+                appOnly
+                action={async () => {
+                  const result = await deleteTask(task.id);
+                  if (!result.error) notifyRemindersChanged();
+                  return result;
+                }}
+                title="할 일을 삭제할까요?"
+                description="삭제하면 되돌릴 수 없어요."
+                trigger={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="삭제"
+                    className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 app:opacity-100"
+                  >
+                    <Trash2 />
+                  </Button>
+                }
+              />
             </div>
           ))}
         </div>
@@ -160,6 +176,7 @@ export function TaskDialog({
   const { state, pending, onSubmit, setState } = useFormAction(createTask, {
     onSuccess: (result) => {
       toast.success(result.message);
+      notifyRemindersChanged();
       setOpen(false);
     },
   });
@@ -192,7 +209,7 @@ export function TaskDialog({
             <Label htmlFor="task-title">내용</Label>
             <Input id="task-title" name="title" placeholder="예: 래미안 102동 잔금, 임대인 수리 일정 확인" required />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 app:grid-cols-1">
             <div className="space-y-1.5">
               <Label htmlFor="task-type">종류</Label>
               <NativeSelect id="task-type" name="type" options={TASK_TYPES} defaultValue={fixedCustomerId ? "연락" : "기타"} />
@@ -232,9 +249,9 @@ export function TaskDialog({
             </div>
           )}
           <FormMessage state={state} />
-          <div className="flex justify-end">
+          <FormActions>
             <SubmitButton pending={pending}>추가</SubmitButton>
-          </div>
+          </FormActions>
         </form>
       </DialogContent>
     </Dialog>

@@ -14,7 +14,7 @@ import { formatDate, formatManwon } from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
 import { ClauseLibrary } from "./clause-library";
 
-export const metadata: Metadata = { title: "계약 준비" };
+export const metadata: Metadata = { title: "계약관리" };
 
 export default async function ContractsPage({ searchParams }: PageProps<"/contracts">) {
   const { tab, q } = await searchParams;
@@ -79,7 +79,7 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
   return (
     <div className="space-y-6">
       <PageHeader
-        title="계약 준비"
+        title="계약관리"
         description="거래별 확인 체크리스트와 특약을 정리해요. 최종 계약서 작성 전 단계를 돕는 기능이에요."
         actions={
           <GatedLink href="/contracts/new" kind="deal" blocked={gate.blocked.deal} isOwner={gate.isOwner} className={buttonVariants()}>
@@ -90,10 +90,16 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
       />
 
       <Tabs defaultValue={tab === "clauses" ? "clauses" : "deals"}>
-        <TabsList>
-          <TabsTrigger value="deals">진행 중 계약 ({active.length})</TabsTrigger>
-          <TabsTrigger value="closed">종료된 계약 ({closed.length})</TabsTrigger>
-          <TabsTrigger value="clauses">특약 라이브러리</TabsTrigger>
+        <TabsList className="app:w-full">
+          <TabsTrigger value="deals" className="app:px-1 app:text-sm">
+            진행 중<span className="app:hidden"> 계약</span> ({active.length})
+          </TabsTrigger>
+          <TabsTrigger value="closed" className="app:px-1 app:text-sm">
+            종료<span className="app:hidden">된 계약</span> ({closed.length})
+          </TabsTrigger>
+          <TabsTrigger value="clauses" className="app:px-1 app:text-sm">
+            특약 라이브러리
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="deals" className="pt-4">
           {renderDeals(active, "진행 중인 계약 내역이 없어요.")}

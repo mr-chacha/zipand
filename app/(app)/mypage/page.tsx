@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
-import { ComingSoonBadge } from "@/components/coming-soon";
 import { PageHeader } from "@/components/page-header";
 import { CustomerStatusBadge, PropertyStatusBadge } from "@/components/status-badge";
 import { TaskBoard } from "@/components/tasks/task-board";
@@ -81,7 +80,7 @@ export default async function MyPage() {
       href: "/settings?tab=members",
       icon: Users,
     },
-    { label: "알림 설정", href: "/notifications", icon: Bell, comingSoon: true },
+    { label: "알림", href: "/notifications", icon: Bell },
     { label: "고객센터", href: "/help", icon: LifeBuoy },
     { label: "이용약관", href: "/terms", icon: FileText },
     { label: "개인정보 처리방침", href: "/privacy", icon: ShieldCheck },
@@ -258,7 +257,6 @@ export default async function MyPage() {
                 >
                   <m.icon className="size-4 text-muted-foreground" />
                   <span className="flex-1">{m.label}</span>
-                  {m.comingSoon && <ComingSoonBadge />}
                   <ChevronRight className="size-4 text-muted-foreground" />
                 </Link>
               ))}

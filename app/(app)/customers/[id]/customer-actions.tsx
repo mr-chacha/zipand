@@ -1,11 +1,13 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Link2, Link2Off, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
+import { FileAudio, Link2, Link2Off, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { NativeSelect } from "@/components/form/native-select";
 import { useOfficeGuard, type GateInfo } from "@/components/office-gate";
 import { SubmitButton } from "@/components/form/submit-button";
@@ -16,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useBusy } from "@/lib/busy";
 import {
   addConsultation,
   deleteConsultation,
@@ -23,6 +26,7 @@ import {
   linkCustomerProperty,
   unlinkCustomerProperty,
 } from "@/lib/actions/customers";
+import { formatDuration } from "@/lib/audio";
 import { CONSULT_CHANNELS } from "@/lib/constants";
 import { formatDateTime, formatPrice, isoToKstLocal } from "@/lib/format";
 import type { PropertyListItem } from "@/lib/queries";
@@ -59,23 +63,30 @@ interface ConsultationItem {
   channel: string;
   content: string;
   consulted_at: string;
+  audio_name: string | null;
+  audio_duration_sec: number | null;
+  audioUrl: string | null;
   author: { name: string } | null;
 }
 
 export function ConsultationPanel({
+  officeId,
   customerId,
   consultations,
   gate,
 }: {
+  officeId: string;
   customerId: string;
   consultations: ConsultationItem[];
   gate: GateInfo;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [audio, setAudio] = useState<AttachedAudio | null>(null);
+  const [audioBusy, setAudioBusy] = useState(false);
   const officeGuard = useOfficeGuard("consultation", gate);
   const { state, pending: saving, onSubmit } = useFormAction(addConsultation.bind(null, customerId), {
     onSuccess: (result, form) => {
       form.reset();
+      setAudio(null);
       toast.success(result.message);
     },
   });
@@ -93,17 +104,33 @@ export function ConsultationPanel({
         className="space-y-2 rounded-lg border p-3"
       >
         <div className="flex flex-wrap gap-2">
-          <NativeSelect name="channel" options={CONSULT_CHANNELS} defaultValue="전화" className="w-28" />
-          <DatePicker name="consulted_at" withTime defaultValue={isoToKstLocal(null)} className="w-56" aria-label="상담 일시" />
+          <NativeSelect name="channel" options={CONSULT_CHANNELS} defaultValue="전화" className="w-28 app:w-full" />
+          <DatePicker name="consulted_at" withTime defaultValue={isoToKstLocal(null)} className="w-56 app:w-full" aria-label="상담 일시" />
         </div>
-        <Textarea name="content" rows={3} placeholder="상담 내용, 고객 반응, 다음에 할 일" required />
+        <Textarea
+          name="content"
+          rows={3}
+          placeholder={audio ? "메모 (선택) — 녹음만 저장해도 돼요" : "상담 내용, 고객 반응, 다음에 할 일"}
+          required={!audio}
+        />
+        <AudioAttach
+          bucket="consultation-audio"
+          officeId={officeId}
+          folderId={customerId}
+          filePrefix="상담녹음"
+          value={audio}
+          onChange={setAudio}
+          onBusyChange={setAudioBusy}
+          fileLabel="통화 녹음 선택"
+          idleText="상담을 녹음하거나 통화 녹음 파일을 첨부하세요"
+        />
         <FormMessage state={state} />
-        <div className="flex justify-end">
-          <SubmitButton size="sm" pending={saving}>
+        <FormActions>
+          <SubmitButton size="sm" className="app:h-11" pending={saving} disabled={audioBusy}>
             <Plus data-icon="inline-start" />
             상담 기록
           </SubmitButton>
-        </div>
+        </FormActions>
       </form>
 
       {consultations.length === 0 ? (
@@ -117,23 +144,38 @@ export function ConsultationPanel({
                 <Badge variant="outline">{c.channel}</Badge>
                 {formatDateTime(c.consulted_at)}
                 {c.author && <span>· {c.author.name}</span>}
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  aria-label="상담 기록 삭제"
-                  className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
-                  disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const result = await deleteConsultation(c.id, customerId);
-                      if (result.error) toast.error(result.error);
-                    })
+                <ConfirmAction
+                  appOnly
+                  action={() => deleteConsultation(c.id, customerId)}
+                  title="상담 기록을 삭제할까요?"
+                  description={c.audio_name ? "첨부된 녹음 파일도 함께 삭제되며, 삭제하면 되돌릴 수 없어요." : "삭제하면 되돌릴 수 없어요."}
+                  trigger={
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label="상담 기록 삭제"
+                      className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                    >
+                      <Trash2 />
+                    </Button>
                   }
-                >
-                  <Trash2 />
-                </Button>
+                />
               </div>
-              <p className="mt-1 text-sm whitespace-pre-wrap">{c.content}</p>
+              {c.content && <p className="mt-1 text-sm whitespace-pre-wrap">{c.content}</p>}
+              {c.audio_name && (
+                <div className="mt-2 space-y-1 rounded-lg border bg-muted/30 p-2">
+                  <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <FileAudio className="size-3.5 shrink-0" />
+                    <span className="truncate">{c.audio_name}</span>
+                    {c.audio_duration_sec ? <span className="shrink-0">· {formatDuration(c.audio_duration_sec)}</span> : null}
+                  </p>
+                  {c.audioUrl ? (
+                    <audio controls preload="none" src={c.audioUrl} className="h-9 w-full" />
+                  ) : (
+                    <p className="text-xs text-muted-foreground">녹음 파일을 불러오지 못했어요.</p>
+                  )}
+                </div>
+              )}
             </li>
           ))}
         </ol>
@@ -174,6 +216,7 @@ export function CustomerProperties({
   gate: GateInfo;
 }) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const officeGuard = useOfficeGuard("link", gate);
   const run = (fn: () => Promise<{ error?: string; message?: string }>) =>
     startTransition(async () => {

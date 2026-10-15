@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useBusy } from "@/lib/busy";
 import {
   addDocumentField,
   addDocumentSignal,
@@ -43,6 +44,7 @@ interface DocumentReviewProps {
 
 export function DocumentReview({ documentId, status, issuedAt, presets, fields, signals }: DocumentReviewProps) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const reviewedCount = fields.filter((f) => f.reviewed).length;
   const done = status === "검토 완료";
 
@@ -111,15 +113,17 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
                     </p>
                   )}
                 </div>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label="항목 삭제"
-                  disabled={pending}
-                  onClick={() => run(() => deleteDocumentField(field.id, documentId))}
-                >
-                  <Trash2 />
-                </Button>
+                <ConfirmAction
+                  appOnly
+                  action={() => deleteDocumentField(field.id, documentId)}
+                  title="추출 항목을 삭제할까요?"
+                  description="삭제하면 되돌릴 수 없어요."
+                  trigger={
+                    <Button size="icon-sm" variant="ghost" aria-label="항목 삭제" disabled={pending}>
+                      <Trash2 />
+                    </Button>
+                  }
+                />
               </div>
             ))}
             <FieldForm documentId={documentId} presets={presets} />
@@ -134,15 +138,17 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
                 <div className="flex items-center gap-2">
                   <SignalBadge level={signal.level} />
                   <p className="flex-1 text-sm font-medium">{signal.title}</p>
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="확인 사항 삭제"
-                    disabled={pending}
-                    onClick={() => run(() => deleteDocumentSignal(signal.id, documentId))}
-                  >
-                    <Trash2 />
-                  </Button>
+                  <ConfirmAction
+                    appOnly
+                    action={() => deleteDocumentSignal(signal.id, documentId)}
+                    title="확인 사항을 삭제할까요?"
+                    description="삭제하면 되돌릴 수 없어요."
+                    trigger={
+                      <Button size="icon-sm" variant="ghost" aria-label="확인 사항 삭제" disabled={pending}>
+                        <Trash2 />
+                      </Button>
+                    }
+                  />
                 </div>
                 {signal.description && <p className="text-sm text-muted-foreground">{signal.description}</p>}
                 {(signal.evidence_text || signal.page) && (

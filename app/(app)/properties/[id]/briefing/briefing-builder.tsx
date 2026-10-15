@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useBusy } from "@/lib/busy";
 import { createBriefing, deleteBriefing } from "@/lib/actions/briefings";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { BriefingSections, ProfileNeed } from "@/types";
@@ -53,6 +54,7 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
   const [comment, setComment] = useState(defaultComment);
   const [days, setDays] = useState("14");
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const [needs, setNeeds] = useState<ProfileNeed[]>([]);
 
   const linkUrl = (token: string) => `${typeof window !== "undefined" ? window.location.origin : siteUrl}/b/${token}`;

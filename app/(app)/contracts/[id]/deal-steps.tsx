@@ -17,6 +17,7 @@ import { completeDeal, saveDealStep } from "@/lib/actions/deals";
 import { DEAL_AMOUNT_LABEL, type DealStep } from "@/lib/constants";
 import { STEP_TITLES, stageIndex } from "@/lib/deal-steps";
 import { formatDate, formatManwon } from "@/lib/format";
+import { notifyRemindersChanged } from "@/lib/reminder-types";
 import { useFormAction } from "@/lib/use-form-action";
 import { cn } from "@/lib/utils";
 import type { Deal } from "@/types";
@@ -116,9 +117,9 @@ function PrevLink({ dealId, step }: { dealId: string; step: number }) {
 function StepButtons({ dealId, step, pending, saveable = true }: { dealId: string; step: number; pending: boolean; saveable?: boolean }) {
   const nextTitle = STEP_TITLES[step];
   return (
-    <div className="flex items-center justify-between gap-2 border-t pt-4">
+    <div className="flex items-center justify-between gap-2 border-t pt-4 app:flex-col-reverse app:items-stretch app:*:w-full">
       <PrevLink dealId={dealId} step={step} />
-      <div className="flex gap-2">
+      <div className="flex gap-2 app:flex-col-reverse app:*:h-11 app:*:w-full">
         {saveable && (
           <SubmitButton name="intent" value="save" variant="outline" pending={pending}>
             저장
@@ -135,7 +136,10 @@ function StepButtons({ dealId, step, pending, saveable = true }: { dealId: strin
 
 function useStepForm(dealId: string, step: DealStep) {
   return useFormAction(saveDealStep.bind(null, dealId, step), {
-    onSuccess: (result) => result.message && toast.success(result.message),
+    onSuccess: (result) => {
+      if (result.message) toast.success(result.message);
+      notifyRemindersChanged();
+    },
   });
 }
 
@@ -362,9 +366,9 @@ export function CompleteStep({ deal }: { deal: Deal }) {
       </Section>
 
       <FormMessage state={state?.error ? state : null} />
-      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 app:flex-col-reverse app:items-stretch app:*:w-full">
         <PrevLink dealId={deal.id} step={5} />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 app:flex-col-reverse app:*:h-11 app:*:w-full">
           <SubmitButton name="intent" value="save" variant="outline" pending={pending}>
             저장
           </SubmitButton>

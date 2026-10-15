@@ -2,6 +2,7 @@
 
 import { toast } from "sonner";
 import { FormMessage } from "@/components/form/form-message";
+import { FormActions } from "@/components/form/form-actions";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Label } from "@/components/ui/label";
@@ -52,9 +53,9 @@ export function DealForm({ properties, customers, defaultPropertyId, defaultCust
         <Textarea id="memo" name="memo" rows={3} defaultValue={deal?.memo ?? ""} placeholder="거래 관련 내부 메모" />
       </div>
       <FormMessage state={state} />
-      <div className="flex justify-end">
+      <FormActions>
         <SubmitButton pending={pending}>{deal ? "저장" : "계약 시작"}</SubmitButton>
-      </div>
+      </FormActions>
     </form>
   );
 }

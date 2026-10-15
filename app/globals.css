@@ -3,6 +3,8 @@
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+/* 안드로이드 앱(WebView) 전용 스타일. MobileAppShell이 data-app을 붙인다 */
+@custom-variant app (&:where([data-app], [data-app] *));
 
 @theme inline {
   --color-background: var(--background);

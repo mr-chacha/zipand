@@ -2,16 +2,29 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/layout/app-header";
 import { Logo } from "@/components/layout/logo";
+import { MobileAppShell } from "@/components/layout/mobile-app-shell";
 import { SidebarNav } from "@/components/layout/sidebar-nav";
+import { NotificationScheduler } from "@/components/notifications/notification-scheduler";
+import { isAppRequest } from "@/lib/app-mode";
 import { getSession } from "@/lib/auth";
 import { ROLE_LABELS } from "@/lib/constants";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { profile, office } = await getSession();
+  const [{ profile, office }, isApp] = await Promise.all([getSession(), isAppRequest()]);
   if (!profile.onboarded_at) redirect("/onboarding");
+
+  if (isApp) {
+    return (
+      <MobileAppShell officeName={office.name}>
+        <NotificationScheduler />
+        {children}
+      </MobileAppShell>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-muted/30">
+      <NotificationScheduler />
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 border-r bg-sidebar p-4 lg:flex print:hidden">
         <Logo className="px-2" />
         <SidebarNav />

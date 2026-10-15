@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useBusy } from "@/lib/busy";
 import { createPropertyList, deletePropertyList } from "@/lib/actions/property-lists";
 import { DEAL_TYPES, PROPERTY_TYPES } from "@/lib/constants";
 import { formatBudget, formatDate, formatPrice, toPyeong } from "@/lib/format";
@@ -91,6 +92,7 @@ export function ListBuilder({
   const [comment, setComment] = useState("");
   const [days, setDays] = useState("14");
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
 
   const customer = customers.find((c) => c.id === customerId);
   const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((f) => ({ ...f, [key]: value }));
@@ -136,9 +138,9 @@ export function ListBuilder({
     });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-5">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-5">
       {officeGuard.dialog}
-      <div className="space-y-4 lg:col-span-3">
+      <div className="min-w-0 space-y-4 lg:col-span-3">
         <Card>
           <CardHeader>
             <CardTitle>조건으로 찾기</CardTitle>
@@ -272,7 +274,7 @@ export function ListBuilder({
         </Card>
       </div>
 
-      <div className="space-y-4 lg:col-span-2">
+      <div className="min-w-0 space-y-4 lg:col-span-2">
         <Card className="lg:sticky lg:top-4">
           <CardHeader>
             <CardTitle>보낼 리스트 ({selected.length})</CardTitle>
@@ -312,8 +314,8 @@ export function ListBuilder({
                 placeholder="예) 말씀하신 조건으로 골라봤어요. 마음에 드는 매물이 있으면 연락 주세요!"
               />
             </div>
-            <div className="flex items-end gap-2">
-              <div className="flex-1 space-y-1.5">
+            <div className="flex items-end gap-2 app:flex-col app:items-stretch">
+              <div className="min-w-0 flex-1 space-y-1.5">
                 <Label htmlFor="list_days">유효 기간</Label>
                 <NativeSelect
                   id="list_days"

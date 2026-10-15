@@ -15,12 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useBusy } from "@/lib/busy";
 import { linkCustomerProperty, unlinkCustomerProperty } from "@/lib/actions/customers";
 import { deleteProperty, updatePropertyStatus } from "@/lib/actions/properties";
 import { PROPERTY_STATUSES, type PropertyStatus } from "@/lib/constants";
 
 export function PropertyStatusSelect({ propertyId, status }: { propertyId: string; status: string }) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   return (
     <Select
       value={status}
@@ -88,6 +90,7 @@ export function LinkedCustomers({
   gate: GateInfo;
 }) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const officeGuard = useOfficeGuard("link", gate);
   const available = options.filter((o) => !linked.some((l) => l.id === o.id));
 

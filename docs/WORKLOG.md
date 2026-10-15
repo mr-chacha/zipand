@@ -4,8 +4,14 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 웹 서비스 1차 개발 마감 (2026-10-15, `feat/mvp-web-ui` → `develop` PR). AI·앱·결제 제외 전 기능 동작
-- **완료**: 인증/사무소(간단 가입·단계별 시작하기·사무소/사업자 인증·서류 심사 신청), 매물·사진(최대 10장)·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크(사진 슬라이드), 매물 리스트 공유 링크, 고객·상담·후속 일정(거래 연동 상태), 계약 준비 5단계·임대인/임차인 공유 링크·계약 취소, 설정, 대시보드(일정 캘린더)
+- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 + 일정 알림 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
+  - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·계약·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
+  - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
+  - 실기기 피드백·UX: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 탭, '계약관리' 명칭, 날짜별 일정 상세(`/schedule/[date]`), **일정 10분 전 알림**(웹·앱)
+  - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
+- **실기기 테스트 방법**: USB 디버깅 연결 → `CAP_SERVER_URL=http://localhost:3000 npx cap sync android` → `./gradlew assembleDebug`(JDK 21) → `adb -s <기기> install -r` → `npm run app:serve`(production, 3100) + `npm run app:usb`(`adb reverse tcp:3000 tcp:3100`). 사무실 Wi‑Fi는 기기 간 통신이 막혀 LAN IP 방식 불가. 알림 플러그인 반영 시 APK 재빌드 필요
+- **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·결제 제외 전 기능 동작. 앱·일정 알림은 `feat/android-app` PR
+- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리 5단계·공유 링크, 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림
 - **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261016090000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 서버 전용 환경변수 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털), `OFFICE_REGISTRATION_SECRET` 필요
 
 > ⚠️ **웹 개발 재개 시 사용자에게 먼저 알릴 것 — 아직 진행하지 못한 서비스**
@@ -55,6 +61,115 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-16 — 일정 알림 (웹·앱, 10분 전 / 계약·잔금 당일 9시)
+**작업 요약**
+- `/notifications`를 준비중 → **다가오는 일정 목록**으로 교체. 알림 권한 허용 UI
+- 알림 대상: 미완료 할 일(`tasks`) + 계약일·잔금일. 계약·잔금은 **당일 오전 9시** 기준, 알림은 모두 일정 **10분 전**
+- **앱**: `@capacitor/local-notifications`로 OS 로컬 알림 스케줄 (백그라운드 가능). `SCHEDULE_EXACT_ALARM` 등 권한
+- **웹**: Notification API + 탭이 열려 있을 때 `setTimeout` (탭 닫으면 울리지 않음)
+- 로그인 레이아웃에 `NotificationScheduler` 마운트. 일정·계약 저장/완료/삭제 시 스케줄 재동기화
+
+**변경 파일**
+- `lib/reminders.ts`, `lib/reminder-types.ts`, `lib/notifications-client.ts`, `lib/actions/reminders.ts`
+- `components/notifications/notification-scheduler.tsx`, `app/(app)/notifications/page.tsx`, `app/(app)/layout.tsx`
+- `capacitor.config.ts`, `android/.../AndroidManifest.xml`, `package.json`(`@capacitor/local-notifications`)
+- 연동: `task-board`, `schedule-calendar`, `deal-steps`, `tasks`/`deals` 액션 revalidate
+
+**결정 사항**
+- 임장·상담 기록(과거 기록)은 알림 대상 아님
+- 거래 단계명 '계약 준비'는 DB 값이라 변경하지 않음(이전 커밋과 동일)
+
+**남은 TODO**
+- 실기기에서 알림 권한·10분 전 발화·알림 탭 시 상세 이동 확인 (APK 재설치 후)
+- 웹: 탭이 닫혀 있을 때 알림이 필요하면 Service Worker/푸시 검토
+
+### 2026-10-15 — '계약관리' 명칭 변경, 대시보드 일정 스크롤, 날짜별 일정 상세 페이지
+**작업 요약**
+- 기능명 '계약 준비' → **'계약관리'** (웹·앱 공통): 사이드바·페이지 제목·뒤로가기·대시보드 카드·캘린더 안내·로그인 화면 문구·이용약관·매물 이력(`계약관리 시작`)·README
+- 대시보드 캘린더 옆 날짜별 일정 목록: 큰 화면에서는 달력 높이를 넘지 않고 목록만 상하 스크롤, 작은 화면·앱은 최대 높이 후 스크롤. 일정이 있으면 '일정 자세히 보기' 버튼
+- 날짜별 일정 상세 페이지 `/schedule/[date]` 신규 (사이드바 메뉴에는 추가하지 않음): 달력 날짜 칸·목록 날짜 제목 클릭 시 이동. 일정 수·할 일 완료 요약, 전날·오늘·다음날 이동, 종류별 범례(건수), 시간순 일정 목록(할 일 바로 완료 처리), 해당 날짜 10:00로 일정 추가, 뒤로가기는 해당 월 대시보드
+
+**변경 파일**
+- `components/calendar/schedule-calendar.tsx` — 날짜 칸을 링크로, 선택 상태 제거(오늘/월 1일 기준 목록), `DayEventList`·`KindLegend`·`formatDayTitle`·`dayHref` 분리 export, 목록 스크롤
+- `app/(app)/schedule/[date]/page.tsx` (신규)
+- `components/layout/nav-items.ts`, `app/(app)/contracts/{page,new/page,[id]/page}.tsx`, `app/(app)/dashboard/page.tsx`, `app/(auth)/layout.tsx`, `app/(legal)/terms/page.tsx`, `lib/actions/deals.ts`, `README.md`
+
+**결정 사항**
+- 거래 단계명 '계약 준비'(서류 확인→조건 협의→계약 준비→잔금 대기)는 DB 값이라 변경하지 않음
+- 잘못된 날짜 주소는 404
+
+**남은 TODO**
+- 실기기에서 일정 상세 페이지·목록 스크롤 확인 (USB 재연결 후 `npm run app:usb`)
+
+### 2026-10-15 — 안드로이드 앱: 실기기 테스트 피드백 반영 (앱 전용 UI·속도·로딩·삭제 컨펌·계약 탭)
+**작업 요약**
+- 앱 아이콘·스플래시: 파비콘 로고(파란 배경 + 흰 집)로 교체. `mobile/generate-assets.mjs`로 `assets/` 원본 생성 → `@capacitor/assets`로 안드로이드 리소스 생성
+- 실기기 설치: 사무실 Wi‑Fi 기기 간 차단으로 LAN 접속 불가 → USB `adb reverse` 방식으로 전환. 앱 테스트는 production 서버(`app:serve`, 3100)로 — 개발 모드는 페이지마다 컴파일·프리페치 없음으로 느림
+- **앱 전용 스타일**: `@custom-variant app`(`[data-app]`, MobileAppShell이 html·셸에 표시). 웹 화면은 그대로
+  - 버튼 44px(아이콘 버튼 포함), 흰 버튼·입력 테두리 진하게, 입력·선택·탭·필터·날짜 선택기 확대
+  - `components/form/form-actions.tsx`: 웹은 오른쪽 정렬 한 줄, 앱은 저장(위)·취소(아래) 가로 꽉 채움 — 매물·고객·임장·계약·특약·할 일·설정 폼, 상담 기록·통화 녹음 선택 버튼
+  - 일정·할 일 추가 창에서 종류·일시 한 줄씩, 고객 상세 "계약 시작하기"를 큰 버튼으로
+  - 날짜 선택기: 앱에서는 화면 가운데 표시(시간 선택은 달력 아래). `scrollIntoView`가 화면 전체를 밀던 문제 수정(웹 포함)
+- **전체 화면 로딩**(앱 전용): `lib/busy.ts` `useBusy` + `components/busy-overlay.tsx`. 폼 저장(`useFormAction`), 삭제 확인, 연결·업로드 등 서버 작업 중 "저장 중입니다… / 삭제 중입니다… / 처리 중입니다…"
+- **삭제 컨펌**: `ConfirmAction`에 `appOnly` 추가(앱은 "삭제하면 되돌릴 수 없어요" 모달, 웹은 기존처럼 바로 삭제) — 상담 기록, 할 일, 매물 사진, 문서 추출 항목·확인 사항, 계약 확인 항목·특약. 마우스 오버로만 보이던 삭제 버튼은 앱에서 항상 표시
+- **속도**: 서명 URL을 서버 메모리에 재사용(같은 사진 같은 URL → 브라우저 캐시), 썸네일 lazy loading, 앱에서 올리는 매물 사진은 긴 변 1920px JPEG로 축소(`lib/image.ts`)
+- 계약 준비: 앱 하단 탭에 "계약" 추가(5개), 계약 상세에서 진행 단계 카드를 위로, 상단 탭 축약
+- 매물 리스트 공유 화면 좌우 스크롤 수정(그리드 `minmax(0,1fr)`), 앱 본문 가로 스크롤 차단
+
+**변경 파일/화면**
+- 공용: `app/globals.css`, `components/ui/{button,input,select,tabs,textarea,popover}.tsx`, `components/form/{form-actions,confirm-action,date-picker,native-select}.tsx`, `components/{busy-overlay,audio-attach,property-thumbnail}.tsx`, `components/layout/{mobile-app-shell,nav-items}.ts(x)`
+- lib: `busy.ts`, `use-is-app.ts`, `image.ts`, `storage.ts`, `upload-client.ts`, `use-form-action.ts`
+- 화면: 고객·매물·임장·사진·문서·계약·특약·설정·시작하기·브리핑·리스트 공유
+- 앱: `assets/`, `mobile/generate-assets.mjs`, `android/app/src/main/res/{mipmap,drawable}-*`, `next.config.ts`(LAN IP `allowedDevOrigins`), `package.json`(`app:serve`, `app:usb`)
+
+**결정 사항**
+- 앱/웹 분기는 서버 `isAppRequest()`(UA `ZipandApp`), 클라이언트 `useIsApp()`, 스타일 `app:` 변형 세 가지로 한다. 앱 요청 사항은 웹 화면을 바꾸지 않는다
+- 사진 축소는 앱 업로드에만 적용(웹 업로드·기존 사진은 원본). Supabase 이미지 변환(유료)은 미사용
+
+**남은 TODO**
+- 실기기에서 이번 변경 전체 확인(로그인 후 화면은 미확인): 버튼 크기·테두리, 날짜 선택기 가운데 표시, 전체 화면 로딩, 삭제 컨펌, 계약 탭
+- 웹 업로드 사진도 축소할지, 매물·고객 "연결 해제"에도 컨펌을 붙일지 결정
+- 3단계 AI 요약(제공사 선택 필요)
+
+### 2026-10-15 — 안드로이드 앱 2단계: 녹음 업로드·백그라운드 녹음, 하단 탭 고정
+**작업 요약**
+- 상담 녹음: 고객 상세 상담 기록 폼에서 녹음하기 / 통화 녹음 파일 선택(시스템 파일 선택기, 갤럭시 `Recordings/Call`) → Storage 업로드 → 상담 기록 저장. 녹음만 저장 가능(내용 선택), 기록 목록에 재생기·길이 표시, 기록 삭제 시 파일도 삭제
+- 공용 `components/audio-attach.tsx` + `lib/use-audio-recorder.ts`: 앱은 네이티브 녹음, 브라우저는 MediaRecorder. 업로드 실패 시 녹음 보관 후 "다시 업로드". 임장 기록 폼도 같은 컴포넌트 사용
+- 네이티브 `RecorderPlugin`(AAC 64kbps 모노 m4a, 캐시 폴더) + `RecordingService`(포그라운드 서비스, microphone 타입, "집앤 녹음 중" 알림). 화면을 끄거나 다른 앱으로 가도 녹음 유지(에뮬레이터 확인). 웹은 `Capacitor.convertFileSrc`로 파일을 읽어 업로드
+- 개발 앱(http://10.0.2.2)에서 `crypto.randomUUID` 없음 → 업로드 경로 생성 실패 수정(`lib/uuid.ts` `randomUuid`, 사진 업로드도 해당)
+- 권한 허용 직후 알림 채널 생성이 메인 스레드를 막아 ANR → 채널은 플러그인 로드 시 백그라운드에서 생성, 녹음 시작도 백그라운드 스레드
+- 앱 레이아웃: 문서 전체 대신 본문만 스크롤(`fixed inset-0` + `main overflow-y-auto`), WebView 오버스크롤 효과 끔 → 상단 바·하단 탭이 스크롤·오버스크롤에 움직이지 않음. 입력 중에는 하단 탭 숨김. 상단 바 검색 아이콘 제거(목록 화면 검색창 사용)
+
+**변경 파일/화면**
+- 마이그레이션(원격 적용·타입 재생성): `20261016100000_consultation_audio`(consultations 녹음 컬럼, `consultation-audio` 버킷 50MB, `visit-audio` 50MB·형식 확장)
+- Android: `RecorderPlugin.java`, `RecordingService.java`, `MainActivity.java`, `AndroidManifest.xml`(RECORD_AUDIO, FOREGROUND_SERVICE(_MICROPHONE), POST_NOTIFICATIONS)
+- 웹: `components/audio-attach.tsx`, `lib/{audio,native-recorder,use-audio-recorder,uuid}.ts`, `app/(app)/customers/[id]/*`, `visit-form.tsx`, `lib/actions/customers.ts`, `components/layout/mobile-app-shell.tsx`
+
+**결정 사항**
+- 앱이 통화 음성을 직접 녹음하지 않고 기본 전화 앱 녹음 파일을 선택해 올린다(`READ_CALL_LOG`·접근성 우회 X)
+- 녹음 파일 경로는 `{office_id}/{customer_id}/{uuid}.ext`, DB 제약으로 경로 검증
+
+**남은 TODO**
+- 3단계: 업로드된 녹음 STT·요약 → 상담 기록 저장(원문·신뢰도·검토 상태 표시)
+- 통화 종료 감지 후 "상담 기록 남길까요?" 알림, 오프라인 업로드 대기열, 이어 올리기(TUS)
+- 새 설치 상태에서 권한 허용 → 녹음 시작 ANR 재확인
+
+### 2026-10-15 — 안드로이드 앱 1단계: Capacitor 셸·앱 UI
+**작업 요약**
+- 개발 환경: JDK 21(Homebrew `openjdk@21`, Capacitor 8 요구), Android SDK(`~/Library/Android/sdk`, API 36), 에뮬레이터 `Zipand_Pixel_API_36`(Pixel 8). `~/.zshrc`에 `JAVA_HOME`·`ANDROID_HOME`·PATH
+- Capacitor 8 + `android/` 프로젝트(appId `kr.zipand.app`). 정적 번들 대신 배포된 웹을 WebView로 띄움(`server.url`, 개발은 `http://10.0.2.2:3000`, 배포는 `CAP_SERVER_URL`). 연결 실패용 `mobile/www/index.html`
+- 앱 판별: WebView User-Agent에 `ZipandApp` 추가 → `lib/app-mode.ts` `isAppRequest()`로 서버에서 판별
+- 앱 레이아웃 `components/layout/mobile-app-shell.tsx`: 상단 바(탭 화면은 로고·사무소명, 하위 화면은 뒤로, 매물·고객 목록 검색, 알림) + 하단 탭(홈·매물·고객·상담·마이)
+- 앱 홈 `app/(app)/dashboard/app-dashboard.tsx`: 매물 등록·고객 등록·일정 추가(바로 다이얼로그), 오늘 일정·등록 매물·관리 중 고객 수, 캘린더, 최근 매물·고객
+- 스크립트: `npm run app:emulator`, `app:run`, `app:sync` / `next.config.ts` `allowedDevOrigins: ["10.0.2.2"]`
+
+**결정 사항**
+- 웹 코드를 유지하기 위해 Capacitor 원격 URL 방식 채택(RN·네이티브 재작성 X). 웹/앱 같은 페이지, 레이아웃만 분기
+- 통화 녹음은 앱이 직접 캡처 불가(Android 10+) → 기본 전화 앱 녹음 파일을 가져오는 방식. `READ_CALL_LOG`는 쓰지 않음
+
+**남은 TODO**
+- 로그인 후 앱 화면(홈·매물·고객) 에뮬레이터 점검, 배포 URL 확정 후 릴리스 빌드·서명
 
 ### 2026-10-15 — 사업자 인증·서류 심사, 계약 준비 5단계·공유, 매물 리스트 공유 (웹 1차 마감)
 **작업 요약**
