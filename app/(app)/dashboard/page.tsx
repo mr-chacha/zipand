@@ -8,12 +8,14 @@ import { DealStageBadge, PropertyStatusBadge } from "@/components/status-badge";
 import { ScheduleCalendar } from "@/components/calendar/schedule-calendar";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { isAppRequest } from "@/lib/app-mode";
 import { getSession } from "@/lib/auth";
 import { addDays, getCalendarEvents, monthGrid, parseMonth } from "@/lib/calendar";
 import { CUSTOMER_CLOSED_STATUSES } from "@/lib/constants";
 import { formatDate, formatDateTime, formatPrice, todayKst } from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions, getOfficeMembers, getPropertyList, getPropertyOptions } from "@/lib/queries";
+import { AppDashboard } from "./app-dashboard";
 import { GettingStarted } from "./getting-started";
 
 export const metadata: Metadata = { title: "대시보드" };
@@ -26,8 +28,10 @@ const quickActions = [
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const { month: monthParam } = await searchParams;
-  const { supabase } = await getSession();
   const month = parseMonth(monthParam);
+  if (await isAppRequest()) return <AppDashboard month={month} />;
+
+  const { supabase } = await getSession();
   const grid = monthGrid(month);
   const days: string[] = [];
   for (let d = grid.start; d <= grid.end; d = addDays(d, 1)) days.push(d);

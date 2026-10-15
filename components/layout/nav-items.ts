@@ -5,6 +5,7 @@ import {
   FileSignature,
   LayoutDashboard,
   Settings,
+  UserRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -27,3 +28,11 @@ export const navItems: NavItem[] = [
 ];
 
 export const bottomNavItems: NavItem[] = [{ title: "설정", href: "/settings", icon: Settings }];
+
+/** 안드로이드 앱 하단 탭 */
+export const appTabItems: NavItem[] = [
+  { title: "홈", href: "/dashboard", icon: LayoutDashboard },
+  { title: "매물", href: "/properties", icon: Building2 },
+  { title: "고객·상담", href: "/customers", icon: Users },
+  { title: "마이", href: "/mypage", icon: UserRound },
+];

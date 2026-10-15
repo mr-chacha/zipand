@@ -4,7 +4,11 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 웹 서비스 1차 개발 마감 (2026-10-15, `feat/mvp-web-ui` → `develop` PR). AI·앱·결제 제외 전 기능 동작
+- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1단계 앱 UI 완료, 2단계 녹음 업로드 진행 중, 3단계 AI 요약 예정
+  - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
+  - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
+  - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
+- **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·앱·결제 제외 전 기능 동작
 - **완료**: 인증/사무소(간단 가입·단계별 시작하기·사무소/사업자 인증·서류 심사 신청), 매물·사진(최대 10장)·동영상·임장 기록, 문서 보관·수동 검토, 고객 브리핑 공유 링크(사진 슬라이드), 매물 리스트 공유 링크, 고객·상담·후속 일정(거래 연동 상태), 계약 준비 5단계·임대인/임차인 공유 링크·계약 취소, 설정, 대시보드(일정 캘린더)
 - **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261016090000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 서버 전용 환경변수 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털), `OFFICE_REGISTRATION_SECRET` 필요
 
@@ -55,6 +59,22 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-15 — 안드로이드 앱 1단계: Capacitor 셸·앱 UI
+**작업 요약**
+- 개발 환경: JDK 21(Homebrew `openjdk@21`, Capacitor 8 요구), Android SDK(`~/Library/Android/sdk`, API 36), 에뮬레이터 `Zipand_Pixel_API_36`(Pixel 8). `~/.zshrc`에 `JAVA_HOME`·`ANDROID_HOME`·PATH
+- Capacitor 8 + `android/` 프로젝트(appId `kr.zipand.app`). 정적 번들 대신 배포된 웹을 WebView로 띄움(`server.url`, 개발은 `http://10.0.2.2:3000`, 배포는 `CAP_SERVER_URL`). 연결 실패용 `mobile/www/index.html`
+- 앱 판별: WebView User-Agent에 `ZipandApp` 추가 → `lib/app-mode.ts` `isAppRequest()`로 서버에서 판별
+- 앱 레이아웃 `components/layout/mobile-app-shell.tsx`: 상단 바(탭 화면은 로고·사무소명, 하위 화면은 뒤로, 매물·고객 목록 검색, 알림) + 하단 탭(홈·매물·고객·상담·마이)
+- 앱 홈 `app/(app)/dashboard/app-dashboard.tsx`: 매물 등록·고객 등록·일정 추가(바로 다이얼로그), 오늘 일정·등록 매물·관리 중 고객 수, 캘린더, 최근 매물·고객
+- 스크립트: `npm run app:emulator`, `app:run`, `app:sync` / `next.config.ts` `allowedDevOrigins: ["10.0.2.2"]`
+
+**결정 사항**
+- 웹 코드를 유지하기 위해 Capacitor 원격 URL 방식 채택(RN·네이티브 재작성 X). 웹/앱 같은 페이지, 레이아웃만 분기
+- 통화 녹음은 앱이 직접 캡처 불가(Android 10+) → 기본 전화 앱 녹음 파일을 가져오는 방식. `READ_CALL_LOG`는 쓰지 않음
+
+**남은 TODO**
+- 로그인 후 앱 화면(홈·매물·고객) 에뮬레이터 점검, 배포 URL 확정 후 릴리스 빌드·서명
 
 ### 2026-10-15 — 사업자 인증·서류 심사, 계약 준비 5단계·공유, 매물 리스트 공유 (웹 1차 마감)
 **작업 요약**
