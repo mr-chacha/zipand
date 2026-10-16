@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AppMain } from "./app-main";
 import { AppHeader } from "@/components/layout/app-header";
 import { Logo } from "@/components/layout/logo";
 import { MobileAppShell } from "@/components/layout/mobile-app-shell";
@@ -39,7 +40,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="print:hidden">
           <AppHeader userName={profile.name} officeName={office.name} role={profile.role} />
         </div>
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 lg:p-8">{children}</main>
+        <main className="min-w-0 w-full flex-1">
+          <AppMain>{children}</AppMain>
+        </main>
       </div>
     </div>
   );
