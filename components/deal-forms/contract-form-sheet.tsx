@@ -14,10 +14,10 @@ import {
   LAND_CATEGORIES,
   LEASE_MONTH_OPTIONS,
   RENT_ARREARS_OPTIONS,
-  DEFAULT_SALE_SPECIAL_TERMS,
   addMonthsToYmd,
   contractArticle1Text,
   contractArticlesForDeal,
+  defaultSpecialTermsForDeal,
   type ContractDealType,
   type ContractPropertyType,
 } from "@/lib/contract-templates";
@@ -52,9 +52,20 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
   const [delivery, setDelivery] = useState(
     () => data.delivery_date ?? data.move_in_date ?? ""
   );
+  const [leaseStart, setLeaseStart] = useState(
+    () =>
+      data.lease_start_date ||
+      data.delivery_date ||
+      data.move_in_date ||
+      ""
+  );
   const [expiry, setExpiry] = useState(() => {
     if (data.expiry_date) return data.expiry_date;
-    const start = data.delivery_date ?? data.move_in_date ?? "";
+    const start =
+      data.lease_start_date ||
+      data.delivery_date ||
+      data.move_in_date ||
+      "";
     return start
       ? addMonthsToYmd(start, Number(normalizeLeaseMonths(data.lease_months)))
       : "";
@@ -75,12 +86,26 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
         value={delivery}
         onChange={(v) => {
           setDelivery(v);
+          if (!leaseStart || leaseStart === delivery) {
+            setLeaseStart(v);
+            syncExpiry(v, months);
+          }
+        }}
+        className="mx-1 inline-flex min-w-36 align-baseline"
+        inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
+      />{" "}
+      까지 임차인에게 인도하며, 임대차 기간은{" "}
+      <DatePicker
+        name="lease_start_date"
+        value={leaseStart}
+        onChange={(v) => {
+          setLeaseStart(v);
           syncExpiry(v, months);
         }}
         className="mx-1 inline-flex min-w-36 align-baseline"
         inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
       />{" "}
-      일까지 임차인에게 인도하며, 임대차 기간은 인도일로부터{" "}
+      부터{" "}
       <DatePicker
         name="expiry_date"
         value={expiry}
@@ -88,14 +113,14 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
         className="mx-1 inline-flex min-w-36 align-baseline"
         inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
       />{" "}
-      일(
+      (
       <NativeSelect
         name="lease_months"
         value={months}
         onChange={(e) => {
           const next = normalizeLeaseMonths(e.target.value);
           setMonths(next);
-          syncExpiry(delivery, next);
+          syncExpiry(leaseStart || delivery, next);
         }}
         options={LEASE_MONTH_OPTIONS.map((m) => ({ value: m, label: m }))}
         className="mx-1 inline-flex w-16 align-baseline"
@@ -1241,7 +1266,7 @@ export function ContractFormSheet({
       ? propertyType
       : "아파트");
   const [specialTerms, setSpecialTerms] = useState(
-    () => data.special_terms || (isSale ? DEFAULT_SALE_SPECIAL_TERMS : "")
+    () => data.special_terms || defaultSpecialTermsForDeal(dealType)
   );
 
   return (
@@ -1475,6 +1500,23 @@ export function ContractFormSheet({
                   bodyBefore={article.bodyBefore}
                   bodyAfter={article.bodyAfter}
                 />
+              ) : "variant" in article &&
+                article.variant === "explanation_delivery" &&
+                "bodyBeforeDate" in article ? (
+                <span className="inline">
+                  {article.bodyBeforeDate}{" "}
+                  <DatePicker
+                    name="explanation_delivery_date"
+                    defaultValue={
+                      data.explanation_delivery_date ||
+                      data.contract_date ||
+                      ""
+                    }
+                    className="mx-1 inline-flex min-w-36 align-baseline"
+                    inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
+                  />{" "}
+                  {article.bodyAfterDate}
+                </span>
               ) : "bodyBeforeDate" in article ? (
                 <span className="inline">
                   {article.bodyBeforeDate}{" "}
