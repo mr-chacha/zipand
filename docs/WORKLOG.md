@@ -61,6 +61,20 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 
 ## 기록
 
+### 2026-10-16 — 전세·월세 특약 기본문구·일반조항(제2~9조) 정리
+**작업 요약**
+- 전세·월세 특약사항 기본 문구 추가(`DEFAULT_JEONSE/MONTHLY_SPECIAL_TERMS`), 임대인·임차인 용어로 정리
+- 월세(전세 공통) 제2조 [임대차] 문구: 인도일·기간 시작~만기(개월)
+- 제3~8조 띄어쓰기·표현 맞춤, **제9조** 확인·설명서 교부(+교부일자) 추가
+- 월세 제4조 차임 연체 기준 선택 유지
+
+**변경 파일/화면**
+- `lib/contract-templates.ts`, `components/deal-forms/contract-form-sheet.tsx`
+
+**남은 TODO**
+- 원격 `db:push`, 작성→저장→인쇄 실사용 검증
+- 확인설명서·영수증 UI
+
 ### 2026-10-16 — 계약서 A4 인쇄·양식 디테일 (매매·임대차)
 **작업 요약**
 - 인쇄를 body 직속 `#contract-print-host` 복제 방식으로 바꿔 빈 1페이지·모달 클리핑 방지 (`lib/print-contract.ts`)
