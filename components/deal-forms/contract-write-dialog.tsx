@@ -21,6 +21,7 @@ import {
   type ContractPropertyType,
 } from "@/lib/contract-templates";
 import { buildDealFormDefaults, newContractNo, type DealFormPrefill } from "@/lib/deal-forms";
+import { printContractSheet } from "@/lib/print-contract";
 import { cn } from "@/lib/utils";
 
 export type WriteDealOption = {
@@ -53,6 +54,8 @@ function emptyPrefill(): DealFormPrefill {
     officeName: "",
     officePhone: null,
     officeAddress: null,
+    officeRepresentative: null,
+    officeRegistrationNo: null,
     agentName: "",
     agentPhone: null,
   };
@@ -117,7 +120,8 @@ export function ContractWriteDialog({
 
   const [pickProperty, setPickProperty] = useState<ContractPropertyType>("아파트");
   const [pickDeal, setPickDeal] = useState<ContractDealType>("매매");
-  const [dealId, setDealId] = useState(deals[0]?.value ?? "");
+  /** 기본은 연결 안 함 — 선택 시에만 매물·금액 prefill */
+  const [dealId, setDealId] = useState("");
   const [formId, setFormId] = useState<string | null>(null);
   /** 종류·거래가 바뀔 때 양식을 다시 마운트하기 위한 키 */
   const [formEpoch, setFormEpoch] = useState(0);
@@ -136,25 +140,27 @@ export function ContractWriteDialog({
     setFormId(null);
     setPickProperty("아파트");
     setPickDeal("매매");
-    setDealId(deals[0]?.value ?? "");
+    setDealId("");
     setFormEpoch(0);
   };
 
   const handleOpenChange = (next: boolean) => {
     if (!next) reset();
     else {
-      const initial = matchDeals(deals, "아파트", "매매");
-      setDealId(initial[0]?.value ?? deals[0]?.value ?? "");
+      setDealId("");
       setFormEpoch((n) => n + 1);
     }
     onOpenChange(next);
   };
 
+  const keepOrClearDeal = (nextDeals: WriteDealOption[], prev: string) =>
+    prev && nextDeals.some((d) => d.value === prev) ? prev : "";
+
   const changeProperty = (value: ContractPropertyType) => {
     setPickProperty(value);
     setFormId(null);
     const next = matchDeals(deals, value, pickDeal);
-    setDealId(next[0]?.value ?? deals[0]?.value ?? "");
+    setDealId((prev) => keepOrClearDeal(next, prev));
     setFormEpoch((n) => n + 1);
   };
 
@@ -162,7 +168,7 @@ export function ContractWriteDialog({
     setPickDeal(value);
     setFormId(null);
     const next = matchDeals(deals, pickProperty, value);
-    setDealId(next[0]?.value ?? deals[0]?.value ?? "");
+    setDealId((prev) => keepOrClearDeal(next, prev));
     setFormEpoch((n) => n + 1);
   };
 
@@ -228,9 +234,9 @@ export function ContractWriteDialog({
         </DialogHeader>
 
         <div className="flex flex-wrap items-end gap-3 border-b bg-slate-800 px-4 py-3 text-white print:hidden">
-          <p className="w-full text-xs font-medium text-white/80 sm:w-auto sm:pb-2">계약서종류</p>
+          <p className="w-full text-[14px] font-medium text-white/80 sm:w-auto sm:pb-2">계약서종류</p>
           <div className="space-y-1">
-            <Label htmlFor="cw-property" className="text-xs text-white/70">
+            <Label htmlFor="cw-property" className="text-[14px] text-white/70">
               부동산 종류
             </Label>
             <NativeSelect
@@ -242,7 +248,7 @@ export function ContractWriteDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="cw-deal" className="text-xs text-white/70">
+            <Label htmlFor="cw-deal" className="text-[14px] text-white/70">
               거래 종류
             </Label>
             <NativeSelect
@@ -254,11 +260,11 @@ export function ContractWriteDialog({
             />
           </div>
           <div className="ml-auto space-y-1">
-            <Label htmlFor="cw-link-deal" className="text-xs text-white/70">
+            <Label htmlFor="cw-link-deal" className="text-[14px] text-white/70">
               연결 거래
             </Label>
             {deals.length === 0 ? (
-              <p className="max-w-xs text-xs text-white/80">
+              <p className="max-w-xs text-[14px] text-white/80">
                 거래가 없어요.{" "}
                 <Link href="/contracts/new" className="underline">
                   계약 시작
@@ -269,6 +275,7 @@ export function ContractWriteDialog({
                 id="cw-link-deal"
                 value={dealId}
                 onChange={(e) => changeDealId(e.target.value)}
+                placeholder="선택안함"
                 options={(matchedDeals.length ? matchedDeals : deals).map((d) => ({ value: d.value, label: d.label }))}
                 className="min-w-48 max-w-xs bg-white text-foreground"
               />
@@ -281,22 +288,28 @@ export function ContractWriteDialog({
             <Save data-icon="inline-start" />
             계약서저장
           </Button>
-          <Button type="button" size="sm" variant="outline" disabled={!active} onClick={() => window.print()}>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!active}
+            onClick={() => printContractSheet(active?.title)}
+          >
             <Printer data-icon="inline-start" />
             인쇄 · PDF
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => handleOpenChange(false)}>
             닫기
           </Button>
-          {formId && <span className="text-xs text-muted-foreground">저장됨</span>}
+          {formId && <span className="text-[14px] text-muted-foreground">저장됨</span>}
           {!formId && active && (
-            <span className="text-xs text-destructive">신규계약서작성 모드 · 아직 저장되지 않았어요</span>
+            <span className="text-[14px] text-destructive">신규계약서작성 모드 · 아직 저장되지 않았어요</span>
           )}
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 print:overflow-visible print:p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[14px] print:overflow-visible print:p-0">
           {!active ? (
-            <p className="py-16 text-center text-sm text-muted-foreground">해당 종류의 계약서 서식이 없어요.</p>
+            <p className="py-16 text-center text-[14px] text-muted-foreground">해당 종류의 계약서 서식이 없어요.</p>
           ) : (
             <form
               id="contract-write-form"

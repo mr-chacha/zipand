@@ -72,6 +72,8 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
           officeName: office.name,
           officePhone: office.phone,
           officeAddress: office.address,
+          officeRepresentative: office.representative,
+          officeRegistrationNo: office.registration_no,
           agentName: profile.name,
           agentPhone: profile.phone,
         },

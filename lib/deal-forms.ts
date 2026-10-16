@@ -1,3 +1,5 @@
+import { defaultSpecialTermsForDeal } from "@/lib/contract-templates";
+
 /** 거래 서식 종류·기본값·필드 키 (웹 작성 / 공유 공용) */
 
 export const DEAL_FORM_KINDS = ["contract", "disclosure", "receipt", "other"] as const;
@@ -39,6 +41,8 @@ export type DealFormPrefill = {
   officeName: string;
   officePhone: string | null;
   officeAddress: string | null;
+  officeRepresentative: string | null;
+  officeRegistrationNo: string | null;
   agentName: string;
   agentPhone: string | null;
 };
@@ -53,7 +57,7 @@ function money(v: number | null | undefined) {
 
 /** 거래·매물 정보로 서식 초안 data 채우기 */
 export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): Record<string, string> {
-  const clauses = p.clauses.length ? p.clauses.map((c, i) => `${i + 1}. ${c}`).join("\n") : "";
+  const clauses = defaultSpecialTermsForDeal(p.dealType, p.clauses);
   const common = {
     property_title: p.propertyTitle,
     property_address: p.propertyAddress,
@@ -64,6 +68,8 @@ export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): R
     office_name: p.officeName,
     office_phone: str(p.officePhone),
     office_address: str(p.officeAddress),
+    office_representative: str(p.officeRepresentative),
+    office_registration_no: str(p.officeRegistrationNo),
     agent_name: p.agentName,
     agent_phone: str(p.agentPhone),
   };
@@ -75,8 +81,25 @@ export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): R
         lessor_name: str(p.lessorName),
         lessor_phone: str(p.lessorPhone),
         lessor_account: str(p.lessorAccount),
+        lessor_address: "",
+        lessor_id_type: "주민등록번호",
+        lessor_id_front: "",
+        lessor_id_back: "",
+        lessor_count: "1",
         lessee_name: str(p.lesseeName),
         lessee_phone: str(p.lesseePhone),
+        lessee_address: "",
+        lessee_id_type: "주민등록번호",
+        lessee_id_front: "",
+        lessee_id_back: "",
+        lessee_count: "1",
+        joint_office_count: "0",
+        joint_office_name: "",
+        joint_office_phone: "",
+        joint_office_address: "",
+        joint_office_representative: "",
+        joint_office_registration_no: "",
+        joint_agent_name: "",
         amount: money(p.amount),
         monthly_rent: money(p.monthlyRent),
         down_payment: money(p.downPayment),
@@ -95,8 +118,15 @@ export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): R
         balance_date: str(p.balanceDate),
         delivery_date: str(p.moveInDate),
         move_in_date: str(p.moveInDate),
+        lease_months: p.dealType === "매매" ? "" : "24",
+        day_count_rule: p.dealType === "매매" ? "" : "초일불산입",
+        rent_arrears_periods: p.dealType === "매매" ? "" : "2기",
         building: "",
         unit: "",
+        leased_portion: "",
+        leased_portion_area: "",
+        rent_pay_day: "",
+        rent_pay_timing: "후불",
         land_category: "대",
         land_area: "",
         land_right_type: "",
@@ -214,6 +244,8 @@ export function formFieldKeys(kind: DealFormKind): string[] {
     officeName: "",
     officePhone: null,
     officeAddress: null,
+    officeRepresentative: null,
+    officeRegistrationNo: null,
     agentName: "",
     agentPhone: null,
   }));

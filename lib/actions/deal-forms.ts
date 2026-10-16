@@ -69,6 +69,8 @@ async function loadPrefill(dealId: string) {
       officeName: office.name,
       officePhone: office.phone,
       officeAddress: office.address,
+      officeRepresentative: office.representative,
+      officeRegistrationNo: office.registration_no,
       agentName: profile.name,
       agentPhone: profile.phone,
     },
