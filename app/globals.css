@@ -136,3 +136,20 @@
     @apply font-sans;
   }
 }
+
+/* 계약서 작성 창 인쇄: 양식만 A4로 */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #contract-print-root,
+  #contract-print-root * {
+    visibility: visible;
+  }
+  #contract-print-root {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    padding: 12mm;
+  }
+}

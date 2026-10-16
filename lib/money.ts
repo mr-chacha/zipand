@@ -46,3 +46,16 @@ export function manwonToHangul(manwon: number) {
   }
   return `${out}원`;
 }
+
+/** 원 단위 금액을 한글로 읽는다. 100000000 → "일억원", 15000 → "일만오천원" */
+export function wonToHangul(won: number) {
+  if (!Number.isFinite(won) || won <= 0) return "";
+  let rest = Math.floor(won);
+  let out = "";
+  for (let i = 0; rest > 0 && i < BIG_UNITS.length; i++) {
+    const group = rest % 10000;
+    if (group) out = `${groupToHangul(group)}${BIG_UNITS[i]}${out}`;
+    rest = Math.floor(rest / 10000);
+  }
+  return `${out}원`;
+}

@@ -16,6 +16,8 @@ export type Task = Tables<"tasks">;
 export type Deal = Tables<"deals">;
 export type DealChecklistItem = Tables<"deal_checklist_items">;
 export type DealClause = Tables<"deal_clauses">;
+export type DealForm = Tables<"deal_forms">;
+export type DealFormShare = Tables<"deal_form_shares">;
 export type OfficeClause = Tables<"office_clauses">;
 export type Briefing = Tables<"briefings">;
 

@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { ComingSoonPanel } from "@/components/coming-soon";
+import { ContractWriteEntry } from "@/components/deal-forms/contract-write-entry";
+import type { WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
 import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { DealStageBadge } from "@/components/status-badge";
@@ -9,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { isAppRequest } from "@/lib/app-mode";
 import { getSession } from "@/lib/auth";
 import { formatDate, formatManwon } from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
@@ -19,13 +22,13 @@ export const metadata: Metadata = { title: "계약관리" };
 export default async function ContractsPage({ searchParams }: PageProps<"/contracts">) {
   const { tab, q } = await searchParams;
   const keyword = typeof q === "string" ? q.trim() : "";
-  const { supabase } = await getSession();
+  const [{ supabase, profile, office }, isApp] = await Promise.all([getSession(), isAppRequest()]);
 
   const [{ data: deals }, { data: officeClauses }, gate] = await Promise.all([
     supabase
       .from("deals")
       .select(
-        "id, stage, contract_date, balance_date, amount, updated_at, property:properties(id, title, deal_type), customer:customers(id, name), deal_checklist_items(done)"
+        "id, stage, contract_date, balance_date, amount, monthly_rent, down_payment, move_in_date, lessor_name, lessor_phone, lessor_account, lessee_name, lessee_phone, terms_note, updated_at, property:properties(id, title, address, deal_type, property_type), customer:customers(id, name), deal_checklist_items(done)"
       )
       .order("updated_at", { ascending: false }),
     supabase.from("office_clauses").select("id, category, title, body").order("created_at", { ascending: false }),
@@ -37,6 +40,43 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
     : (deals ?? []);
   const active = matched.filter((d) => d.stage !== "완료" && d.stage !== "취소");
   const closed = matched.filter((d) => d.stage === "완료" || d.stage === "취소");
+
+  const writeDeals: WriteDealOption[] = (deals ?? [])
+    .filter((d) => d.stage !== "취소")
+    .map((deal) => {
+      const property = Array.isArray(deal.property) ? deal.property[0] : deal.property;
+      const customer = Array.isArray(deal.customer) ? deal.customer[0] : deal.customer;
+      return {
+        value: deal.id,
+        label: [property?.title, customer?.name, property?.deal_type, deal.stage].filter(Boolean).join(" · ") || deal.id.slice(0, 8),
+        propertyType: property?.property_type ?? "",
+        dealType: property?.deal_type ?? "",
+        prefill: {
+          dealType: property?.deal_type ?? "",
+          propertyTitle: property?.title ?? "",
+          propertyAddress: property?.address ?? "",
+          propertyType: property?.property_type ?? "",
+          amount: deal.amount,
+          monthlyRent: deal.monthly_rent,
+          downPayment: deal.down_payment,
+          balanceDate: deal.balance_date,
+          contractDate: deal.contract_date,
+          moveInDate: deal.move_in_date,
+          lessorName: deal.lessor_name,
+          lessorPhone: deal.lessor_phone,
+          lessorAccount: deal.lessor_account,
+          lesseeName: deal.lessee_name,
+          lesseePhone: deal.lessee_phone,
+          termsNote: deal.terms_note,
+          clauses: [],
+          officeName: office.name,
+          officePhone: office.phone,
+          officeAddress: office.address,
+          agentName: profile.name,
+          agentPhone: profile.phone,
+        },
+      };
+    });
 
   const renderDeals = (list: typeof active, empty: string) =>
     list.length === 0 ? (
@@ -80,12 +120,33 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
     <div className="space-y-6">
       <PageHeader
         title="계약관리"
-        description="거래별 확인 체크리스트와 특약을 정리해요. 최종 계약서 작성 전 단계를 돕는 기능이에요."
+        description="거래별 확인 체크리스트와 특약을 정리해요. 계약서·확인설명서 작성은 계약서 관리에서 해요."
         actions={
-          <GatedLink href="/contracts/new" kind="deal" blocked={gate.blocked.deal} isOwner={gate.isOwner} className={buttonVariants()}>
-            <Plus data-icon="inline-start" />
-            계약 시작
-          </GatedLink>
+          <div className="flex flex-wrap gap-2">
+            <GatedLink href="/contracts/new" kind="deal" blocked={gate.blocked.deal} isOwner={gate.isOwner} className={buttonVariants()}>
+              <Plus data-icon="inline-start" />
+              계약 시작
+            </GatedLink>
+            {isApp ? (
+              <GatedLink
+                href="/contracts/documents"
+                kind="deal"
+                blocked={gate.blocked.deal}
+                isOwner={gate.isOwner}
+                className={buttonVariants()}
+              >
+                <FileText data-icon="inline-start" />
+                계약서
+              </GatedLink>
+            ) : (
+              <ContractWriteEntry
+                deals={writeDeals}
+                blocked={gate.blocked.deal}
+                isOwner={gate.isOwner}
+                variant="outline"
+              />
+            )}
+          </div>
         }
       />
 
@@ -109,8 +170,8 @@ export default async function ContractsPage({ searchParams }: PageProps<"/contra
         </TabsContent>
         <TabsContent value="clauses" className="space-y-4 pt-4">
           <ComingSoonPanel
-            title="AI 특약 추천 · 계약서 초안"
-            description="계약 조건에 맞는 특약 추천과 계약서·확인설명서 초안 작성은 서비스 준비중이에요. 지금은 예시 문구와 사무소 특약을 직접 골라 쓸 수 있어요."
+            title="AI 특약 추천"
+            description="계약 조건에 맞는 특약 추천은 서비스 준비중이에요. 계약서·확인설명서는 계약서 작성에서 만들 수 있어요."
           />
           <Card>
             <CardHeader>

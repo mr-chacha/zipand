@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "./database.types";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/b", "/d", "/l", "/terms", "/privacy"];
+const PUBLIC_PATHS = ["/login", "/signup", "/auth", "/b", "/d", "/f", "/l", "/terms", "/privacy"];
 const AUTH_PAGES = ["/login", "/signup"];
 
 function matches(pathname: string, paths: string[]) {

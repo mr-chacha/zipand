@@ -388,6 +388,135 @@ export type Database = {
           },
         ]
       }
+      deal_form_shares: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deal_id: string
+          expires_at: string
+          form_id: string
+          id: string
+          office_id: string
+          token: string
+          view_count: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deal_id: string
+          expires_at?: string
+          form_id: string
+          id?: string
+          office_id?: string
+          token?: string
+          view_count?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string
+          expires_at?: string
+          form_id?: string
+          id?: string
+          office_id?: string
+          token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_form_shares_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_form_shares_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_form_shares_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "deal_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_form_shares_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "offices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deal_forms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data: Json
+          deal_id: string
+          finalized_at: string | null
+          id: string
+          kind: string
+          office_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          deal_id: string
+          finalized_at?: string | null
+          id?: string
+          kind: string
+          office_id?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data?: Json
+          deal_id?: string
+          finalized_at?: string | null
+          id?: string
+          kind?: string
+          office_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deal_forms_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_forms_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deal_forms_office_id_fkey"
+            columns: ["office_id"]
+            isOneToOne: false
+            referencedRelation: "offices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deal_shares: {
         Row: {
           created_at: string
@@ -1518,6 +1647,7 @@ export type Database = {
       current_office_id: { Args: never; Returns: string }
       current_role_is: { Args: { target: string }; Returns: boolean }
       get_briefing: { Args: { briefing_token: string }; Returns: Json }
+      get_deal_form_share: { Args: { share_token: string }; Returns: Json }
       get_deal_share: { Args: { share_token: string }; Returns: Json }
       get_invite: {
         Args: { invite_token: string }
