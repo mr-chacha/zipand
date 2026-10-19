@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { Printer, Save } from "lucide-react";
 import { toast } from "sonner";
 import { ContractFormSheet } from "@/components/deal-forms/contract-form-sheet";
+import {
+  DisclosureWriteDialog,
+  type DisclosureWriteSeed,
+} from "@/components/deal-forms/disclosure-write-dialog";
 import { NativeSelect } from "@/components/form/native-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,12 +28,24 @@ import { buildDealFormDefaults, newContractNo, type DealFormPrefill } from "@/li
 import { printContractSheet } from "@/lib/print-contract";
 import { cn } from "@/lib/utils";
 
+function readFormRecord(formId: string): Record<string, string> {
+  const form = document.getElementById(formId);
+  if (!(form instanceof HTMLFormElement)) return {};
+  const out: Record<string, string> = {};
+  new FormData(form).forEach((value, key) => {
+    if (typeof value === "string") out[key] = value;
+  });
+  return out;
+}
+
 export type WriteDealOption = {
   value: string;
   label: string;
   propertyType: string;
   dealType: string;
   prefill?: Partial<DealFormPrefill>;
+  /** 해당 거래의 최신 계약서 data (확인설명서 등에서 소재지·면적·인적사항 반영) */
+  contractData?: Record<string, string>;
 };
 
 function emptyPrefill(): DealFormPrefill {
@@ -125,6 +141,8 @@ export function ContractWriteDialog({
   const [formId, setFormId] = useState<string | null>(null);
   /** 종류·거래가 바뀔 때 양식을 다시 마운트하기 위한 키 */
   const [formEpoch, setFormEpoch] = useState(0);
+  const [disclosureOpen, setDisclosureOpen] = useState(false);
+  const [disclosureSeed, setDisclosureSeed] = useState<DisclosureWriteSeed | null>(null);
 
   const matchedDeals = useMemo(
     () => matchDeals(deals, pickProperty, pickDeal),
@@ -142,6 +160,8 @@ export function ContractWriteDialog({
     setPickDeal("매매");
     setDealId("");
     setFormEpoch(0);
+    setDisclosureOpen(false);
+    setDisclosureSeed(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -151,6 +171,18 @@ export function ContractWriteDialog({
       setFormEpoch((n) => n + 1);
     }
     onOpenChange(next);
+  };
+
+  const openDisclosure = () => {
+    const deal = dealId ? deals.find((d) => d.value === dealId) : undefined;
+    const live = readFormRecord("contract-write-form");
+    setDisclosureSeed({
+      propertyType: pickProperty,
+      dealType: pickDeal,
+      dealId: dealId || "",
+      contractData: { ...deal?.contractData, ...live },
+    });
+    setDisclosureOpen(true);
   };
 
   const keepOrClearDeal = (nextDeals: WriteDealOption[], prev: string) =>
@@ -183,10 +215,6 @@ export function ContractWriteDialog({
       toast.error("계약서 양식을 불러오지 못했어요.");
       return;
     }
-    if (!dealId) {
-      toast.error("연결할 거래를 선택해 주세요.");
-      return;
-    }
     startTransition(async () => {
       if (formId) {
         const result = await updateDealForm(formId, null, fd);
@@ -197,7 +225,7 @@ export function ContractWriteDialog({
         }
         return;
       }
-      const created = await createDealFormForDeal(dealId, {
+      const created = await createDealFormForDeal(dealId || null, {
         templateId: active.templateId,
         kind: "contract",
         title: active.title,
@@ -220,6 +248,7 @@ export function ContractWriteDialog({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange} disablePointerDismissal>
       <DialogContent
         showCloseButton
@@ -284,9 +313,18 @@ export function ContractWriteDialog({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-b bg-muted/40 px-4 py-2 print:hidden">
-          <Button type="submit" form="contract-write-form" size="sm" disabled={pending || !active || !dealId}>
+          <Button type="submit" form="contract-write-form" size="sm" disabled={pending || !active}>
             <Save data-icon="inline-start" />
             계약서저장
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={!active}
+            onClick={openDisclosure}
+          >
+            확인설명서 작성
           </Button>
           <Button
             type="button"
@@ -331,6 +369,14 @@ export function ContractWriteDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    <DisclosureWriteDialog
+      open={disclosureOpen}
+      onOpenChange={setDisclosureOpen}
+      deals={deals}
+      seed={disclosureSeed}
+    />
+    </>
   );
 }
 

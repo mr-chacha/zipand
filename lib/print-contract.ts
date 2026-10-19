@@ -36,8 +36,14 @@ function stripPlaceholders(root: HTMLElement) {
   });
 }
 
-export function printContractSheet(title?: string) {
-  const source = document.getElementById("contract-print-root");
+/**
+ * @param title 인쇄 문서 제목
+ * @param root 인쇄할 루트 요소 또는 id. 생략 시 `#contract-print-root`(문서에서 첫 번째)
+ */
+export function printContractSheet(title?: string, root?: HTMLElement | string | null) {
+  const source =
+    (typeof root === "string" ? document.getElementById(root) : root) ??
+    document.getElementById("contract-print-root");
   if (!source) return;
 
   document.getElementById(HOST_ID)?.remove();
@@ -48,6 +54,17 @@ export function printContractSheet(title?: string) {
   const clone = source.cloneNode(true) as HTMLElement;
   clone.removeAttribute("id");
   clone.classList.add("contract-print-clone");
+  const disclosurePages = clone.querySelectorAll(".disclosure-page");
+  if (disclosurePages.length > 0) {
+    clone.classList.add("disclosure-print-clone");
+    // 화면에서 숨긴 2~4쪽도 인쇄본에 전부 표시
+    disclosurePages.forEach((node) => {
+      if (node instanceof HTMLElement) {
+        node.classList.remove("hidden");
+        node.style.display = "block";
+      }
+    });
+  }
   stripPlaceholders(clone);
   host.appendChild(clone);
   document.body.appendChild(host);

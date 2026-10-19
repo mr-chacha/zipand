@@ -62,17 +62,29 @@ export function DealFormDocumentView({
         )}
         {kind === "disclosure" && (
           <>
-            <Row label="소재지" value={data.property_address || property?.address} />
-            <Row label="거래 유형" value={data.deal_type || property?.deal_type} />
-            <Row label="임대인(매도인)" value={data.lessor_name} />
-            <Row label="임차인(매수인)" value={data.lessee_name} />
+            <Row
+              label="소재지"
+              value={[data.property_address || property?.address, data.building && `${data.building}동`, data.unit && `${data.unit}호`]
+                .filter(Boolean)
+                .join(" ")}
+            />
+            <Row label="주택유형" value={data.housing_type} />
+            <Row label="거래형태" value={data.trade_type || data.deal_type || property?.deal_type} />
+            <Row label="토지면적" value={data.land_area ? `${data.land_area}㎡` : null} />
+            <Row label="전용면적" value={data.building_area ? `${data.building_area}㎡` : null} />
+            <Row label="구조·용도" value={[data.building_structure, data.building_use].filter(Boolean).join(" · ")} />
+            <Row
+              label="거래예정금액"
+              value={data.deal_amount_won ? `${Number(data.deal_amount_won).toLocaleString("ko-KR")}원` : null}
+            />
+            <Row label="중개보수" value={data.fee_amount ? `${data.fee_amount}원` : null} />
+            <Row label="매도·임대인" value={[data.lessor_name, data.lessor_phone].filter(Boolean).join(" · ")} />
+            <Row label="매수·임차인" value={[data.lessee_name, data.lessee_phone].filter(Boolean).join(" · ")} />
             <Row label="설명일" value={data.contract_date} />
-            <Row label="소유권·등기" value={data.ownership_note} />
-            <Row label="권리관계" value={data.rights_note} />
-            <Row label="건축물·토지" value={data.building_note} />
-            <Row label="토지이용·기타" value={data.land_use_note} />
+            <Row label="소유권(토지)" value={data.ownership_land || data.ownership_note} />
+            <Row label="소유권(건물)" value={data.ownership_building} />
+            <Row label="권리사항" value={data.rights_land || data.rights_note} />
             <Row label="설명 요지" value={data.explanation_note} />
-            <Row label="확인" value={data.confirmation_note} />
           </>
         )}
         {kind === "receipt" && data.form_template === "broker_fee_receipt" && (

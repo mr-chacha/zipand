@@ -71,6 +71,13 @@ export default async function ContractsPage() {
     };
   });
 
+  /** 거래별 최신 계약서 data (확인설명서 작성 시 소재지·면적·인적사항) */
+  const contractByDeal = new Map<string, Record<string, string>>();
+  for (const f of forms ?? []) {
+    if (f.kind !== "contract" || !f.deal_id || contractByDeal.has(f.deal_id)) continue;
+    contractByDeal.set(f.deal_id, asStringRecord(f.data));
+  }
+
   const dealOptions: WriteDealOption[] = (deals ?? []).map((deal) => {
     const property = Array.isArray(deal.property) ? deal.property[0] : deal.property;
     const customer = Array.isArray(deal.customer) ? deal.customer[0] : deal.customer;
@@ -80,6 +87,7 @@ export default async function ContractsPage() {
       label: label || deal.id.slice(0, 8),
       propertyType: property?.property_type ?? "",
       dealType: property?.deal_type ?? "",
+      contractData: contractByDeal.get(deal.id),
       prefill: {
         dealType: property?.deal_type ?? "",
         propertyTitle: property?.title ?? "",

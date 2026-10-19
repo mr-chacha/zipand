@@ -1,5 +1,6 @@
 import { BalanceSettlementSheet } from "@/components/deal-forms/balance-settlement-sheet";
 import { BrokerFeeReceiptSheet } from "@/components/deal-forms/broker-fee-receipt-sheet";
+import { DisclosureFormSheet } from "@/components/deal-forms/disclosure-form-sheet";
 import { PowerOfAttorneySheet } from "@/components/deal-forms/power-of-attorney-sheet";
 import { PrivacyConsentSheet } from "@/components/deal-forms/privacy-consent-sheet";
 import { ReceiptSheet } from "@/components/deal-forms/receipt-sheet";
@@ -167,57 +168,13 @@ export function DealFormFields({ kind, data, readOnly }: { kind: DealFormKind; d
 
   if (kind === "disclosure") {
     return (
-      <div className="space-y-6">
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold">중개대상물</h3>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="물건명" htmlFor="property_title" className="space-y-1.5 sm:col-span-2">
-              <TextInput id="property_title" name="property_title" data={data} disabled={disabled} />
-            </Field>
-            <Field label="소재지" htmlFor="property_address" className="space-y-1.5 sm:col-span-2">
-              <TextInput id="property_address" name="property_address" data={data} disabled={disabled} />
-            </Field>
-            <Field label="거래 유형" htmlFor="deal_type">
-              <TextInput id="deal_type" name="deal_type" data={data} disabled={disabled} />
-            </Field>
-            <Field label="물건 종류" htmlFor="property_type">
-              <TextInput id="property_type" name="property_type" data={data} disabled={disabled} />
-            </Field>
-            <Field label="임대인(매도인)" htmlFor="lessor_name">
-              <TextInput id="lessor_name" name="lessor_name" data={data} disabled={disabled} />
-            </Field>
-            <Field label="임차인(매수인)" htmlFor="lessee_name">
-              <TextInput id="lessee_name" name="lessee_name" data={data} disabled={disabled} />
-            </Field>
-            <Field label="설명일" htmlFor="contract_date">
-              <DatePicker id="contract_date" name="contract_date" defaultValue={data.contract_date ?? ""} disabled={disabled} />
-            </Field>
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <h3 className="text-sm font-semibold">확인·설명 내용</h3>
-          <Field label="소유권·등기 관계" htmlFor="ownership_note">
-            <Textarea id="ownership_note" name="ownership_note" rows={3} defaultValue={data.ownership_note ?? ""} disabled={disabled} placeholder="소유자, 갑구·을구 주요 내용" />
-          </Field>
-          <Field label="권리관계(근저당·가압류 등)" htmlFor="rights_note">
-            <Textarea id="rights_note" name="rights_note" rows={3} defaultValue={data.rights_note ?? ""} disabled={disabled} />
-          </Field>
-          <Field label="건축물·토지 이용" htmlFor="building_note">
-            <Textarea id="building_note" name="building_note" rows={3} defaultValue={data.building_note ?? ""} disabled={disabled} placeholder="위반건축물, 용도지역 등" />
-          </Field>
-          <Field label="토지이용계획·기타" htmlFor="land_use_note">
-            <Textarea id="land_use_note" name="land_use_note" rows={3} defaultValue={data.land_use_note ?? ""} disabled={disabled} />
-          </Field>
-          <Field label="중개사 설명 요지" htmlFor="explanation_note">
-            <Textarea id="explanation_note" name="explanation_note" rows={4} defaultValue={data.explanation_note ?? ""} disabled={disabled} />
-          </Field>
-          <Field label="확인 문구" htmlFor="confirmation_note">
-            <Textarea id="confirmation_note" name="confirmation_note" rows={2} defaultValue={data.confirmation_note ?? ""} disabled={disabled} />
-          </Field>
-        </section>
-
-        <OfficeFields data={data} disabled={disabled} />
+      <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+        <DisclosureFormSheet
+          propertyType={data.property_type || "아파트"}
+          dealType={data.deal_type || "매매"}
+          title={data.template_title || "확인설명서"}
+          data={data}
+        />
       </div>
     );
   }

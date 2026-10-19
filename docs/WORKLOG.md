@@ -5,23 +5,23 @@
 
 ## 현재 상태
 - **단계**: 웹 서식 작성 개발 중 (`feat/contract-forms`) — 계약관리 = 작성된 계약서 테이블
-  - **웹**: `/contracts`에 계약서 목록 테이블 + 「계약서 작성」모달·저장·인쇄. `/contracts/documents`는 `/contracts`로 리다이렉트. 확인설명서·영수증·기타는 초안/공유 뼈대
+  - **웹**: `/contracts`에 계약서 목록 + 「계약서 작성」모달·저장·인쇄. 계약서저장 옆 「확인설명서 작성」(PDF 4쪽·1~4페이지 탭·거래 없이도 저장/인쇄). `/contracts/documents`는 `/contracts`로 리다이렉트. 영수증·기타는 초안/공유 뼈대
   - **앱**: 확정된 서식만 열람·공유 (`/f/[token]`)
   - 안드로이드 앱 1·2단계·일정 알림은 `develop` 반영 완료 (PR #2)
 - **실기기 테스트 방법**: USB `adb reverse` + `npm run app:serve` / `app:usb` (기존과 동일)
-- **웹**: 인쇄 실사용 검증·기타 서식 UI. 부동산 커뮤니티·AI·결제는 미진행
-- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리(계약서 테이블), 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림, 계약서 PDF형 양식·인쇄·전세/월세 특약·조항
+- **웹**: 확인설명서 인쇄·필드 세부 맞춤, 영수증 UI, 기타 서식. 부동산 커뮤니티·AI·결제는 미진행
+- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리(계약서 테이블), 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림, 계약서 PDF형 양식·인쇄·전세/월세 특약·조항, 확인설명서 4쪽 작성·인쇄
 - **환경**: 원격 Supabase. 새 마이그레이션 `20261016120000_deal_forms` — **`npm run db:push` 필요**. 타입은 로컬 `database.types.ts`에 반영됨
 
 > ⚠️ **아직 진행하지 못한 서비스**
-> 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (기타 서식·영수증 포함)
+> 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
 > 2. **부동산 커뮤니티** (중개사 간 게시판·정보 공유)
 >
 > 웹 작업을 이어서 할 때 커뮤니티 우선순위를 정한다.
 
 - **다음 작업** (우선순위 순)
-  0. **시작 지점**: `npm run db:push` 후 계약관리 테이블에서 작성→저장→인쇄 실사용 검증
-  0. 확인설명서·영수증 작성 UI를 계약서 모달 수준으로 맞춤 / PDF 필드 더 가깝게
+  0. **시작 지점**: 확인설명서 PDF와 필드 더 가깝게 / 영수증·관련서식 작성 UI 실사용 검증
+  0. `npm run db:push` 후 계약서·확인설명서 작성→저장→인쇄(1~4쪽) 재확인
   0. (선택) 거래 체크리스트·특약 라이브러리는 거래 상세(`/contracts/[id]`)·별도 진입으로 유지할지 정리
   0. 사용자 확인 필요: 계약 취소 시 고객 상태를 '관심 고객'으로 되돌리는 규칙 유지 여부, 개인정보처리방침의 '중개사 자격번호' 항목 삭제 여부
   0. 서류 심사 신청(`office_verification_requests`) 관리자 처리 화면 — 현재는 Supabase 대시보드에서 수동 승인
@@ -61,6 +61,22 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-19 — 확인설명서 PDF 4쪽 작성·인쇄
+**작업 요약**
+- 중개대상물 확인·설명서[I]를 PDF 기준 제1~4쪽 양식으로 재작성. 계약서 작성 모달 「계약서저장」옆 「확인설명서 작성」으로 진입
+- 1~4페이지 탭은 스크롤 밖 고정. 거래 연결 없이도 저장 가능(`deal_id` null). 계약서 소재지·면적·인적사항·금액을 확인설명서에 반영
+- 인쇄 시 확인설명서 전용 루트·다중 페이지 CSS로 1~4쪽 전부 출력(계약서와 id 충돌·1장 클리핑 수정)
+- 계약내용 금액(원/만원)·날짜 직접입력(숫자·점) 입력 개선
+
+**변경 파일**
+- `lib/disclosure-defaults.ts`, `lib/disclosure-form.ts`, `components/deal-forms/disclosure-form-sheet.tsx`, `disclosure-write-dialog.tsx`
+- `contract-write-dialog.tsx`, `contract-form-sheet.tsx`, `form-fields.tsx`, `form-document-view.tsx`, `date-picker.tsx`
+- `lib/deal-forms.ts`, `lib/actions/deal-forms.ts`, `lib/print-contract.ts`, `lib/contract-templates.ts`, `app/globals.css`, `app/(app)/contracts/page.tsx`
+
+**남은 TODO**
+- 확인설명서 필드·레이아웃을 원본 PDF에 더 맞춤
+- 영수증 등 관련 서식 UI 실사용 검증
 
 ### 2026-10-19 — 개인정보 수집·이용 동의서 양식 연결
 **작업 요약**

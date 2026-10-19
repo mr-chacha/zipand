@@ -184,7 +184,7 @@ function LeaseTerminateClause({
   );
 }
 
-/** 만원 저장값 ↔ 원 표시(쉼표). 폼 hidden에는 만원을 넣는다. */
+/** 만원 저장값 ↔ 원 표시(쉼표). 입력 중에는 원 자릿수를 유지하고, blur 시 만원 단위로 맞춘다. */
 function WonAmountInput({
   name,
   manwon,
@@ -196,26 +196,38 @@ function WonAmountInput({
   onManwonChange?: (manwon: string) => void;
   className?: string;
 }) {
-  const won = parseManwon(manwon) * 10_000;
-  const display = won > 0 ? formatNumberInput(String(won)) : "";
+  /** null이면 manwon에서 표시, 문자열이면 입력 중인 원 자리 */
+  const [draft, setDraft] = useState<string | null>(null);
+  const wonFromManwon = (() => {
+    const won = parseManwon(manwon) * 10_000;
+    return won > 0 ? String(won) : "";
+  })();
+  const wonDigits = draft !== null ? draft : wonFromManwon;
+
+  const commitManwon = (digits: string) => {
+    if (!onManwonChange) return;
+    if (!digits) {
+      onManwonChange("");
+      return;
+    }
+    onManwonChange(String(Math.floor(Number(digits) / 10_000)));
+  };
 
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
       <Input
         inputMode="numeric"
         autoComplete="off"
-        value={display}
+        value={wonDigits ? formatNumberInput(wonDigits) : ""}
+        onFocus={() => setDraft(wonFromManwon)}
+        onBlur={() => setDraft(null)}
         onChange={(e) => {
-          if (!onManwonChange) return;
           const digits = e.target.value
             .replace(/\D/g, "")
             .replace(/^0+(?=\d)/, "")
             .slice(0, 15);
-          if (!digits) {
-            onManwonChange("");
-            return;
-          }
-          onManwonChange(String(Math.floor(Number(digits) / 10_000)));
+          setDraft(digits);
+          commitManwon(digits);
         }}
         placeholder="0"
         className={cn(

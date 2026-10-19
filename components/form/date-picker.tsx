@@ -46,6 +46,15 @@ function formatDisplay(value: string, withTime: boolean) {
   return `${day} ${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}:${pad(minute)}`;
 }
 
+/** 숫자만 받아 YYYY. MM. DD. 형식으로 점 자동 삽입 (직접입력용) */
+function formatDateDigitsTyping(raw: string) {
+  const d = raw.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 4) return d;
+  if (d.length <= 6) return `${d.slice(0, 4)}. ${d.slice(4)}`;
+  const body = `${d.slice(0, 4)}. ${d.slice(4, 6)}. ${d.slice(6)}`;
+  return d.length === 8 ? `${body}.` : body;
+}
+
 /** 직접 입력 문자열을 YYYY-MM-DD / YYYY-MM-DDTHH:mm 으로 정규화. 실패 시 null */
 function normalizeTyped(raw: string, withTime: boolean): string | null {
   const trimmed = raw.trim();
@@ -188,11 +197,24 @@ export function DatePicker({
           aria-label={ariaLabel ?? (withTime ? "날짜·시간" : "날짜")}
           placeholder={placeholder ?? (withTime ? "YYYY. MM. DD. 오전 9:00" : "YYYY. MM. DD.")}
           value={display}
+          inputMode={withTime ? "text" : "numeric"}
+          autoComplete="off"
           onFocus={() => {
-            setText(current ? (withTime ? current.replace("T", " ") : current) : "");
+            if (withTime) {
+              setText(current ? current.replace("T", " ") : "");
+            } else {
+              setText(current ? formatDateDigitsTyping(current.replace(/-/g, "")) : "");
+            }
             setFocused(true);
           }}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            if (withTime) {
+              setText(e.target.value);
+              return;
+            }
+            // 날짜만: 한글·기호 무시, 숫자만 + 점 자동
+            setText(formatDateDigitsTyping(e.target.value));
+          }}
           onBlur={commitText}
           onKeyDown={(e) => {
             if (e.key === "Enter") {

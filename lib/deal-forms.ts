@@ -1,4 +1,5 @@
 import { defaultSpecialTermsForDeal } from "@/lib/contract-templates";
+import { buildDisclosureFormDefaults } from "@/lib/disclosure-defaults";
 import { buildPrivacyConsentDefaults } from "@/lib/privacy-consent";
 import {
   buildBalanceSettlementDefaults,
@@ -156,15 +157,7 @@ export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): R
     case "disclosure":
       return {
         ...common,
-        lessor_name: str(p.lessorName),
-        lessee_name: str(p.lesseeName),
-        ownership_note: "",
-        rights_note: "",
-        building_note: "",
-        land_use_note: "",
-        explanation_note: str(p.termsNote),
-        confirmation_note: "중개대상물의 상태에 대하여 설명하였으며, 당사자는 내용을 확인하였습니다.",
-        contract_date: str(p.contractDate),
+        ...buildDisclosureFormDefaults(p),
       };
     case "receipt":
       return {

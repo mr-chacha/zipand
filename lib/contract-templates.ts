@@ -60,8 +60,18 @@ export function findContractFormTemplate(propertyType: ContractPropertyType, dea
   return CONTRACT_TEMPLATES.find((t) => t.propertyType === propertyType && t.dealType === dealType && t.kind === "contract") ?? null;
 }
 
+/** 확인설명서 서식 1건 */
+export function findDisclosureFormTemplate(propertyType: ContractPropertyType, dealType: ContractDealType) {
+  return CONTRACT_TEMPLATES.find((t) => t.propertyType === propertyType && t.dealType === dealType && t.kind === "disclosure") ?? null;
+}
+
 export function contractFormHeading(propertyType: ContractPropertyType, dealType: ContractDealType) {
   return `${propertyType} ${dealType}계약서`;
+}
+
+export function disclosureFormHeading(propertyType: ContractPropertyType, dealType: ContractDealType) {
+  if (propertyType === "아파트") return `${propertyType} ${dealType} 확인설명서`;
+  return `${propertyType} 확인설명서`;
 }
 
 /** 만원 입력을 원 단위 표시로 (예: 300000 → 3,000,000,000) */

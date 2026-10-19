@@ -46,6 +46,41 @@ async function requireWebWrite() {
   }
 }
 
+function officePrefill(office: {
+  name: string;
+  phone: string | null;
+  address: string | null;
+  representative: string | null;
+  registration_no: string | null;
+}, profile: { name: string; phone: string | null }) {
+  return {
+    dealType: "",
+    propertyTitle: "",
+    propertyAddress: "",
+    propertyType: "",
+    amount: null as number | null,
+    monthlyRent: null as number | null,
+    downPayment: null as number | null,
+    balanceDate: null as string | null,
+    contractDate: null as string | null,
+    moveInDate: null as string | null,
+    lessorName: null as string | null,
+    lessorPhone: null as string | null,
+    lessorAccount: null as string | null,
+    lesseeName: null as string | null,
+    lesseePhone: null as string | null,
+    termsNote: null as string | null,
+    clauses: [] as string[],
+    officeName: office.name,
+    officePhone: office.phone,
+    officeAddress: office.address,
+    officeRepresentative: office.representative,
+    officeRegistrationNo: office.registration_no,
+    agentName: profile.name,
+    agentPhone: profile.phone,
+  };
+}
+
 async function loadPrefill(dealId: string) {
   const { supabase, profile, office } = await getSession();
   const { data: deal, error } = await supabase
@@ -64,6 +99,7 @@ async function loadPrefill(dealId: string) {
     office,
     deal,
     prefill: {
+      ...officePrefill(office, profile),
       dealType: property?.deal_type ?? "매매",
       propertyTitle: property?.title ?? "",
       propertyAddress: property?.address ?? "",
@@ -81,13 +117,6 @@ async function loadPrefill(dealId: string) {
       lesseePhone: deal.lessee_phone,
       termsNote: deal.terms_note,
       clauses: (clauses ?? []).map((c) => c.body),
-      officeName: office.name,
-      officePhone: office.phone,
-      officeAddress: office.address,
-      officeRepresentative: office.representative,
-      officeRegistrationNo: office.registration_no,
-      agentName: profile.name,
-      agentPhone: profile.phone,
     },
   };
 }
@@ -333,9 +362,9 @@ type CreateFormOptions = {
   formTemplate?: string | null;
 };
 
-/** 계약서 관리 목록용 생성 (거래·서식 선택 후 초안) — redirect 없이 id 반환 */
+/** 계약서 관리 목록용 생성 (거래 선택 선택사항) — redirect 없이 id 반환 */
 export async function createDealFormForDeal(
-  dealId: string,
+  dealId: string | null,
   kindOrOptions: DealFormKind | CreateFormOptions,
   title?: string | null
 ): Promise<ActionState & { id?: string }> {
@@ -350,7 +379,18 @@ export async function createDealFormForDeal(
     const kind = (template?.kind ?? options.kind) as DealFormKind | undefined;
     if (!kind || !DEAL_FORM_KINDS.includes(kind)) return { error: "서식 종류를 확인해 주세요." };
 
-    const { supabase, profile, prefill } = await loadPrefill(dealId);
+    const linkedDealId = dealId?.trim() || null;
+    let supabase;
+    let profile;
+    let prefill;
+    if (linkedDealId) {
+      ({ supabase, profile, prefill } = await loadPrefill(linkedDealId));
+    } else {
+      const session = await getSession();
+      supabase = session.supabase;
+      profile = session.profile;
+      prefill = officePrefill(session.office, session.profile);
+    }
     if (template) {
       prefill.propertyType = template.propertyType;
       prefill.dealType = template.dealType;
@@ -383,7 +423,7 @@ export async function createDealFormForDeal(
     const { data: row, error } = await supabase
       .from("deal_forms")
       .insert({
-        deal_id: dealId,
+        deal_id: linkedDealId,
         kind,
         title: formTitle,
         data: data as Json,
@@ -392,7 +432,7 @@ export async function createDealFormForDeal(
       .select("id")
       .single();
     if (error) throw error;
-    revalidateFormPaths(dealId, row.id);
+    revalidateFormPaths(linkedDealId, row.id);
     return { message: "초안을 만들었어요.", id: row.id };
   } catch (e) {
     return { error: toErrorMessage(e) };
