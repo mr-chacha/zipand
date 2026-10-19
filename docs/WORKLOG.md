@@ -4,13 +4,13 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 웹 서식 작성 개발 중 (`feat/contract-forms`) — 계약서 PDF형 작성·A4 인쇄·**전세/월세 특약·조항**까지 맞춤
-  - **웹**: `/contracts/documents` 목록 + 「계약서 작성」모달(종류 선택 즉시 양식)·저장·인쇄(`lib/print-contract.ts` body 복제). 확인설명서·영수증·기타는 초안/공유 뼈대
+- **단계**: 웹 서식 작성 개발 중 (`feat/contract-forms`) — 계약관리 = 작성된 계약서 테이블
+  - **웹**: `/contracts`에 계약서 목록 테이블 + 「계약서 작성」모달·저장·인쇄. `/contracts/documents`는 `/contracts`로 리다이렉트. 확인설명서·영수증·기타는 초안/공유 뼈대
   - **앱**: 확정된 서식만 열람·공유 (`/f/[token]`)
   - 안드로이드 앱 1·2단계·일정 알림은 `develop` 반영 완료 (PR #2)
 - **실기기 테스트 방법**: USB `adb reverse` + `npm run app:serve` / `app:usb` (기존과 동일)
 - **웹**: 인쇄 실사용 검증·기타 서식 UI. 부동산 커뮤니티·AI·결제는 미진행
-- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리 5단계·진행 공유 링크, 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림, 계약서 PDF형 양식·인쇄·전세/월세 특약·조항
+- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리(계약서 테이블), 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림, 계약서 PDF형 양식·인쇄·전세/월세 특약·조항
 - **환경**: 원격 Supabase. 새 마이그레이션 `20261016120000_deal_forms` — **`npm run db:push` 필요**. 타입은 로컬 `database.types.ts`에 반영됨
 
 > ⚠️ **아직 진행하지 못한 서비스**
@@ -20,8 +20,9 @@
 > 웹 작업을 이어서 할 때 커뮤니티 우선순위를 정한다.
 
 - **다음 작업** (우선순위 순)
-  0. **시작 지점**: `npm run db:push` 후 계약서 작성→저장→인쇄(브라우저 머리글/바닥글 끄기) 실사용 검증
+  0. **시작 지점**: `npm run db:push` 후 계약관리 테이블에서 작성→저장→인쇄 실사용 검증
   0. 확인설명서·영수증 작성 UI를 계약서 모달 수준으로 맞춤 / PDF 필드 더 가깝게
+  0. (선택) 거래 체크리스트·특약 라이브러리는 거래 상세(`/contracts/[id]`)·별도 진입으로 유지할지 정리
   0. 사용자 확인 필요: 계약 취소 시 고객 상태를 '관심 고객'으로 되돌리는 규칙 유지 여부, 개인정보처리방침의 '중개사 자격번호' 항목 삭제 여부
   0. 서류 심사 신청(`office_verification_requests`) 관리자 처리 화면 — 현재는 Supabase 대시보드에서 수동 승인
   0. 브라우저 점검: 시작하기 2단계 사무소 조회→선택→저장(등록), 미등록 상태에서 각 제한 기능(매물·고객 2건째, 문서, 계약, 구성원 초대, 브리핑 공유, 상담 기록, 고객-매물 연결) 모달 동작, 시작하기 4·5단계 잠김 표시, 설정 사무소 정보 표시
@@ -60,6 +61,29 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-19 — 개인정보 수집·이용 동의서 양식 연결
+**작업 요약**
+- 참고 PDF(`집앤/계약관리/기타 서식/개인정보수집동의서.pdf`) 기준으로 작성·인쇄 모달 추가
+- 계약관리 툴바 「개인정보수집동의서」→ 연결 거래 선택·저장·인쇄. 저장 시 `deal_forms.kind=other` + `form_template=privacy_consent`
+
+**변경 파일**
+- `lib/privacy-consent.ts`, `components/deal-forms/privacy-consent-sheet.tsx`, `privacy-consent-dialog.tsx`
+- `documents-table.tsx`, `form-fields.tsx`, `form-document-view.tsx`, `lib/deal-forms.ts`, `lib/actions/deal-forms.ts`
+
+### 2026-10-19 — 계약관리를 계약서 목록 테이블로 통합
+**작업 요약**
+- 계약관리(`/contracts`): 진행중/종료/특약 탭·「계약 시작」버튼 제거 → 작성된 계약서 `DocumentsTable` 표시
+- 툴바에 「계약서 작성」유지. `/contracts/documents`·`/documents/new`는 `/contracts`로 리다이렉트
+- 본문 full-width를 `/contracts`에 적용
+
+**변경 파일/화면**
+- `app/(app)/contracts/page.tsx`, `documents/page.tsx`, `documents/new/page.tsx`
+- `app/(app)/app-main.tsx`, `components/deal-forms/documents-table.tsx`, `contract-write-entry.tsx`
+- `lib/actions/deal-forms.ts`, `components/layout/app-header.tsx`
+
+**남은 TODO**
+- 거래 상세·체크리스트 진입 UX 정리, `db:push`·실사용 검증
 
 ### 2026-10-16 — 전세·월세 특약 기본문구·일반조항(제2~9조) 정리
 **작업 요약**

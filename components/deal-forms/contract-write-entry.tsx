@@ -28,7 +28,7 @@ export function ContractWriteEntry({
           <FileText data-icon="inline-start" />
           계약서 작성
         </button>
-        <OfficeRequiredDialog open={gateOpen} onOpenChange={setGateOpen} kind="deal" isOwner={isOwner} next="/contracts/documents" />
+        <OfficeRequiredDialog open={gateOpen} onOpenChange={setGateOpen} kind="deal" isOwner={isOwner} next="/contracts" />
       </>
     );
   }

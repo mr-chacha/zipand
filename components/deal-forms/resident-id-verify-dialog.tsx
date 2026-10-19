@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { DatePicker } from "@/components/form/date-picker";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -43,14 +43,16 @@ export function ResidentIdVerifyDialog({
   const [issuedAt, setIssuedAt] = useState("");
   const [govUrl, setGovUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    setName(initialName);
-    setIdFront(initialIdFront);
-    setIdBack(initialIdBack);
-    setIssuedAt("");
-    setGovUrl(null);
-  }, [open, initialName, initialIdFront, initialIdBack]);
+  const handleOpenChange = (next: boolean) => {
+    if (next) {
+      setName(initialName);
+      setIdFront(initialIdFront);
+      setIdBack(initialIdBack);
+      setIssuedAt("");
+      setGovUrl(null);
+    }
+    onOpenChange(next);
+  };
 
   const submit = () => {
     const fd = new FormData();
@@ -71,7 +73,7 @@ export function ResidentIdVerifyDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>주민등록증 진위확인</DialogTitle>

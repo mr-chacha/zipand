@@ -75,20 +75,65 @@ export function DealFormDocumentView({
             <Row label="확인" value={data.confirmation_note} />
           </>
         )}
-        {kind === "receipt" && (
+        {kind === "receipt" && data.form_template === "broker_fee_receipt" && (
           <>
-            <Row label="종류" value={data.receipt_type} />
-            <Row label="수령일" value={data.paid_at} />
-            <Row label="납부자" value={data.payer_name} />
-            <Row label="수령자" value={data.payee_name} />
-            <Row label="금액" value={data.amount ? `${data.amount}만원` : null} />
-            <Row label="지급 방법" value={data.payment_method} />
-            <Row label="계좌" value={data.account} />
-            <Row label="용도" value={data.purpose} />
-            <Row label="비고" value={data.note} />
+            <Row label="종류" value="중개보수 영수증" />
+            <Row label="수령인" value={data.recipient_name} />
+            <Row label="대상물" value={data.property_label || data.property_address} />
+            <Row label="거래액" value={data.deal_amount_won ? `${Number(data.deal_amount_won).toLocaleString("ko-KR")}원` : null} />
+            <Row label="중개보수" value={data.fee_amount_won ? `${Number(data.fee_amount_won).toLocaleString("ko-KR")}원` : null} />
+            <Row label="발행일" value={data.issued_at || data.paid_at} />
           </>
         )}
-        {kind === "other" && (
+        {kind === "receipt" && data.form_template !== "broker_fee_receipt" && (
+          <>
+            <Row label="종류" value={data.receipt_doc_kind || data.receipt_type} />
+            <Row label="수령인" value={data.recipient_name || data.payer_name} />
+            <Row label="금액" value={data.amount_won ? `${Number(data.amount_won).toLocaleString("ko-KR")}원` : data.amount ? `${data.amount}만원` : null} />
+            <Row label="부동산" value={data.property_label || data.property_address} />
+            <Row label="용도" value={data.purpose_line1 || data.purpose} />
+            <Row label="발행일" value={data.issued_at || data.paid_at} />
+            <Row label="발행인" value={data.issuer_name || data.payee_name} />
+          </>
+        )}
+        {kind === "other" && data.form_template === "privacy_consent" && (
+          <>
+            <Row label="제공자1" value={[data.provider1_name, data.provider1_consent].filter(Boolean).join(" · ")} />
+            <Row label="제공자2" value={[data.provider2_name, data.provider2_consent].filter(Boolean).join(" · ")} />
+            <Row label="수집일시" value={data.collected_at} />
+            <Row label="수집자" value={[data.office_name, data.collector_name].filter(Boolean).join(" · ")} />
+          </>
+        )}
+        {kind === "other" && data.form_template === "utility_settlement" && (
+          <>
+            <Row label="물건소재지" value={data.property_label || data.property_address} />
+            <Row label="정산총액" value={data.total_amount ? `${Number(data.total_amount).toLocaleString("ko-KR")}원` : null} />
+            <Row label="발행일" value={data.issued_at} />
+            <Row label="비고" value={data.remarks || data.note} />
+          </>
+        )}
+        {kind === "other" && data.form_template === "power_of_attorney" && (
+          <>
+            <Row label="위임대상물" value={data.subject_label} />
+            <Row label="위임인" value={data.principal_name} />
+            <Row label="수임인" value={data.agent_name_poa} />
+            <Row label="위임사항" value={data.mandate_body} />
+            <Row label="작성일" value={data.issued_at} />
+          </>
+        )}
+        {kind === "other" && data.form_template === "balance_settlement" && (
+          <>
+            <Row label="물건소재지" value={data.property_label || data.property_address} />
+            <Row label="잔금정산액" value={data.total_amount ? `${Number(data.total_amount).toLocaleString("ko-KR")}원` : null} />
+            <Row label="발행일" value={data.issued_at} />
+            <Row label="비고" value={data.remarks || data.note} />
+          </>
+        )}
+        {kind === "other" &&
+          data.form_template !== "privacy_consent" &&
+          data.form_template !== "utility_settlement" &&
+          data.form_template !== "power_of_attorney" &&
+          data.form_template !== "balance_settlement" && (
           <>
             <Row label="내용" value={data.body} />
             <Row label="비고" value={data.note} />

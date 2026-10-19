@@ -3,32 +3,63 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Printer, Trash2 } from "lucide-react";
+import { Download, Printer, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { ComingSoonButton } from "@/components/coming-soon";
 import { DocumentsWriteControls } from "@/components/deal-forms/contract-write-entry";
 import type { WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
+import { PrivacyConsentWriteButton } from "@/components/deal-forms/privacy-consent-dialog";
+import {
+  RelatedFormsWriteButton,
+  type RelatedFormsOfficeDefaults,
+} from "@/components/deal-forms/related-forms-dialog";
 import { ConfirmDialog } from "@/components/dialogs";
-import { NativeSelect } from "@/components/form/native-select";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { createDealFormForDeal, deleteDealForms } from "@/lib/actions/deal-forms";
+import { deleteDealForms } from "@/lib/actions/deal-forms";
 import { useBusy } from "@/lib/busy";
-import {
-  DEAL_FORM_KIND_LABELS,
-  DEAL_FORM_KINDS,
-  formatDealAmount,
-  formatShortDate,
-  type DealFormKind,
-} from "@/lib/deal-forms";
+import { formatDealAmount, formatShortDate, type DealFormKind } from "@/lib/deal-forms";
 import { useIsApp } from "@/lib/use-is-app";
 import { cn } from "@/lib/utils";
 
+/** 정적 PDF 서식 다운로드 (입력 폼 없음) */
+const STATIC_FORM_DOWNLOADS = [
+  {
+    href: "/forms/housing-fund-plan.pdf",
+    filename: "주택자금조달서.pdf",
+    label: "주택자금조달서",
+  },
+  {
+    href: "/forms/balance-prep-checklist.pdf",
+    filename: "잔금시 준비서류.pdf",
+    label: "잔금시 준비서류",
+  },
+] as const;
+
+function FormDownloadLink({
+  href,
+  filename,
+  label,
+}: {
+  href: string;
+  filename: string;
+  label: string;
+}) {
+  return (
+    <a
+      href={href}
+      download={filename}
+      className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+    >
+      <Download data-icon="inline-start" />
+      {label}
+    </a>
+  );
+}
+
 export type DocumentRow = {
   id: string;
-  dealId: string;
+  dealId: string | null;
   kind: DealFormKind;
   title: string;
   status: "draft" | "finalized";
@@ -79,83 +110,22 @@ const COLS = [
   "계약서번호",
 ] as const;
 
-function CreateOtherFormDialog({ deals }: { deals: DealOption[] }) {
-  const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-  useBusy(pending);
-  const [dealId, setDealId] = useState(deals[0]?.value ?? "");
-  const [kind, setKind] = useState<DealFormKind>("receipt");
-
-  const submit = () => {
-    if (!dealId) {
-      toast.error("연결할 거래를 선택해 주세요. 먼저 계약 시작으로 거래를 만들어 주세요.");
-      return;
-    }
-    startTransition(async () => {
-      const result = await createDealFormForDeal(dealId, { kind });
-      if (result.error || !result.id) {
-        toast.error(result.error ?? "초안을 만들지 못했어요.");
-        return;
-      }
-      toast.success(result.message);
-      setOpen(false);
-      router.push(`/contracts/${dealId}/forms/${result.id}`);
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="secondary" size="sm" disabled={deals.length === 0}>
-            <FileText data-icon="inline-start" />
-            기타서식
-          </Button>
-        }
-      />
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>기타서식</DialogTitle>
-          <DialogDescription>영수증 등 기타 서식을 거래에 연결해 작성해요.</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div className="space-y-1.5">
-            <Label htmlFor="doc-deal">거래</Label>
-            {deals.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                등록된 거래가 없어요.{" "}
-                <Link href="/contracts/new" className="text-primary underline">
-                  계약 시작
-                </Link>
-                으로 먼저 만들어 주세요.
-              </p>
-            ) : (
-              <NativeSelect id="doc-deal" value={dealId} onChange={(e) => setDealId(e.target.value)} options={deals} />
-            )}
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="doc-kind">서식 종류</Label>
-            <NativeSelect
-              id="doc-kind"
-              value={kind}
-              onChange={(e) => setKind(e.target.value as DealFormKind)}
-              options={DEAL_FORM_KINDS.filter((k) => k !== "contract" && k !== "disclosure").map((k) => ({
-                value: k,
-                label: DEAL_FORM_KIND_LABELS[k],
-              }))}
-            />
-          </div>
-          <Button className="w-full" disabled={pending || !deals.length} onClick={submit}>
-            초안 만들기
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+function formHref(row: DocumentRow) {
+  return row.dealId ? `/contracts/${row.dealId}/forms/${row.id}` : `/contracts/forms/${row.id}`;
 }
 
-export function DocumentsTable({ rows, deals }: { rows: DocumentRow[]; deals: DealOption[] }) {
+export function DocumentsTable({
+  rows,
+  deals,
+  office,
+  guaranteeCertificate,
+}: {
+  rows: DocumentRow[];
+  deals: DealOption[];
+  office: RelatedFormsOfficeDefaults;
+  /** 업로드된 공제증서 — 없으면 설정으로 이동 */
+  guaranteeCertificate: { url: string; fileName: string } | null;
+}) {
   const isApp = useIsApp();
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
@@ -237,14 +207,14 @@ export function DocumentsTable({ rows, deals }: { rows: DocumentRow[]; deals: De
     }
     const row = rows.find((r) => r.id === selected[0]);
     if (!row) return;
-    router.push(`/contracts/${row.dealId}/forms/${row.id}`);
+    router.push(formHref(row));
   };
 
   return (
     <div className="space-y-3">
       {!isApp && (
         <DocumentsWriteControls deals={deals}>
-          <CreateOtherFormDialog deals={deals} />
+          <RelatedFormsWriteButton office={office} />
           <Button size="sm" variant="outline" disabled={!selected.length || pending} onClick={() => setConfirmOpen(true)}>
             <Trash2 data-icon="inline-start" />
             삭제
@@ -256,10 +226,27 @@ export function DocumentsTable({ rows, deals }: { rows: DocumentRow[]; deals: De
             <Printer data-icon="inline-start" />
             계약서 인쇄
           </Button>
-          <ComingSoonButton size="sm">공제증서 인쇄</ComingSoonButton>
-          <ComingSoonButton size="sm">자금조달계획서 인쇄</ComingSoonButton>
-          <ComingSoonButton size="sm">개인정보활용동의서 인쇄</ComingSoonButton>
-          <ComingSoonButton size="sm">중개사무소찾기</ComingSoonButton>
+          {guaranteeCertificate ? (
+            <a
+              href={guaranteeCertificate.url}
+              download={guaranteeCertificate.fileName}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+            >
+              <Printer data-icon="inline-start" />
+              공제증서 인쇄
+            </a>
+          ) : (
+            <Link href="/settings?tab=office" className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+              <Upload data-icon="inline-start" />
+              공제증서 업로드
+            </Link>
+          )}
+          {STATIC_FORM_DOWNLOADS.map((f) => (
+            <FormDownloadLink key={f.href} href={f.href} filename={f.filename} label={f.label} />
+          ))}
+          <PrivacyConsentWriteButton deals={deals} />
           <ComingSoonButton size="sm">등기열람</ComingSoonButton>
         </DocumentsWriteControls>
       )}
@@ -300,7 +287,7 @@ export function DocumentsTable({ rows, deals }: { rows: DocumentRow[]; deals: De
               </tr>
             ) : (
               rows.map((row) => {
-                const href = `/contracts/${row.dealId}/forms/${row.id}`;
+                const href = formHref(row);
                 const cells = [
                   formatShortDate(row.contractDate),
                   formatShortDate(row.expiryDate),
@@ -360,16 +347,10 @@ export function DocumentsTable({ rows, deals }: { rows: DocumentRow[]; deals: De
         </table>
       </div>
 
-      {!isApp && (
-        <div className="flex flex-wrap gap-2">
-          <Link href="/contracts" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            계약관리로
-          </Link>
-          <p className="self-center text-xs text-muted-foreground">
-            선택 {selected.length}건 · 전체 {rows.length}건
-          </p>
-        </div>
-      )}
+      <p className="text-xs text-muted-foreground">
+        {!isApp && selected.length > 0 ? `선택 ${selected.length}건 · ` : ""}
+        전체 {rows.length}건
+      </p>
 
       <ConfirmDialog
         open={confirmOpen}

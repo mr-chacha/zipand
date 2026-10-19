@@ -1,9 +1,22 @@
+import { BalanceSettlementSheet } from "@/components/deal-forms/balance-settlement-sheet";
+import { BrokerFeeReceiptSheet } from "@/components/deal-forms/broker-fee-receipt-sheet";
+import { PowerOfAttorneySheet } from "@/components/deal-forms/power-of-attorney-sheet";
+import { PrivacyConsentSheet } from "@/components/deal-forms/privacy-consent-sheet";
+import { ReceiptSheet } from "@/components/deal-forms/receipt-sheet";
+import { UtilitySettlementSheet } from "@/components/deal-forms/utility-settlement-sheet";
 import { DatePicker } from "@/components/form/date-picker";
 import { NativeSelect } from "@/components/form/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { DealFormKind } from "@/lib/deal-forms";
+import { isPrivacyConsentForm } from "@/lib/privacy-consent";
+import {
+  isBalanceSettlementForm,
+  isBrokerFeeReceiptForm,
+  isPowerOfAttorneyForm,
+  isUtilitySettlementForm,
+} from "@/lib/related-forms";
 
 function Field({
   label,
@@ -211,51 +224,40 @@ export function DealFormFields({ kind, data, readOnly }: { kind: DealFormKind; d
 
   if (kind === "receipt") {
     return (
-      <div className="space-y-6">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="영수증 종류" htmlFor="receipt_type">
-            <NativeSelect
-              id="receipt_type"
-              name="receipt_type"
-              disabled={disabled}
-              defaultValue={data.receipt_type || "계약금"}
-              options={["계약금", "중도금", "잔금", "중개수수료", "기타"]}
-            />
-          </Field>
-          <Field label="수령일" htmlFor="paid_at">
-            <DatePicker id="paid_at" name="paid_at" defaultValue={data.paid_at ?? ""} disabled={disabled} />
-          </Field>
-          <Field label="납부자" htmlFor="payer_name">
-            <TextInput id="payer_name" name="payer_name" data={data} disabled={disabled} />
-          </Field>
-          <Field label="수령자" htmlFor="payee_name">
-            <TextInput id="payee_name" name="payee_name" data={data} disabled={disabled} />
-          </Field>
-          <Field label="금액 (만원)" htmlFor="amount">
-            <TextInput id="amount" name="amount" data={data} disabled={disabled} inputMode="numeric" />
-          </Field>
-          <Field label="지급 방법" htmlFor="payment_method">
-            <TextInput id="payment_method" name="payment_method" data={data} disabled={disabled} />
-          </Field>
-          <Field label="입금 계좌" htmlFor="account" className="space-y-1.5 sm:col-span-2">
-            <TextInput id="account" name="account" data={data} disabled={disabled} />
-          </Field>
-          <Field label="관련 물건" htmlFor="property_title" className="space-y-1.5 sm:col-span-2">
-            <TextInput id="property_title" name="property_title" data={data} disabled={disabled} />
-          </Field>
-          <Field label="용도·적요" htmlFor="purpose" className="space-y-1.5 sm:col-span-2">
-            <TextInput id="purpose" name="purpose" data={data} disabled={disabled} />
-          </Field>
-          <Field label="비고" htmlFor="note" className="space-y-1.5 sm:col-span-2">
-            <Textarea id="note" name="note" rows={3} defaultValue={data.note ?? ""} disabled={disabled} />
-          </Field>
-        </div>
-        {/* 숨김 필드로 나머지 키 유지 */}
-        {["property_address", "property_type", "deal_type", "office_name", "office_phone", "office_address", "agent_name", "agent_phone"].map(
-          (name) => (
-            <input key={name} type="hidden" name={name} defaultValue={data[name] ?? ""} />
-          )
-        )}
+      <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+        {isBrokerFeeReceiptForm(data) ? <BrokerFeeReceiptSheet data={data} /> : <ReceiptSheet data={data} />}
+      </div>
+    );
+  }
+
+  if (isPrivacyConsentForm(data)) {
+    return (
+      <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+        <PrivacyConsentSheet data={data} />
+      </div>
+    );
+  }
+
+  if (isUtilitySettlementForm(data)) {
+    return (
+      <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+        <UtilitySettlementSheet data={data} />
+      </div>
+    );
+  }
+
+  if (isPowerOfAttorneyForm(data)) {
+    return (
+      <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+        <PowerOfAttorneySheet data={data} />
+      </div>
+    );
+  }
+
+  if (isBalanceSettlementForm(data)) {
+    return (
+      <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+        <BalanceSettlementSheet data={data} />
       </div>
     );
   }

@@ -26,6 +26,14 @@ import { cn } from "@/lib/utils";
 
 type ShareLink = { id: string; token: string; expires_at: string; view_count: number; expired: boolean };
 
+function formPath(dealId: string | null, formId: string) {
+  return dealId ? `/contracts/${dealId}/forms/${formId}` : `/contracts/forms/${formId}`;
+}
+
+function listPath(dealId: string | null) {
+  return dealId ? `/contracts/${dealId}/forms` : "/contracts";
+}
+
 export function DealFormEditor({
   formId,
   dealId,
@@ -37,7 +45,7 @@ export function DealFormEditor({
   siteUrl,
 }: {
   formId: string;
-  dealId: string;
+  dealId: string | null;
   kind: DealFormKind;
   title: string;
   status: "draft" | "finalized";
@@ -68,7 +76,7 @@ export function DealFormEditor({
       if (result.error) toast.error(result.error);
       else if (result.id) {
         toast.success(result.message);
-        router.push(`/contracts/${dealId}/forms/${result.id}`);
+        router.push(formPath(dealId, result.id));
       }
     });
 
@@ -81,7 +89,7 @@ export function DealFormEditor({
       )}
 
       {finalized && (
-        <DealFormShareLinks formId={formId} dealId={dealId} links={shares} siteUrl={siteUrl} />
+        <DealFormShareLinks formId={formId} dealId={dealId ?? ""} links={shares} siteUrl={siteUrl} />
       )}
 
       <form onSubmit={onSubmit} className="space-y-6">
@@ -96,7 +104,7 @@ export function DealFormEditor({
 
         {!isApp && !finalized && (
           <FormActions>
-            <Link href={`/contracts/${dealId}/forms`} className={buttonVariants({ variant: "outline" })}>
+            <Link href={listPath(dealId)} className={buttonVariants({ variant: "outline" })}>
               목록
             </Link>
             <SubmitButton pending={saving}>저장</SubmitButton>
@@ -120,7 +128,7 @@ export function DealFormEditor({
             appOnly
             action={async () => {
               const result = await deleteDealForm(formId);
-              if (!result.error) router.push(`/contracts/${dealId}/forms`);
+              if (!result.error) router.push(listPath(dealId));
               return result;
             }}
             title="서식을 삭제할까요?"
@@ -135,12 +143,17 @@ export function DealFormEditor({
         </div>
       )}
 
-      {isApp && (
+      {isApp && dealId && (
         <Link
           href={`/contracts/${dealId}`}
           className={cn(buttonVariants({ variant: "outline" }), "flex w-full justify-center")}
         >
           거래로 돌아가기
+        </Link>
+      )}
+      {isApp && !dealId && (
+        <Link href="/contracts" className={cn(buttonVariants({ variant: "outline" }), "flex w-full justify-center")}>
+          계약관리로 돌아가기
         </Link>
       )}
     </div>

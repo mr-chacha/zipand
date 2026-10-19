@@ -392,7 +392,7 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          deal_id: string
+          deal_id: string | null
           expires_at: string
           form_id: string
           id: string
@@ -403,7 +403,7 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          deal_id: string
+          deal_id?: string | null
           expires_at?: string
           form_id: string
           id?: string
@@ -414,7 +414,7 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
-          deal_id?: string
+          deal_id?: string | null
           expires_at?: string
           form_id?: string
           id?: string
@@ -458,7 +458,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           data: Json
-          deal_id: string
+          deal_id: string | null
           finalized_at: string | null
           id: string
           kind: string
@@ -471,7 +471,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data?: Json
-          deal_id: string
+          deal_id?: string | null
           finalized_at?: string | null
           id?: string
           kind: string
@@ -484,7 +484,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           data?: Json
-          deal_id?: string
+          deal_id?: string | null
           finalized_at?: string | null
           id?: string
           kind?: string
@@ -1040,6 +1040,8 @@ export type Database = {
           address: string | null
           business_no: string | null
           created_at: string
+          guarantee_certificate_name: string | null
+          guarantee_certificate_path: string | null
           id: string
           name: string
           phone: string | null
@@ -1052,6 +1054,8 @@ export type Database = {
           address?: string | null
           business_no?: string | null
           created_at?: string
+          guarantee_certificate_name?: string | null
+          guarantee_certificate_path?: string | null
           id?: string
           name: string
           phone?: string | null
@@ -1064,6 +1068,8 @@ export type Database = {
           address?: string | null
           business_no?: string | null
           created_at?: string
+          guarantee_certificate_name?: string | null
+          guarantee_certificate_path?: string | null
           id?: string
           name?: string
           phone?: string | null

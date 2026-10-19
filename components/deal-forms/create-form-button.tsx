@@ -7,7 +7,6 @@ import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createDealForm } from "@/lib/actions/deal-forms";
 import { DEAL_FORM_KIND_LABELS, DEAL_FORM_KINDS } from "@/lib/deal-forms";
@@ -45,7 +44,7 @@ export function CreateDealFormButton({ dealId }: { dealId: string }) {
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="kind">종류</Label>
+            <Label htmlFor="kind">서식 종류</Label>
             <NativeSelect
               id="kind"
               name="kind"
@@ -53,10 +52,6 @@ export function CreateDealFormButton({ dealId }: { dealId: string }) {
               defaultValue="contract"
               required
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="title">제목 (선택)</Label>
-            <Input id="title" name="title" placeholder="비우면 자동으로 채워요" />
           </div>
           <FormMessage state={state} />
           <SubmitButton pending={pending} className="w-full">

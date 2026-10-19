@@ -1,4 +1,12 @@
 import { defaultSpecialTermsForDeal } from "@/lib/contract-templates";
+import { buildPrivacyConsentDefaults } from "@/lib/privacy-consent";
+import {
+  buildBalanceSettlementDefaults,
+  buildBrokerFeeReceiptDefaults,
+  buildPowerOfAttorneyDefaults,
+  buildReceiptDefaults,
+  buildUtilitySettlementDefaults,
+} from "@/lib/related-forms";
 
 /** 거래 서식 종류·기본값·필드 키 (웹 작성 / 공유 공용) */
 
@@ -222,33 +230,56 @@ export function readFormDataRecord(fd: FormData, keys: string[]): Record<string,
   return out;
 }
 
+const EMPTY_PREFILL: DealFormPrefill = {
+  dealType: "",
+  propertyTitle: "",
+  propertyAddress: "",
+  propertyType: "",
+  amount: null,
+  monthlyRent: null,
+  downPayment: null,
+  balanceDate: null,
+  contractDate: null,
+  moveInDate: null,
+  lessorName: null,
+  lessorPhone: null,
+  lessorAccount: null,
+  lesseeName: null,
+  lesseePhone: null,
+  termsNote: null,
+  clauses: [],
+  officeName: "",
+  officePhone: null,
+  officeAddress: null,
+  officeRepresentative: null,
+  officeRegistrationNo: null,
+  agentName: "",
+  agentPhone: null,
+};
+
 export function formFieldKeys(kind: DealFormKind): string[] {
-  return Object.keys(buildDealFormDefaults(kind, {
-    dealType: "",
-    propertyTitle: "",
-    propertyAddress: "",
-    propertyType: "",
-    amount: null,
-    monthlyRent: null,
-    downPayment: null,
-    balanceDate: null,
-    contractDate: null,
-    moveInDate: null,
-    lessorName: null,
-    lessorPhone: null,
-    lessorAccount: null,
-    lesseeName: null,
-    lesseePhone: null,
-    termsNote: null,
-    clauses: [],
-    officeName: "",
-    officePhone: null,
-    officeAddress: null,
-    officeRepresentative: null,
-    officeRegistrationNo: null,
-    agentName: "",
-    agentPhone: null,
-  }));
+  const keys = Object.keys(buildDealFormDefaults(kind, EMPTY_PREFILL));
+  if (kind === "other") {
+    return [
+      ...new Set([
+        ...keys,
+        ...Object.keys(buildPrivacyConsentDefaults(EMPTY_PREFILL)),
+        ...Object.keys(buildUtilitySettlementDefaults(EMPTY_PREFILL)),
+        ...Object.keys(buildPowerOfAttorneyDefaults(EMPTY_PREFILL)),
+        ...Object.keys(buildBalanceSettlementDefaults(EMPTY_PREFILL)),
+      ]),
+    ];
+  }
+  if (kind === "receipt") {
+    return [
+      ...new Set([
+        ...keys,
+        ...Object.keys(buildReceiptDefaults(EMPTY_PREFILL)),
+        ...Object.keys(buildBrokerFeeReceiptDefaults(EMPTY_PREFILL)),
+      ]),
+    ];
+  }
+  return keys;
 }
 
 export function asStringRecord(data: unknown): Record<string, string> {

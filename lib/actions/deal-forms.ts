@@ -14,15 +14,30 @@ import {
   readFormDataRecord,
   type DealFormKind,
 } from "@/lib/deal-forms";
+import {
+  PRIVACY_CONSENT_TEMPLATE,
+  PRIVACY_CONSENT_TITLE,
+  buildPrivacyConsentDefaults,
+} from "@/lib/privacy-consent";
+import {
+  RELATED_FORM_TABS,
+  buildRelatedFormDefaults,
+  relatedFormTitle,
+  type RelatedFormTabId,
+} from "@/lib/related-forms";
 import { oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
 import type { ActionState } from "@/types";
 import type { Json } from "@/lib/supabase/database.types";
 
-function revalidateFormPaths(dealId: string, formId?: string) {
+function revalidateFormPaths(dealId: string | null | undefined, formId?: string) {
+  revalidatePath("/contracts");
   revalidatePath("/contracts/documents");
-  revalidatePath(`/contracts/${dealId}`);
-  revalidatePath(`/contracts/${dealId}/forms`);
-  if (formId) revalidatePath(`/contracts/${dealId}/forms/${formId}`);
+  if (formId) revalidatePath(`/contracts/forms/${formId}`);
+  if (dealId) {
+    revalidatePath(`/contracts/${dealId}`);
+    revalidatePath(`/contracts/${dealId}/forms`);
+    if (formId) revalidatePath(`/contracts/${dealId}/forms/${formId}`);
+  }
 }
 
 async function requireWebWrite() {
@@ -243,9 +258,67 @@ export async function deleteDealForms(ids: string[]): Promise<ActionState> {
     const { error } = await supabase.from("deal_forms").delete().in("id", ids);
     if (error) throw error;
     const dealIds = [...new Set((rows ?? []).map((r) => r.deal_id))];
-    revalidatePath("/contracts/documents");
     for (const dealId of dealIds) revalidateFormPaths(dealId);
     return { message: `${ids.length}건을 삭제했어요.` };
+  } catch (e) {
+    return { error: toErrorMessage(e) };
+  }
+}
+
+/** 웹 전용: 거래 없이 영수증등 관련 서식 초안 생성 */
+export async function createStandaloneRelatedForm(options: {
+  formTemplate: string;
+  title?: string | null;
+}): Promise<ActionState & { id?: string }> {
+  try {
+    await requireWebWrite();
+    const tab = RELATED_FORM_TABS.find((t) => t.formTemplate === options.formTemplate);
+    if (!tab) return { error: "서식 종류를 확인해 주세요." };
+
+    const { supabase, profile, office } = await getSession();
+    const prefill = {
+      dealType: "",
+      propertyTitle: "",
+      propertyAddress: "",
+      propertyType: "",
+      amount: null,
+      monthlyRent: null,
+      downPayment: null,
+      balanceDate: null,
+      contractDate: null,
+      moveInDate: null,
+      lessorName: null,
+      lessorPhone: null,
+      lessorAccount: null,
+      lesseeName: null,
+      lesseePhone: null,
+      termsNote: null,
+      clauses: [] as string[],
+      officeName: office.name,
+      officePhone: office.phone,
+      officeAddress: office.address,
+      officeRepresentative: office.representative,
+      officeRegistrationNo: office.registration_no,
+      agentName: profile.name,
+      agentPhone: profile.phone,
+    };
+    const data = buildRelatedFormDefaults(tab.id as RelatedFormTabId, prefill);
+    const formTitle = options.title?.trim() || relatedFormTitle(tab.id);
+
+    const { data: row, error } = await supabase
+      .from("deal_forms")
+      .insert({
+        deal_id: null,
+        kind: tab.kind,
+        title: formTitle,
+        data: data as Json,
+        created_by: profile.id,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    revalidateFormPaths(null, row.id);
+    return { message: "초안을 만들었어요.", id: row.id };
   } catch (e) {
     return { error: toErrorMessage(e) };
   }
@@ -256,6 +329,8 @@ type CreateFormOptions = {
   title?: string | null;
   /** lib/contract-templates 서식 id */
   templateId?: string | null;
+  /** 기타 서식 세부 양식 (예: privacy_consent) */
+  formTemplate?: string | null;
 };
 
 /** 계약서 관리 목록용 생성 (거래·서식 선택 후 초안) — redirect 없이 id 반환 */
@@ -280,17 +355,28 @@ export async function createDealFormForDeal(
       prefill.propertyType = template.propertyType;
       prefill.dealType = template.dealType;
     }
-    const data = buildDealFormDefaults(kind, prefill);
+    let data = buildDealFormDefaults(kind, prefill);
     if (template) {
       data.template_id = template.id;
       data.property_type = template.propertyType;
       data.deal_type = template.dealType;
       data.template_title = template.title;
     }
+    if (options.formTemplate === PRIVACY_CONSENT_TEMPLATE) {
+      data = { ...data, ...buildPrivacyConsentDefaults(prefill) };
+    } else {
+      const relatedTabForData = RELATED_FORM_TABS.find((t) => t.formTemplate === options.formTemplate);
+      if (relatedTabForData) {
+        data = { ...data, ...buildRelatedFormDefaults(relatedTabForData.id, prefill) };
+      }
+    }
     if (kind === "contract" && !data.contract_no) data.contract_no = newContractNo();
 
+    const relatedTab = RELATED_FORM_TABS.find((t) => t.formTemplate === options.formTemplate);
     const formTitle =
       options.title?.trim() ||
+      (options.formTemplate === PRIVACY_CONSENT_TEMPLATE ? PRIVACY_CONSENT_TITLE : "") ||
+      (relatedTab ? relatedFormTitle(relatedTab.id, prefill.dealType) : "") ||
       template?.title ||
       defaultTitle(kind, prefill.propertyTitle, template?.propertyType ?? prefill.propertyType);
 
@@ -306,7 +392,6 @@ export async function createDealFormForDeal(
       .select("id")
       .single();
     if (error) throw error;
-    revalidatePath("/contracts/documents");
     revalidateFormPaths(dealId, row.id);
     return { message: "초안을 만들었어요.", id: row.id };
   } catch (e) {
