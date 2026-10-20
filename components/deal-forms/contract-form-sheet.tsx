@@ -86,33 +86,20 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
         value={delivery}
         onChange={(v) => {
           setDelivery(v);
-          if (!leaseStart || leaseStart === delivery) {
-            setLeaseStart(v);
-            syncExpiry(v, months);
-          }
-        }}
-        className="mx-1 inline-flex min-w-36 align-baseline"
-        inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
-      />{" "}
-      까지 임차인에게 인도하며, 임대차 기간은{" "}
-      <DatePicker
-        name="lease_start_date"
-        value={leaseStart}
-        onChange={(v) => {
           setLeaseStart(v);
           syncExpiry(v, months);
         }}
         className="mx-1 inline-flex min-w-36 align-baseline"
         inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
       />{" "}
-      부터{" "}
+      까지 임차인에게 인도하며, 임대차 기간은 인도일로부터{" "}
       <DatePicker
         name="expiry_date"
         value={expiry}
         onChange={setExpiry}
         className="mx-1 inline-flex min-w-36 align-baseline"
         inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
-      />{" "}
+      />
       (
       <NativeSelect
         name="lease_months"
@@ -120,7 +107,7 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
         onChange={(e) => {
           const next = normalizeLeaseMonths(e.target.value);
           setMonths(next);
-          syncExpiry(leaseStart || delivery, next);
+          syncExpiry(delivery || leaseStart, next);
         }}
         options={LEASE_MONTH_OPTIONS.map((m) => ({ value: m, label: m }))}
         className="mx-1 inline-flex w-16 align-baseline"
@@ -130,7 +117,8 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
         )}
         aria-label="계약 기간(개월)"
       />{" "}
-      개월)까지로 한다.{" "}
+      개월) 까지로 한다.
+      <input type="hidden" name="lease_start_date" value={leaseStart || delivery} />
       <NativeSelect
         name="day_count_rule"
         value={dayRule}
@@ -1496,7 +1484,7 @@ export function ContractFormSheet({
         <ContractTermsTable dealType={dealType} data={data} />
       </section>
 
-      {/* 일반조항 제2조~제8조 + 추가 특약 (매매·임대차 조항 상이) */}
+      {/* 일반조항 제2조~제9조 + 추가 특약 (매매·임대차 조항 상이, 협회 PDF 원문) */}
       <section className="contract-articles-block space-y-3 print:flex print:min-h-0 print:flex-1 print:flex-col print:space-y-0">
         <div className="shrink-0 space-y-2.5 rounded-md border px-3 py-3 text-[14px] leading-relaxed print:space-y-1.5 print:rounded-none print:border-x-0 print:border-b-0 print:border-black print:px-0 print:py-0 print:text-[10.5px] print:leading-relaxed">
           {contractArticlesForDeal(dealType).map((article) => (

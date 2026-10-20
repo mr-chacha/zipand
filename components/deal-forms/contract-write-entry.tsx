@@ -4,6 +4,7 @@ import { useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
 import { ContractWriteButton, ContractWriteDialog, type WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
+import type { RelatedFormsOfficeDefaults } from "@/components/deal-forms/related-forms-dialog";
 import { OfficeRequiredDialog } from "@/components/office-gate";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -11,11 +12,13 @@ import { cn } from "@/lib/utils";
 /** 계약관리 헤더용: 게이트 + 작성 창 */
 export function ContractWriteEntry({
   deals,
+  office = null,
   blocked,
   isOwner,
   variant = "outline",
 }: {
   deals: WriteDealOption[];
+  office?: RelatedFormsOfficeDefaults | null;
   blocked: boolean;
   isOwner: boolean;
   variant?: "default" | "outline" | "secondary";
@@ -33,7 +36,7 @@ export function ContractWriteEntry({
     );
   }
   return (
-    <ContractWriteButton deals={deals} variant={variant}>
+    <ContractWriteButton deals={deals} office={office} variant={variant}>
       <FileText data-icon="inline-start" />
       계약서 작성
     </ContractWriteButton>
@@ -43,9 +46,11 @@ export function ContractWriteEntry({
 /** 계약서 관리 툴바 + ?write=1 로 창 열기 */
 export function DocumentsWriteControls({
   deals,
+  office = null,
   children,
 }: {
   deals: WriteDealOption[];
+  office?: RelatedFormsOfficeDefaults | null;
   children?: React.ReactNode;
 }) {
   const searchParams = useSearchParams();
@@ -69,7 +74,7 @@ export function DocumentsWriteControls({
         </Button>
         {children}
       </div>
-      <ContractWriteDialog open={open} onOpenChange={setOpen} deals={deals} />
+      <ContractWriteDialog open={open} onOpenChange={setOpen} deals={deals} office={office} />
     </>
   );
 }

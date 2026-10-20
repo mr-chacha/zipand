@@ -201,7 +201,8 @@
     font-size: 10.5px !important;
     line-height: 1.3 !important;
   }
-  #contract-print-host .disclosure-print-clone .disclosure-page {
+  #contract-print-host .disclosure-print-clone .disclosure-page,
+  #contract-print-host .disclosure-print-clone .form-print-page {
     display: block !important;
     box-sizing: border-box !important;
     width: 100% !important;
@@ -213,11 +214,13 @@
     break-after: page;
     page-break-after: always;
   }
-  #contract-print-host .disclosure-print-clone .disclosure-page:last-of-type {
+  #contract-print-host .disclosure-print-clone .disclosure-page:last-of-type,
+  #contract-print-host .disclosure-print-clone .form-print-page:last-of-type {
     break-after: auto;
     page-break-after: auto;
   }
-  #contract-print-host .disclosure-print-clone .disclosure-page.hidden {
+  #contract-print-host .disclosure-print-clone .disclosure-page.hidden,
+  #contract-print-host .disclosure-print-clone .form-print-page.hidden {
     display: block !important;
   }
   #contract-print-host .contract-print-clone > header,

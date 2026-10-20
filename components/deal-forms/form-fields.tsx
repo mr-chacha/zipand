@@ -1,15 +1,18 @@
 import { BalanceSettlementSheet } from "@/components/deal-forms/balance-settlement-sheet";
 import { BrokerFeeReceiptSheet } from "@/components/deal-forms/broker-fee-receipt-sheet";
+import { ContractFormSheet } from "@/components/deal-forms/contract-form-sheet";
 import { DisclosureFormSheet } from "@/components/deal-forms/disclosure-form-sheet";
 import { PowerOfAttorneySheet } from "@/components/deal-forms/power-of-attorney-sheet";
 import { PrivacyConsentSheet } from "@/components/deal-forms/privacy-consent-sheet";
 import { ReceiptSheet } from "@/components/deal-forms/receipt-sheet";
+import { StandardLeaseFormSheet } from "@/components/deal-forms/standard-lease-form-sheet";
 import { UtilitySettlementSheet } from "@/components/deal-forms/utility-settlement-sheet";
 import { DatePicker } from "@/components/form/date-picker";
 import { NativeSelect } from "@/components/form/native-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import type { ContractDealType, ContractPropertyType } from "@/lib/contract-templates";
 import type { DealFormKind } from "@/lib/deal-forms";
 import { isPrivacyConsentForm } from "@/lib/privacy-consent";
 import {
@@ -18,6 +21,7 @@ import {
   isPowerOfAttorneyForm,
   isUtilitySettlementForm,
 } from "@/lib/related-forms";
+import { STANDARD_LEASE_TITLE, isStandardLeaseForm } from "@/lib/standard-lease";
 
 function Field({
   label,
@@ -47,6 +51,27 @@ export function DealFormFields({ kind, data, readOnly }: { kind: DealFormKind; d
   const disabled = readOnly;
 
   if (kind === "contract") {
+    if (isStandardLeaseForm(data)) {
+      return (
+        <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+          <StandardLeaseFormSheet title={data.template_title || STANDARD_LEASE_TITLE} data={data} />
+        </div>
+      );
+    }
+    if (data.template_id || data.template_title) {
+      const propertyType = (data.property_type || "아파트") as ContractPropertyType;
+      const dealType = (data.deal_type || "매매") as ContractDealType;
+      return (
+        <div className={disabled ? "pointer-events-none opacity-80" : undefined}>
+          <ContractFormSheet
+            propertyType={propertyType}
+            dealType={dealType}
+            title={data.template_title || "계약서"}
+            data={data}
+          />
+        </div>
+      );
+    }
     return (
       <div className="space-y-6">
         <section className="space-y-3">

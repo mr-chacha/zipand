@@ -56,6 +56,7 @@ export default async function ContractsPage() {
       amount: d.amount || "",
       monthlyRent: d.monthly_rent || "",
       dealType: d.deal_type || "",
+      propertyType: d.property_type || "",
       lessorName: d.lessor_name || d.payee_name || "",
       lessorPhone: d.lessor_phone || "",
       lesseeName: d.lessee_name || d.payer_name || "",

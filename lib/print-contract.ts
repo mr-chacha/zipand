@@ -54,11 +54,11 @@ export function printContractSheet(title?: string, root?: HTMLElement | string |
   const clone = source.cloneNode(true) as HTMLElement;
   clone.removeAttribute("id");
   clone.classList.add("contract-print-clone");
-  const disclosurePages = clone.querySelectorAll(".disclosure-page");
-  if (disclosurePages.length > 0) {
+  const multipage = clone.querySelectorAll(".disclosure-page, .form-print-page");
+  if (multipage.length > 0) {
     clone.classList.add("disclosure-print-clone");
-    // 화면에서 숨긴 2~4쪽도 인쇄본에 전부 표시
-    disclosurePages.forEach((node) => {
+    // 화면에서 숨긴 쪽도 인쇄본에 전부 표시 (확인설명서·표준임대차 등)
+    multipage.forEach((node) => {
       if (node instanceof HTMLElement) {
         node.classList.remove("hidden");
         node.style.display = "block";

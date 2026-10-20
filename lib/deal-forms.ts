@@ -8,6 +8,7 @@ import {
   buildReceiptDefaults,
   buildUtilitySettlementDefaults,
 } from "@/lib/related-forms";
+import { buildStandardLeaseDefaults } from "@/lib/standard-lease";
 
 /** 거래 서식 종류·기본값·필드 키 (웹 작성 / 공유 공용) */
 
@@ -252,6 +253,9 @@ const EMPTY_PREFILL: DealFormPrefill = {
 
 export function formFieldKeys(kind: DealFormKind): string[] {
   const keys = Object.keys(buildDealFormDefaults(kind, EMPTY_PREFILL));
+  if (kind === "contract") {
+    return [...new Set([...keys, ...Object.keys(buildStandardLeaseDefaults(EMPTY_PREFILL))])];
+  }
   if (kind === "other") {
     return [
       ...new Set([
