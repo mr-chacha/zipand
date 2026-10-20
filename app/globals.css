@@ -136,3 +136,322 @@
     @apply font-sans;
   }
 }
+
+/* 계약서 인쇄: body 직속 #contract-print-host 만 출력 (빈 1페이지 방지) */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+
+  /* 앱·모달 전부 숨김 — 복제 호스트만 남김 */
+  body > *:not(#contract-print-host) {
+    display: none !important;
+  }
+
+  #contract-print-host {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  #contract-print-host .contract-print-clone {
+    display: flex !important;
+    flex-direction: column !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    /* A4(@page margin 12mm) 한 페이지 높이까지 늘림 */
+    min-height: calc(297mm - 24mm) !important;
+    height: calc(297mm - 24mm) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11.5px !important;
+    line-height: 1.35 !important;
+    background: white !important;
+    color: #000 !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    border: 2.5px solid #000 !important;
+  }
+
+  /* 확인설명서: 제1~4쪽 연속 출력 (계약서 1페이지 고정 레이아웃 해제) */
+  #contract-print-host .contract-print-clone.disclosure-print-clone {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    border: none !important;
+    font-size: 10.5px !important;
+    line-height: 1.3 !important;
+  }
+  #contract-print-host .disclosure-print-clone .disclosure-page,
+  #contract-print-host .disclosure-print-clone .form-print-page {
+    display: block !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-height: calc(297mm - 24mm) !important;
+    margin: 0 !important;
+    padding: 4mm !important;
+    border: 2px solid #000 !important;
+    background: white !important;
+    break-after: page;
+    page-break-after: always;
+  }
+  #contract-print-host .disclosure-print-clone .disclosure-page:last-of-type,
+  #contract-print-host .disclosure-print-clone .form-print-page:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+  #contract-print-host .disclosure-print-clone .disclosure-page.hidden,
+  #contract-print-host .disclosure-print-clone .form-print-page.hidden {
+    display: block !important;
+  }
+  #contract-print-host .contract-print-clone > header,
+  #contract-print-host .contract-print-clone > section:not(.contract-articles-block),
+  #contract-print-host .contract-print-clone > .contract-parties {
+    flex-shrink: 0 !important;
+  }
+  /* 남는 세로 공간 → 특약사항 공백으로 채움 */
+  #contract-print-host .contract-articles-block {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+  #contract-print-host .contract-special-terms {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+  }
+  #contract-print-host .contract-special-terms-body {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+  #contract-print-host .contract-print-clone > input[type="hidden"] {
+    display: none !important;
+  }
+  /* 외곽선과 맞닿는 안쪽 여백·이중선 제거 — 라인 연속 */
+  #contract-print-host .contract-print-clone > * {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  #contract-print-host .contract-print-clone > :first-child {
+    margin-top: 0 !important;
+  }
+  #contract-print-host .contract-print-clone > :last-child {
+    margin-bottom: 0 !important;
+  }
+  #contract-print-host .contract-print-clone table {
+    margin: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+  #contract-print-host .contract-print-clone header {
+    margin: 0 !important;
+    padding: 0 !important;
+    border-bottom: none !important;
+  }
+  /* 제목(매매계약서 등) 아래 구분선 */
+  #contract-print-host .contract-print-clone header h2 {
+    border-bottom: 2px solid #000 !important;
+    padding-bottom: 2px !important;
+    margin-bottom: 2px !important;
+  }
+  /* 1. 부동산의 표시 아래 구분선 */
+  #contract-print-host .contract-print-clone > section:first-of-type > h3 {
+    border-bottom: 2px solid #000 !important;
+  }
+  /* 매도인·매수인·개업공인중개사 표 여백 없이 이어 붙이기 */
+  #contract-print-host .contract-parties {
+    flex-shrink: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    margin-top: 0 !important;
+  }
+  #contract-print-host .contract-parties .contract-party-table {
+    margin: 0 !important;
+    border-top: none !important;
+    /* 매도인·매수인 아래 구분선 */
+    border-bottom: 1.5px solid #000 !important;
+  }
+  #contract-print-host .contract-parties .contract-party-start {
+    border-top: 1.5px solid #000 !important;
+  }
+  /* 마지막 중개사 표 → 본문 하단 외곽선에 붙임(아래 여백·이중선 제거) */
+  #contract-print-host .contract-parties .contract-party-flush {
+    border-bottom: none !important;
+  }
+  #contract-print-host .contract-parties input[type="hidden"] {
+    display: none !important;
+  }
+  /* 잔금(계약조건 표) 아래·특약 아래·증명문 위 선 제거 */
+  #contract-print-host .contract-print-clone table.print\:border-b-0,
+  #contract-print-host .contract-print-clone .print\:border-b-0 {
+    border-bottom: none !important;
+  }
+  #contract-print-host .contract-print-clone .print\:border-t-0 {
+    border-top: none !important;
+  }
+  #contract-print-host .contract-print-clone section > .rounded-md,
+  #contract-print-host .contract-print-clone pre {
+    margin: 0 !important;
+    padding: 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+  }
+  /* 특약사항: 위 구분선만, 아래 선 없음 */
+  #contract-print-host .contract-print-clone section .print\:border-t {
+    border-top: 1.5px solid #000 !important;
+    border-bottom: none !important;
+  }
+  #contract-print-host .contract-print-clone pre.print\:border-0,
+  #contract-print-host .contract-print-clone .print\:border-0 {
+    border: none !important;
+  }
+  /* 구조 보더는 유지, 입력 필드용 border-2 / border-input 만 제거 */
+  #contract-print-host .contract-print-clone [class*="border-2"],
+  #contract-print-host .contract-print-clone [class*="border-input"] {
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  #contract-print-host .contract-print-clone .print\:hidden {
+    display: none !important;
+  }
+
+  #contract-print-host h2 {
+    font-size: 20px !important;
+    line-height: 1.25 !important;
+    margin: 0 !important;
+  }
+  #contract-print-host h3 {
+    font-size: 12.5px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* 섹션 간 여백 제거 → 외곽·내부 라인 연속 */
+  #contract-print-host .space-y-6 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .space-y-4 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .space-y-3 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .space-y-2 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .space-y-1 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .print\:space-y-2 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .print\:space-y-1 > :not([hidden]) ~ :not([hidden]),
+  #contract-print-host .print\:space-y-0 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0 !important;
+  }
+
+  #contract-print-host table {
+    width: 100% !important;
+    font-size: 11.5px !important;
+    border-collapse: collapse !important;
+    border-color: #000 !important;
+  }
+  #contract-print-host th,
+  #contract-print-host td {
+    padding: 3px 5px !important;
+    border-color: #000 !important;
+  }
+  #contract-print-host .border,
+  #contract-print-host [class*="border-"] {
+    border-color: #000 !important;
+  }
+  #contract-print-host tr.border-b,
+  #contract-print-host .border-b:not(.print\:border-b-0) {
+    border-bottom-width: 1.5px !important;
+  }
+  #contract-print-host .border-r,
+  #contract-print-host .border-x {
+    border-right-width: 1.5px !important;
+  }
+  /* 입력·드롭다운: 테두리·화살표 없이 값만. 빈 칸 placeholder 숨김 */
+  #contract-print-host input,
+  #contract-print-host select,
+  #contract-print-host textarea {
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    font-size: 11.5px !important;
+    line-height: 1.3 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    border-width: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent !important;
+    color: #000 !important;
+  }
+  #contract-print-host input::placeholder,
+  #contract-print-host textarea::placeholder {
+    color: transparent !important;
+    opacity: 0 !important;
+  }
+  #contract-print-host select {
+    background-image: none !important;
+    padding-right: 0 !important;
+  }
+  /* NativeSelect 화살표(Chevron) · 날짜 버튼 등 */
+  #contract-print-host svg,
+  #contract-print-host button {
+    display: none !important;
+  }
+  #contract-print-host input[class*="border"],
+  #contract-print-host select[class*="border"],
+  #contract-print-host textarea[class*="border"] {
+    border: none !important;
+    border-width: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+  #contract-print-host [class*="leading-relaxed"],
+  #contract-print-host [class*="leading-snug"] {
+    font-size: 10.5px !important;
+    line-height: 1.4 !important;
+  }
+  #contract-print-host pre {
+    display: block !important;
+    width: 100% !important;
+    font-size: 12px !important;
+    line-height: 1.4 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    white-space: pre-wrap !important;
+    font-family: inherit !important;
+  }
+  #contract-print-host .rounded-md,
+  #contract-print-host .rounded-lg {
+    border-radius: 0 !important;
+  }
+}
+
+/* 화면에서는 인쇄 호스트 숨김 */
+#contract-print-host {
+  display: none;
+}

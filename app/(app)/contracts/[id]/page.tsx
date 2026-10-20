@@ -4,13 +4,16 @@ import { notFound } from "next/navigation";
 import { ComingSoonButton } from "@/components/coming-soon";
 import { PageHeader } from "@/components/page-header";
 import { DealStageBadge, DocStatusBadge } from "@/components/status-badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { isAppRequest } from "@/lib/app-mode";
 import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/format";
 import { getCustomerOptions } from "@/lib/queries";
 import { DealForm } from "../deal-form";
 import { STEP_DESCRIPTIONS, STEP_TITLES, stageIndex } from "@/lib/deal-steps";
 import { isPast } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { DealChecklist, DealClauses, DealHeaderActions, DealShareLinks } from "./deal-actions";
 import { BalanceStep, CompleteStep, DealStepNav, DocsStepFooter, PrepStep, TermsStep } from "./deal-steps";
 
@@ -19,7 +22,7 @@ export const metadata: Metadata = { title: "거래 상세" };
 export default async function DealDetailPage({ params, searchParams }: PageProps<"/contracts/[id]">) {
   const { id } = await params;
   const { step: stepParam } = await searchParams;
-  const { supabase } = await getSession();
+  const [{ supabase }, isApp] = await Promise.all([getSession(), isAppRequest()]);
 
   const { data: deal } = await supabase
     .from("deals")
@@ -28,13 +31,14 @@ export default async function DealDetailPage({ params, searchParams }: PageProps
     .maybeSingle();
   if (!deal) notFound();
 
-  const [checklist, clauses, officeClauses, documents, customers, shares] = await Promise.all([
+  const [checklist, clauses, officeClauses, documents, customers, shares, dealForms] = await Promise.all([
     supabase.from("deal_checklist_items").select("*").eq("deal_id", id).order("sort_order").order("created_at"),
     supabase.from("deal_clauses").select("*").eq("deal_id", id).order("sort_order").order("created_at"),
     supabase.from("office_clauses").select("id, category, title, body").order("created_at", { ascending: false }),
     supabase.from("documents").select("id, doc_type, status, issued_at").eq("property_id", deal.property_id),
     getCustomerOptions(),
     supabase.from("deal_shares").select("id, token, expires_at, view_count, created_at").eq("deal_id", id).order("created_at", { ascending: false }),
+    supabase.from("deal_forms").select("id, kind, title, status").eq("deal_id", id).order("created_at", { ascending: false }),
   ]);
   const closed = deal.stage === "완료" || deal.stage === "취소";
 
@@ -181,13 +185,36 @@ export default async function DealDetailPage({ params, searchParams }: PageProps
 
           <Card>
             <CardHeader>
-              <CardTitle>AI 계약 도우미</CardTitle>
-              <CardDescription>계약서·중개대상물 확인설명서 초안</CardDescription>
+              <CardTitle>거래 서식</CardTitle>
+              <CardDescription>
+                {isApp
+                  ? "확정된 계약서·확인설명서·영수증을 공유해요. 작성은 웹에서 해주세요."
+                  : "계약서·확인설명서·영수증 등을 작성하고 확정한 뒤 공유해요."}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <ComingSoonButton size="sm">계약서 초안</ComingSoonButton>
-              <ComingSoonButton size="sm">확인설명서 초안</ComingSoonButton>
-              <ComingSoonButton size="sm">특약 추천</ComingSoonButton>
+            <CardContent className="space-y-3">
+              {(dealForms.data ?? []).length > 0 && (
+                <ul className="space-y-1.5">
+                  {(isApp ? (dealForms.data ?? []).filter((f) => f.status === "finalized") : dealForms.data ?? [])
+                    .slice(0, 5)
+                    .map((f) => (
+                      <li key={f.id}>
+                        <Link href={`/contracts/${id}/forms/${f.id}`} className="block truncate text-sm hover:underline">
+                          {f.title}
+                          <span className="ml-1 text-xs text-muted-foreground">
+                            {f.status === "finalized" ? "확정" : "작성 중"}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                </ul>
+              )}
+              <Link href={`/contracts/${id}/forms`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex")}>
+                서식 {isApp ? "보기·공유" : "작성·관리"}
+              </Link>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <ComingSoonButton size="sm">AI 특약 추천</ComingSoonButton>
+              </div>
             </CardContent>
           </Card>
         </div>

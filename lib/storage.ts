@@ -2,7 +2,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { randomUuid } from "@/lib/uuid";
 
-export type Bucket = "property-photos" | "property-videos" | "visit-audio" | "consultation-audio" | "documents" | "office-verification";
+export type Bucket =
+  | "property-photos"
+  | "property-videos"
+  | "visit-audio"
+  | "consultation-audio"
+  | "documents"
+  | "office-verification"
+  | "office-docs";
 
 /** 버킷 설정(supabase/migrations)과 맞춘 업로드 제한 */
 export const MEDIA_LIMITS = {

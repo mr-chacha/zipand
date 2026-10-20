@@ -27,7 +27,7 @@ const SEARCH_SCOPES = [
   { path: "/properties", placeholder: "매물명, 주소, 지역 검색" },
   { path: "/customers", placeholder: "고객 이름, 연락처, 지역 검색" },
   { path: "/documents", placeholder: "문서 종류, 파일명, 매물명 검색" },
-  { path: "/contracts", placeholder: "거래 매물명, 고객 이름 검색" },
+  { path: "/contracts", placeholder: "계약서 제목, 당사자, 소재지 검색" },
 ];
 
 interface AppHeaderProps {

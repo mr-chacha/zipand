@@ -24,6 +24,7 @@ interface DatePickerProps {
   defaultOpen?: boolean;
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
   "aria-label"?: string;
 }
 
@@ -45,7 +46,63 @@ function formatDisplay(value: string, withTime: boolean) {
   return `${day} ${hour < 12 ? "오전" : "오후"} ${hour % 12 || 12}:${pad(minute)}`;
 }
 
-/** 확인·취소 버튼이 있는 날짜(·시간) 선택기 */
+/** 숫자만 받아 YYYY. MM. DD. 형식으로 점 자동 삽입 (직접입력용) */
+function formatDateDigitsTyping(raw: string) {
+  const d = raw.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 4) return d;
+  if (d.length <= 6) return `${d.slice(0, 4)}. ${d.slice(4)}`;
+  const body = `${d.slice(0, 4)}. ${d.slice(4, 6)}. ${d.slice(6)}`;
+  return d.length === 8 ? `${body}.` : body;
+}
+
+/** 직접 입력 문자열을 YYYY-MM-DD / YYYY-MM-DDTHH:mm 으로 정규화. 실패 시 null */
+function normalizeTyped(raw: string, withTime: boolean): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+
+  const dateMatch = trimmed.match(/^(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})\s*[일.]?/);
+  if (!dateMatch) {
+    // YYYYMMDD
+    const compact = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (!compact) return null;
+    return validateDateKey(`${compact[1]}-${compact[2]}-${compact[3]}`) ? `${compact[1]}-${compact[2]}-${compact[3]}` : null;
+  }
+
+  const y = Number(dateMatch[1]);
+  const mo = Number(dateMatch[2]);
+  const d = Number(dateMatch[3]);
+  const key = toKey(y, mo, d);
+  if (!validateDateKey(key)) return null;
+
+  if (!withTime) return key;
+
+  const rest = trimmed.slice(dateMatch[0].length).trim();
+  if (!rest) return `${key}T09:00`;
+
+  const ampm = rest.match(/(오전|오후)/);
+  const hm = rest.match(/(\d{1,2})\s*[:시]\s*(\d{1,2})/);
+  if (!hm) return `${key}T09:00`;
+  let hour = Number(hm[1]);
+  const minute = Number(hm[2]);
+  if (ampm?.[1] === "오후" && hour < 12) hour += 12;
+  if (ampm?.[1] === "오전" && hour === 12) hour = 0;
+  if (!ampm && hour <= 23) {
+    /* 24h */
+  } else if (!ampm) {
+    hour = hour % 12;
+  }
+  if (hour > 23 || minute > 59) return null;
+  return `${key}T${pad(hour)}:${pad(minute)}`;
+}
+
+function validateDateKey(key: string) {
+  const [y, m, d] = key.split("-").map(Number);
+  if (!y || !m || !d || m > 12 || d > 31) return false;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+}
+
+/** 확인·취소 버튼이 있는 날짜(·시간) 선택기. 입력칸 직접 입력 + 달력 버튼 */
 export function DatePicker({
   name,
   withTime = false,
@@ -58,6 +115,7 @@ export function DatePicker({
   defaultOpen,
   placeholder,
   className,
+  inputClassName,
   "aria-label": ariaLabel,
 }: DatePickerProps) {
   const [inner, setInner] = useState(defaultValue);
@@ -65,17 +123,27 @@ export function DatePicker({
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [draft, setDraft] = useState(() => parse(current || todayKst()));
   const [view, setView] = useState(() => (current || todayKst()).slice(0, 7));
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
   const hourColRef = useRef<HTMLDivElement>(null);
   const minuteColRef = useRef<HTMLDivElement>(null);
+  const display = focused ? text : current ? formatDisplay(current, withTime) : "";
 
   useEffect(() => {
-    const form = inputRef.current?.form;
-    if (!form) return;
-    const onReset = () => setInner(defaultValue);
-    form.addEventListener("reset", onReset);
-    return () => form.removeEventListener("reset", onReset);
-  }, [defaultValue]);
+    if (!open || !withTime) return;
+    const frame = requestAnimationFrame(() => {
+      for (const col of [hourColRef.current, minuteColRef.current]) {
+        const cell = col?.querySelector<HTMLElement>("[data-selected=true]");
+        if (col && cell) col.scrollTop = cell.offsetTop - col.offsetTop - (col.clientHeight - cell.offsetHeight) / 2;
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [open, withTime]);
+
+  const setValue = (next: string) => {
+    if (value === undefined) setInner(next);
+    onChange?.(next);
+  };
 
   const openPicker = (next: boolean) => {
     if (next) {
@@ -86,24 +154,22 @@ export function DatePicker({
     setOpen(next);
   };
 
-  useEffect(() => {
-    if (!open || !withTime) return;
-    const frame = requestAnimationFrame(() => {
-      // scrollIntoView는 화면(조상 스크롤)까지 움직이므로 목록 안에서만 스크롤한다
-      for (const col of [hourColRef.current, minuteColRef.current]) {
-        const cell = col?.querySelector<HTMLElement>("[data-selected=true]");
-        if (col && cell) col.scrollTop = cell.offsetTop - col.offsetTop - (col.clientHeight - cell.offsetHeight) / 2;
-      }
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [open, withTime]);
-
   const confirm = () => {
     if (!draft.date) return;
     const next = withTime ? `${draft.date}T${pad(draft.hour)}:${pad(draft.minute)}` : draft.date;
-    if (value === undefined) setInner(next);
-    onChange?.(next);
+    setValue(next);
+    setFocused(false);
     setOpen(false);
+  };
+
+  const commitText = () => {
+    const normalized = normalizeTyped(text, withTime);
+    if (normalized === null) {
+      setFocused(false);
+      return;
+    }
+    setValue(normalized);
+    setFocused(false);
   };
 
   const [vy, vm] = view.split("-").map(Number);
@@ -123,32 +189,55 @@ export function DatePicker({
 
   return (
     <Popover open={open} onOpenChange={openPicker}>
-      <div className={cn("relative", className)}>
-      <input
-        ref={inputRef}
-        name={name}
-        value={current}
-        required={required}
-        onChange={() => {}}
-        tabIndex={-1}
-        aria-hidden
-        className="pointer-events-none absolute bottom-0 left-1/2 size-px opacity-0"
-      />
-      <PopoverTrigger
-        id={id}
-        disabled={disabled}
-        aria-label={ariaLabel}
-        className="flex h-8 w-full min-w-0 items-center gap-2 rounded-lg border border-input bg-transparent px-2.5 text-left text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50 app:h-11 app:border-foreground/30 app:px-3 app:text-base app:focus-visible:border-ring dark:bg-input/30"
-      >
-        <span className={cn("flex-1 truncate", !current && "text-muted-foreground")}>
-          {current ? formatDisplay(current, withTime) : (placeholder ?? (withTime ? "날짜·시간 선택" : "날짜 선택"))}
-        </span>
-        <CalendarDays className="size-4 shrink-0 text-muted-foreground app:size-5" />
-      </PopoverTrigger>
+      <div className={cn("relative flex min-w-0 items-center gap-1", className)}>
+        <input type="hidden" name={name} value={current} required={required} readOnly tabIndex={-1} />
+        <input
+          id={id}
+          disabled={disabled}
+          aria-label={ariaLabel ?? (withTime ? "날짜·시간" : "날짜")}
+          placeholder={placeholder ?? (withTime ? "YYYY. MM. DD. 오전 9:00" : "YYYY. MM. DD.")}
+          value={display}
+          inputMode={withTime ? "text" : "numeric"}
+          autoComplete="off"
+          onFocus={() => {
+            if (withTime) {
+              setText(current ? current.replace("T", " ") : "");
+            } else {
+              setText(current ? formatDateDigitsTyping(current.replace(/-/g, "")) : "");
+            }
+            setFocused(true);
+          }}
+          onChange={(e) => {
+            if (withTime) {
+              setText(e.target.value);
+              return;
+            }
+            // 날짜만: 한글·기호 무시, 숫자만 + 점 자동
+            setText(formatDateDigitsTyping(e.target.value));
+          }}
+          onBlur={commitText}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          className={cn(
+            "h-8 min-w-0 flex-1 rounded-md border-2 border-foreground/35 bg-background px-2 text-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-foreground/60 focus-visible:ring-1 focus-visible:ring-ring/40 disabled:opacity-50 app:h-11 app:text-base",
+            inputClassName,
+          )}
+        />
+        <PopoverTrigger
+          type="button"
+          disabled={disabled}
+          aria-label="달력에서 선택"
+          className="inline-flex size-8 shrink-0 items-center justify-center rounded-md border-2 border-foreground/35 bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:border-foreground/60 focus-visible:ring-1 focus-visible:ring-ring/40 disabled:opacity-50 app:size-11"
+        >
+          <CalendarDays className="size-4 app:size-5" />
+        </PopoverTrigger>
       </div>
       <PopoverContent
         align="start"
-        // 앱에서는 버튼 아래로 펼치면 화면 밖으로 나가므로 화면 가운데에 띄운다
         positionerClassName="app:fixed! app:top-1/2! app:left-1/2! app:z-[60] app:[transform:translate(-50%,-50%)]!"
         className={cn("w-auto p-3 app:max-h-[calc(100dvh-2rem)] app:overflow-y-auto app:shadow-2xl app:ring-foreground/15", withTime && "max-w-[calc(100vw-1rem)]")}
       >
@@ -187,7 +276,7 @@ export function DatePicker({
                     "flex h-8 items-center justify-center rounded-md text-sm transition-colors hover:bg-muted app:h-10 app:text-base",
                     !c.inMonth && "text-muted-foreground/50",
                     c.key === today && "ring-1 ring-foreground/30 ring-inset",
-                    c.key === draft.date && "bg-primary font-semibold text-primary-foreground hover:bg-primary"
+                    c.key === draft.date && "bg-primary font-semibold text-primary-foreground hover:bg-primary",
                   )}
                 >
                   {c.day}
@@ -261,7 +350,7 @@ function TimeCell({ selected, onClick, children }: { selected: boolean; onClick:
       onClick={onClick}
       className={cn(
         "flex h-8 shrink-0 items-center justify-center rounded-md text-sm transition-colors hover:bg-muted app:h-10 app:text-base",
-        selected && "bg-primary font-semibold text-primary-foreground hover:bg-primary"
+        selected && "bg-primary font-semibold text-primary-foreground hover:bg-primary",
       )}
     >
       {children}

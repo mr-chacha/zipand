@@ -4,31 +4,31 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 안드로이드 앱 개발 중 (`feat/android-app`, 3단계 계획) — 1·2단계 + 일정 알림 완료, **다음: 3단계 AI 요약** (STT·요약 API 선택 필요: OpenAI 또는 CLOVA Speech + LLM, 키는 서버 전용 환경변수)
-  - 1단계: Capacitor 앱 셸 + 앱 전용 레이아웃(하단 탭: 홈·매물·고객·상담·계약·마이), 앱 홈(매물 등록·고객 등록·일정 추가)
-  - 2단계: 상담 녹음(통화 녹음 파일 선택·앱 녹음) 업로드, 백그라운드 녹음(포그라운드 서비스)
-  - 실기기 피드백·UX: 앱 아이콘, 앱 전용 큰 버튼·입력, 전체 화면 로딩, 삭제 컨펌, 날짜 선택기, 계약 탭, '계약관리' 명칭, 날짜별 일정 상세(`/schedule/[date]`), **일정 10분 전 알림**(웹·앱)
-  - 3단계: AI API로 녹음 STT·요약 → 고객 상담 기록 저장
-- **실기기 테스트 방법**: USB 디버깅 연결 → `CAP_SERVER_URL=http://localhost:3000 npx cap sync android` → `./gradlew assembleDebug`(JDK 21) → `adb -s <기기> install -r` → `npm run app:serve`(production, 3100) + `npm run app:usb`(`adb reverse tcp:3000 tcp:3100`). 사무실 Wi‑Fi는 기기 간 통신이 막혀 LAN IP 방식 불가. 알림 플러그인 반영 시 APK 재빌드 필요
-- **웹**: 1차 개발 마감 (2026-10-15, PR #1 `feat/mvp-web-ui` → `develop`). AI·결제 제외 전 기능 동작. 앱·일정 알림은 `feat/android-app` PR
-- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리 5단계·공유 링크, 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림
-- **환경**: 원격 Supabase 프로젝트(`ocwvlgeasfkubzasjutx`, 서울) 연결, 마이그레이션 `20261016090000`까지 원격 적용. `.env.local`은 원격을 가리킴(로컬 Docker DB 미사용, `npm run db:types`도 `--linked`). 서버 전용 환경변수 `DATA_GO_KR_SERVICE_KEY`(공공데이터포털), `OFFICE_REGISTRATION_SECRET` 필요
+- **단계**: 웹 서식 작성 개발 중 (`feat/contract-forms`) — 계약관리 = 작성된 계약서 테이블
+  - **웹**: `/contracts`에 계약서 목록·유형 필터 + 「계약서 작성」(일반/표준임대차)·저장·인쇄. 확인설명서 4쪽. 표준임대차 6쪽(별지 제24호서식 원문). `/contracts/documents`는 `/contracts`로 리다이렉트. 영수증·기타는 초안/공유 뼈대
+  - **앱**: 확정된 서식만 열람·공유 (`/f/[token]`)
+  - 안드로이드 앱 1·2단계·일정 알림은 `develop` 반영 완료 (PR #2)
+- **실기기 테스트 방법**: USB `adb reverse` + `npm run app:serve` / `app:usb` (기존과 동일)
+- **웹**: 확인설명서·표준임대차·일반계약서 조항 PDF 맞춤까지 반영. 영수증 UI·기타 서식·커뮤니티·AI·결제는 미진행
+- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리(계약서 테이블), 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림, 계약서 PDF형 양식·인쇄·전세/월세 특약·조항, 확인설명서 4쪽, 표준임대차 6쪽, 일반계약서 조항 협회 PDF 원문 맞춤
+- **환경**: 원격 Supabase. 새 마이그레이션 `20261016120000_deal_forms` — **`npm run db:push` 필요**. 타입은 로컬 `database.types.ts`에 반영됨
 
-> ⚠️ **웹 개발 재개 시 사용자에게 먼저 알릴 것 — 아직 진행하지 못한 서비스**
-> 1. **계약서** 작성 (계약 준비 단계 정보로 매매·전세·월세 계약서 생성·인쇄)
-> 2. **확인설명서** (중개대상물 확인·설명서 작성 — 매물·서류 정보 연동)
-> 3. **부동산 커뮤니티** (중개사 간 게시판·정보 공유)
+> ⚠️ **아직 진행하지 못한 서비스**
+> 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
+> 2. **부동산 커뮤니티** (중개사 간 게시판·정보 공유)
 >
-> 위 3개는 기획만 메모된 상태이며 화면·DB 모두 없음. 웹 작업을 다시 시작하면 이 목록을 사용자에게 안내하고 우선순위를 정한다.
+> 웹 작업을 이어서 할 때 커뮤니티 우선순위를 정한다.
 
 - **다음 작업** (우선순위 순)
-  0. 위 미진행 서비스(계약서·확인설명서·부동산 커뮤니티) 범위 확정 후 개발
+  0. **시작 지점**: 표준임대차·일반계약서 작성→저장→인쇄 실사용 검증 / 확인설명서 필드·레이아웃 PDF 추가 맞춤
+  0. `npm run db:push` 후 계약서·확인설명서·표준임대차 저장→인쇄 재확인
+  0. (선택) 거래 체크리스트·특약 라이브러리는 거래 상세(`/contracts/[id]`)·별도 진입으로 유지할지 정리
   0. 사용자 확인 필요: 계약 취소 시 고객 상태를 '관심 고객'으로 되돌리는 규칙 유지 여부, 개인정보처리방침의 '중개사 자격번호' 항목 삭제 여부
   0. 서류 심사 신청(`office_verification_requests`) 관리자 처리 화면 — 현재는 Supabase 대시보드에서 수동 승인
   0. 브라우저 점검: 시작하기 2단계 사무소 조회→선택→저장(등록), 미등록 상태에서 각 제한 기능(매물·고객 2건째, 문서, 계약, 구성원 초대, 브리핑 공유, 상담 기록, 고객-매물 연결) 모달 동작, 시작하기 4·5단계 잠김 표시, 설정 사무소 정보 표시
   0. 대표자 본인 확인(휴대폰 본인인증 실명 ↔ 공공데이터 대표자명 비교 또는 등록증 업로드 심사) 설계 — 공공데이터에는 대표자 이름만 있음
-  1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행). 새 날짜 선택기(`components/form/date-picker.tsx`)는 브라우저 미확인 — 모든 날짜 입력 화면에서 확인·취소, 시간 선택, 폼 초기화 동작 점검
-  2. 선택 입력 날짜(입주 희망일·계약일·잔금일·발급일)를 비우는 방법 필요 여부 결정 (현재 날짜 선택기에 확인·취소만 있음)
+  1. 원격에서 가입 → 시작하기 5단계 → 매물(사진·동영상) → 캘린더 일정 흐름 직접 점검 (원격은 이메일 인증이 켜져 있어 자동 E2E 미실행). 날짜 선택기는 직접입력+달력 버튼으로 변경됨 — 다른 화면에서도 동작 확인
+  2. 선택 입력 날짜를 비우는 방법 필요 여부 결정
   2. 모바일 레이아웃 점검 — 특히 임장 기록·사진·동영상 업로드, 캘린더 (현장 사용)
   3. 공개 브리핑에 동영상 노출 (`get_briefing` RPC·Storage 공개 정책 확장)
   3. 목록 페이지네이션(현재 전체 조회), 비밀번호 재설정(이메일) 흐름
@@ -61,6 +61,126 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-20 — 표준임대차 6쪽·목록 필터·일반계약서 조항 PDF 원문
+**작업 요약**
+- 계약서 작성에 「일반 계약서」「표준임대차 계약서」드롭다운 추가. 표준임대차는 별지 제24호서식 기준 6쪽(탭·인쇄, 사무소 정보 프리필, 공동당사자·중개사 별지 입력)
+- 표준임대차 3~6쪽 조항·개인정보 동의 등 법정 문구를 토씨 단위로 반영
+- 계약관리 테이블에 유형별 검색 필터. 일반 계약서(매매·전세·월세) 제1~9조를 협회 PDF 원문에 맞춤(매매 제9조 추가, 임대차 제2조「존속기간」등)
+
+**변경 파일**
+- `lib/standard-lease.ts`, `components/deal-forms/standard-lease-form-sheet.tsx`
+- `contract-write-dialog.tsx`, `contract-write-entry.tsx`, `contract-form-sheet.tsx`, `documents-table.tsx`, `form-fields.tsx`
+- `lib/contract-templates.ts`, `lib/deal-forms.ts`, `lib/print-contract.ts`, `app/globals.css`, `app/(app)/contracts/page.tsx`
+
+**결정 사항**
+- 표준임대차·일반계약서 법적 조항은 요약/의역 없이 원문 서식 문구를 그대로 쓴다
+- 계약서번호는 기존과 같이 `Date.now()` 뒤 8자리(`newContractNo`)
+
+**남은 TODO**
+- 표준임대차·일반계약서 저장·인쇄 실사용 검증
+- 확인설명서 필드·레이아웃을 원본 PDF에 더 맞춤
+- 영수증 등 관련 서식 UI 실사용 검증
+
+### 2026-10-19 — 확인설명서 PDF 4쪽 작성·인쇄
+**작업 요약**
+- 중개대상물 확인·설명서[I]를 PDF 기준 제1~4쪽 양식으로 재작성. 계약서 작성 모달 「계약서저장」옆 「확인설명서 작성」으로 진입
+- 1~4페이지 탭은 스크롤 밖 고정. 거래 연결 없이도 저장 가능(`deal_id` null). 계약서 소재지·면적·인적사항·금액을 확인설명서에 반영
+- 인쇄 시 확인설명서 전용 루트·다중 페이지 CSS로 1~4쪽 전부 출력(계약서와 id 충돌·1장 클리핑 수정)
+- 계약내용 금액(원/만원)·날짜 직접입력(숫자·점) 입력 개선
+
+**변경 파일**
+- `lib/disclosure-defaults.ts`, `lib/disclosure-form.ts`, `components/deal-forms/disclosure-form-sheet.tsx`, `disclosure-write-dialog.tsx`
+- `contract-write-dialog.tsx`, `contract-form-sheet.tsx`, `form-fields.tsx`, `form-document-view.tsx`, `date-picker.tsx`
+- `lib/deal-forms.ts`, `lib/actions/deal-forms.ts`, `lib/print-contract.ts`, `lib/contract-templates.ts`, `app/globals.css`, `app/(app)/contracts/page.tsx`
+
+**남은 TODO**
+- 확인설명서 필드·레이아웃을 원본 PDF에 더 맞춤
+- 영수증 등 관련 서식 UI 실사용 검증
+
+### 2026-10-19 — 개인정보 수집·이용 동의서 양식 연결
+**작업 요약**
+- 참고 PDF(`집앤/계약관리/기타 서식/개인정보수집동의서.pdf`) 기준으로 작성·인쇄 모달 추가
+- 계약관리 툴바 「개인정보수집동의서」→ 연결 거래 선택·저장·인쇄. 저장 시 `deal_forms.kind=other` + `form_template=privacy_consent`
+
+**변경 파일**
+- `lib/privacy-consent.ts`, `components/deal-forms/privacy-consent-sheet.tsx`, `privacy-consent-dialog.tsx`
+- `documents-table.tsx`, `form-fields.tsx`, `form-document-view.tsx`, `lib/deal-forms.ts`, `lib/actions/deal-forms.ts`
+
+### 2026-10-19 — 계약관리를 계약서 목록 테이블로 통합
+**작업 요약**
+- 계약관리(`/contracts`): 진행중/종료/특약 탭·「계약 시작」버튼 제거 → 작성된 계약서 `DocumentsTable` 표시
+- 툴바에 「계약서 작성」유지. `/contracts/documents`·`/documents/new`는 `/contracts`로 리다이렉트
+- 본문 full-width를 `/contracts`에 적용
+
+**변경 파일/화면**
+- `app/(app)/contracts/page.tsx`, `documents/page.tsx`, `documents/new/page.tsx`
+- `app/(app)/app-main.tsx`, `components/deal-forms/documents-table.tsx`, `contract-write-entry.tsx`
+- `lib/actions/deal-forms.ts`, `components/layout/app-header.tsx`
+
+**남은 TODO**
+- 거래 상세·체크리스트 진입 UX 정리, `db:push`·실사용 검증
+
+### 2026-10-16 — 전세·월세 특약 기본문구·일반조항(제2~9조) 정리
+**작업 요약**
+- 전세·월세 특약사항 기본 문구 추가(`DEFAULT_JEONSE/MONTHLY_SPECIAL_TERMS`), 임대인·임차인 용어로 정리
+- 월세(전세 공통) 제2조 [임대차] 문구: 인도일·기간 시작~만기(개월)
+- 제3~8조 띄어쓰기·표현 맞춤, **제9조** 확인·설명서 교부(+교부일자) 추가
+- 월세 제4조 차임 연체 기준 선택 유지
+
+**변경 파일/화면**
+- `lib/contract-templates.ts`, `components/deal-forms/contract-form-sheet.tsx`
+
+**남은 TODO**
+- 원격 `db:push`, 작성→저장→인쇄 실사용 검증
+- 확인설명서·영수증 UI
+
+### 2026-10-16 — 계약서 A4 인쇄·양식 디테일 (매매·임대차)
+**작업 요약**
+- 인쇄를 body 직속 `#contract-print-host` 복제 방식으로 바꿔 빈 1페이지·모달 클리핑 방지 (`lib/print-contract.ts`)
+- 인쇄: 입력·드롭다운 테두리/화살표·placeholder 숨김, 외곽 보더, 구분선 위치 조정, 보더 진하게
+- A4 한 페이지 높이로 본문 확장, 남는 세로 공간은 **특약사항** 공백으로 채움
+- 매도인·매수인·개업공인중개사 표 열 너비 통일(주소/사무소 소재지), 표 사이 여백 없이 이어 붙임
+- 매매/임대차 문구·조항·특약 기본값, 임대 기간·임대할 부분, 당사자 추가·주민/외국인 번호, 연결 거래 기본 선택안함
+- 인쇄 시 금액 없는 행 숨김(매매는 잔금 중심), 제1조 글자 크기=제2조
+
+**변경 파일/화면**
+- `components/deal-forms/contract-form-sheet.tsx`, `contract-write-dialog.tsx`
+- `lib/print-contract.ts`, `lib/contract-templates.ts`, `lib/deal-forms.ts`, `lib/actions/deal-forms.ts`
+- `app/globals.css`, `app/(app)/contracts/page.tsx`, `documents/page.tsx` (사무소 대표·등록번호 prefill)
+
+**결정 사항**
+- 인쇄는 clone-to-body. 브라우저 머리글/바닥글은 사용자가 끄도록 안내
+- 페이지 여백 채우기는 특약사항 flex 확장
+
+**남은 TODO**
+- 원격 `db:push`, 작성→저장→인쇄 실사용 검증
+- 확인설명서·영수증 UI를 계약서 수준으로
+- (미커밋) 주민등록번호 검증 다이얼로그 초안 파일은 연결 전이라 제외
+
+### 2026-10-16 — 계약서 PDF형 작성 모달·양식 UX
+**작업 요약**
+- 브랜치 `feat/contract-forms`: 거래 서식 DB·공유 뼈대 + **계약서 작성 모달** 완성
+- `/contracts/documents` 문서 테이블, 「계약서 작성」→ 모달에서 부동산·거래 종류 선택 즉시 양식 표시(확인 단계 제거)
+- 부동산의 표시: 지목·구조·용도 드롭다운(+직접입력), 토지/건물 한 줄 레이아웃, 입력 테두리
+- 계약내용: 원 단위 쉼표 입력, 잔금 한글 자동계산(수정 불가), 금액/원정은/기타 5:1:4 배치, 계약금 영수자 자필서명란
+- 일반조항 제2조~제8조 전문 + 추가 특약 입력, DatePicker 직접입력·달력 분리, 모달 바깥 클릭으로 닫히지 않음
+- 마이그레이션 `20261016120000_deal_forms`, 공개 `/f/[token]`, 앱은 확정본 공유만
+
+**변경 파일/화면**
+- `components/deal-forms/*`, `lib/deal-forms.ts`, `lib/contract-templates.ts`, `lib/actions/deal-forms.ts`
+- `app/(app)/contracts/documents/*`, `app/(app)/contracts/[id]/forms/*`, `app/f/[token]`
+- `components/form/date-picker.tsx`, `native-select.tsx`, `lib/money.ts`, `supabase/migrations/20261016120000_deal_forms.sql`
+
+**결정 사항**
+- 금액 UI는 원+쉼표, 저장값은 기존과 같이 만원 단위
+- 잔금은 자동계산 한글 표시만, 작성 모달은 `disablePointerDismissal`
+
+**남은 TODO**
+- 원격 `db:push`, 작성→저장→인쇄 실사용 검증
+- 확인설명서·영수증 UI를 계약서 수준으로, PDF와 더 가깝게
+- 공부서류 추출값 → 확인설명서 자동 반영
+- 공제증서 등 툴바 준비중 항목
 
 ### 2026-10-16 — 일정 알림 (웹·앱, 10분 전 / 계약·잔금 당일 9시)
 **작업 요약**

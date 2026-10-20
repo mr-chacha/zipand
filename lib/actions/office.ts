@@ -8,6 +8,8 @@ import { FormError, requiredStr, str, toErrorMessage } from "@/lib/form";
 import { findRegistryOffice, searchRegistry, type RegistryOffice } from "@/lib/office-registry";
 import type { ActionState } from "@/types";
 
+const GUARANTEE_PREFIX = "guarantee/";
+
 export type RegistrySearchState = ActionState & { items?: RegistryOffice[]; total?: number; searched?: boolean };
 
 export async function searchOfficeRegistry(_prev: RegistrySearchState | null, fd: FormData): Promise<RegistrySearchState> {
@@ -112,4 +114,51 @@ export async function registerOffice(_prev: ActionState | null, fd: FormData): P
   }
   revalidatePath("/", "layout");
   redirect(next && next.startsWith("/") && !next.startsWith("//") ? next : "/settings?tab=office");
+}
+
+/** 공제증서 파일 경로 저장 (클라이언트 업로드 후 호출, 대표만) */
+export async function saveGuaranteeCertificate(_prev: ActionState | null, fd: FormData): Promise<ActionState> {
+  try {
+    const { supabase, profile, office } = await getSession();
+    if (profile.role !== "owner") throw new FormError("공제증서 업로드는 대표만 할 수 있어요.");
+    const path = requiredStr(fd, "path", "공제증서");
+    const fileName = requiredStr(fd, "file_name", "파일명");
+    if (!path.startsWith(`${office.id}/${GUARANTEE_PREFIX}`)) {
+      throw new FormError("파일 업로드 경로가 올바르지 않아요. 다시 시도해 주세요.");
+    }
+    const prevPath = office.guarantee_certificate_path;
+    const { error } = await supabase
+      .from("offices")
+      .update({ guarantee_certificate_path: path, guarantee_certificate_name: fileName })
+      .eq("id", office.id);
+    if (error) throw error;
+    if (prevPath && prevPath !== path) {
+      await supabase.storage.from("office-docs").remove([prevPath]);
+    }
+    revalidatePath("/settings");
+    revalidatePath("/contracts");
+    return { message: "공제증서를 저장했어요." };
+  } catch (e) {
+    return { error: toErrorMessage(e) };
+  }
+}
+
+/** 공제증서 삭제 (대표만) */
+export async function removeGuaranteeCertificate(): Promise<ActionState> {
+  try {
+    const { supabase, profile, office } = await getSession();
+    if (profile.role !== "owner") throw new FormError("공제증서 삭제는 대표만 할 수 있어요.");
+    const prevPath = office.guarantee_certificate_path;
+    const { error } = await supabase
+      .from("offices")
+      .update({ guarantee_certificate_path: null, guarantee_certificate_name: null })
+      .eq("id", office.id);
+    if (error) throw error;
+    if (prevPath) await supabase.storage.from("office-docs").remove([prevPath]);
+    revalidatePath("/settings");
+    revalidatePath("/contracts");
+    return { message: "공제증서를 삭제했어요." };
+  } catch (e) {
+    return { error: toErrorMessage(e) };
+  }
 }

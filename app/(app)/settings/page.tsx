@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSession } from "@/lib/auth";
 import { PLANS } from "@/lib/constants";
 import { isPast } from "@/lib/format";
+import { signedUrls } from "@/lib/storage";
 import { cn } from "@/lib/utils";
 import { AccountForms, MemberManager, OfficeInfo } from "./settings-forms";
 
@@ -21,12 +22,18 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const isOwner = profile.role === "owner";
   const defaultTab = TABS.includes(tab as (typeof TABS)[number]) ? (tab as string) : "office";
 
-  const [{ data: members }, { data: invites }] = await Promise.all([
+  const [{ data: members }, { data: invites }, guaranteeUrls] = await Promise.all([
     supabase.from("profiles").select("id, name, email, phone, role, active, verification_status, created_at").order("created_at"),
     isOwner
       ? supabase.from("office_invites").select("id, email, role, token, expires_at, accepted_at").is("accepted_at", null).order("created_at", { ascending: false })
       : Promise.resolve({ data: [] }),
+    office.guarantee_certificate_path
+      ? signedUrls(supabase, "office-docs", [office.guarantee_certificate_path])
+      : Promise.resolve({} as Record<string, string>),
   ]);
+  const guaranteeDownloadUrl = office.guarantee_certificate_path
+    ? (guaranteeUrls[office.guarantee_certificate_path] ?? null)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -48,7 +55,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <OfficeInfo office={office} isOwner={isOwner} />
+              <OfficeInfo office={office} isOwner={isOwner} guaranteeDownloadUrl={guaranteeDownloadUrl} />
             </CardContent>
           </Card>
         </TabsContent>

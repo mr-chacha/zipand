@@ -9,6 +9,7 @@ import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
 import { FormActions } from "@/components/form/form-actions";
 import { NativeSelect } from "@/components/form/native-select";
+import { GuaranteeCertificateUpload } from "@/components/guarantee-certificate-upload";
 import { useOfficeGuard } from "@/components/office-gate";
 import { PasswordInput } from "@/components/form/password-input";
 import { SubmitButton } from "@/components/form/submit-button";
@@ -42,21 +43,41 @@ function Field({
 const toastOnSuccess = { onSuccess: (r: { message?: string }) => r.message && toast.success(r.message) };
 
 /** 사무소 정보는 공공데이터 조회·등록으로만 입력되고, 여기서는 등록된 값을 보여준다 */
-export function OfficeInfo({ office, isOwner }: { office: Office; isOwner: boolean }) {
+export function OfficeInfo({
+  office,
+  isOwner,
+  guaranteeDownloadUrl,
+}: {
+  office: Office;
+  isOwner: boolean;
+  guaranteeDownloadUrl: string | null;
+}) {
+  const certificate = (
+    <GuaranteeCertificateUpload
+      officeId={office.id}
+      fileName={office.guarantee_certificate_name}
+      downloadUrl={guaranteeDownloadUrl}
+      canEdit={isOwner}
+    />
+  );
+
   if (!office.registered_at) {
     return (
-      <div className="flex flex-col items-center gap-3 py-8 text-center">
-        <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <Building2 className="size-5" />
-        </span>
-        <p className="font-medium">등록된 사무소 정보가 없어요</p>
-        {isOwner ? (
-          <Link href="/office/register?next=%2Fsettings%3Ftab%3Doffice" className={buttonVariants()}>
-            사무소 등록하기
-          </Link>
-        ) : (
-          <p className="text-sm text-muted-foreground">사무소 대표가 사무소를 등록하면 표시돼요.</p>
-        )}
+      <div className="space-y-4">
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <Building2 className="size-5" />
+          </span>
+          <p className="font-medium">등록된 사무소 정보가 없어요</p>
+          {isOwner ? (
+            <Link href="/office/register?next=%2Fsettings%3Ftab%3Doffice" className={buttonVariants()}>
+              사무소 등록하기
+            </Link>
+          ) : (
+            <p className="text-sm text-muted-foreground">사무소 대표가 사무소를 등록하면 표시돼요.</p>
+          )}
+        </div>
+        {certificate}
       </div>
     );
   }
@@ -94,6 +115,7 @@ export function OfficeInfo({ office, isOwner }: { office: Office; isOwner: boole
           </Link>
         </div>
       )}
+      {certificate}
     </div>
   );
 }
