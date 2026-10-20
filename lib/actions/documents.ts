@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { DOC_TYPES, SIGNAL_LEVELS, type DocType } from "@/lib/constants";
 import { int, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
 import type { ActionState } from "@/types";
+import { extractDocumentFields } from "./document-extract";
 import { logPropertyEvent } from "./properties";
 
 interface NewDocument {
@@ -15,6 +16,8 @@ interface NewDocument {
   storagePath: string;
   fileSize: number;
   issuedAt: string | null;
+  /** false면 업로드만 (기본: PDF일 때 자동 추출) */
+  skipExtract?: boolean;
 }
 
 export async function createDocument(input: NewDocument): Promise<ActionState & { id?: string }> {
@@ -41,6 +44,25 @@ export async function createDocument(input: NewDocument): Promise<ActionState & 
   await logPropertyEvent(input.propertyId, `${input.docType} 업로드`);
   revalidatePath("/documents");
   revalidatePath(`/properties/${input.propertyId}`);
+
+  const isPdf = input.fileName.toLowerCase().endsWith(".pdf");
+  if (!input.skipExtract && isPdf) {
+    const extracted = await extractDocumentFields(data.id);
+    if (extracted.count && extracted.count > 0) {
+      return {
+        message: `업로드했어요. ${extracted.count}개 항목을 자동으로 채웠어요. 값을 검토해 주세요.`,
+        id: data.id,
+      };
+    }
+    // 스캔 PDF 등 — 업로드 자체는 성공
+    return {
+      message: extracted.error
+        ? "업로드했어요. 자동 추출은 못 했어요(스캔본일 수 있어요). 문서 상세에서 다시 시도하거나 직접 입력해 주세요."
+        : "업로드했어요. 핵심 항목을 정리해 주세요.",
+      id: data.id,
+    };
+  }
+
   return { message: "업로드했어요.", id: data.id };
 }
 

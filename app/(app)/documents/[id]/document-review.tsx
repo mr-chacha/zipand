@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { ComingSoonButton } from "@/components/coming-soon";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
 import { NativeSelect } from "@/components/form/native-select";
@@ -18,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
+import { extractDocumentFields } from "@/lib/actions/document-extract";
 import {
   addDocumentField,
   addDocumentSignal,
@@ -44,7 +44,8 @@ interface DocumentReviewProps {
 
 export function DocumentReview({ documentId, status, issuedAt, presets, fields, signals }: DocumentReviewProps) {
   const [pending, startTransition] = useTransition();
-  useBusy(pending);
+  const [extracting, setExtracting] = useState(false);
+  useBusy(pending || extracting);
   const reviewedCount = fields.filter((f) => f.reviewed).length;
   const done = status === "검토 완료";
 
@@ -55,17 +56,35 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
       else if (result.message) toast.success(result.message);
     });
 
+  const runExtract = () => {
+    setExtracting(true);
+    startTransition(async () => {
+      try {
+        const result = await extractDocumentFields(documentId);
+        if (result.error) toast.error(result.error);
+        else if (result.message) toast.success(result.message);
+      } finally {
+        setExtracting(false);
+      }
+    });
+  };
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>핵심 항목 정리</CardTitle>
-        <CardDescription>원문을 보며 항목과 확인할 사항을 입력하고, 원문 페이지·문구를 근거로 남겨주세요.</CardDescription>
-        <div className="pt-1">
-          <ComingSoonButton size="sm">AI 자동 추출</ComingSoonButton>
+    <Card className="flex min-h-0 flex-col xl:sticky xl:top-4 xl:max-h-[calc(100vh-5.5rem)]">
+      <CardHeader className="shrink-0 space-y-2 pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="space-y-1">
+            <CardTitle>핵심 항목 정리</CardTitle>
+            <CardDescription>
+              원문과 대조해 확인하세요. 항목이 많으면 아래 목록을 스크롤할 수 있어요.
+            </CardDescription>
+          </div>
+          <Button type="button" size="sm" variant="outline" disabled={pending || extracting || done} onClick={runExtract}>
+            <Sparkles data-icon="inline-start" />
+            {extracting ? "추출 중…" : "자동 추출"}
+          </Button>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="issued_at">발급일</Label>
             <DatePicker
@@ -77,99 +96,104 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
               }}
             />
           </div>
-          <p className="pb-2 text-xs text-muted-foreground">계약 직전에는 최신 발급본인지 다시 확인하세요.</p>
+          <p className="pb-2 text-xs text-muted-foreground">계약 직전 최신본인지 확인</p>
         </div>
-
-        <Tabs defaultValue="fields">
-          <TabsList>
+      </CardHeader>
+      <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden pt-0">
+        <Tabs defaultValue="fields" className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="shrink-0">
             <TabsTrigger value="fields">
               추출 항목 {fields.length > 0 && `(${reviewedCount}/${fields.length})`}
             </TabsTrigger>
             <TabsTrigger value="signals">확인 사항 {signals.length > 0 && `(${signals.length})`}</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="fields" className="space-y-3 pt-2">
-            {fields.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">아직 입력한 항목이 없어요.</p>
-            )}
-            {fields.map((field) => (
-              <div key={field.id} className="flex gap-3 rounded-lg border p-3">
-                <Checkbox
-                  checked={field.reviewed}
-                  disabled={pending}
-                  onCheckedChange={(v) => run(() => setFieldReviewed(field.id, documentId, Boolean(v)))}
-                  aria-label="확인 완료"
-                  className="mt-0.5"
-                />
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex flex-wrap items-baseline gap-x-2">
-                    <span className="text-xs text-muted-foreground">{field.label}</span>
-                    <span className="text-sm font-medium">{field.value}</span>
+          <TabsContent value="fields" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
+            <div className="space-y-3 pb-1">
+              {fields.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">아직 입력한 항목이 없어요.</p>
+              )}
+              {fields.map((field) => (
+                <div key={field.id} className="flex gap-3 rounded-lg border p-3">
+                  <Checkbox
+                    checked={field.reviewed}
+                    disabled={pending}
+                    onCheckedChange={(v) => run(() => setFieldReviewed(field.id, documentId, Boolean(v)))}
+                    aria-label="확인 완료"
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className="text-xs text-muted-foreground">{field.label}</span>
+                      <span className="whitespace-pre-wrap text-sm font-medium">{field.value}</span>
+                    </div>
+                    {(field.evidence_text || field.page) && (
+                      <p className="rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
+                        {field.page && <span className="mr-1 font-medium">p.{field.page}</span>}
+                        {field.evidence_text && `"${field.evidence_text}"`}
+                      </p>
+                    )}
                   </div>
-                  {(field.evidence_text || field.page) && (
-                    <p className="rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
-                      {field.page && <span className="mr-1 font-medium">p.{field.page}</span>}
-                      {field.evidence_text && `"${field.evidence_text}"`}
-                    </p>
-                  )}
-                </div>
-                <ConfirmAction
-                  appOnly
-                  action={() => deleteDocumentField(field.id, documentId)}
-                  title="추출 항목을 삭제할까요?"
-                  description="삭제하면 되돌릴 수 없어요."
-                  trigger={
-                    <Button size="icon-sm" variant="ghost" aria-label="항목 삭제" disabled={pending}>
-                      <Trash2 />
-                    </Button>
-                  }
-                />
-              </div>
-            ))}
-            <FieldForm documentId={documentId} presets={presets} />
-          </TabsContent>
-
-          <TabsContent value="signals" className="space-y-3 pt-2">
-            {signals.length === 0 && (
-              <p className="py-4 text-center text-sm text-muted-foreground">기록된 확인 사항이 없어요.</p>
-            )}
-            {signals.map((signal) => (
-              <div key={signal.id} className="space-y-1.5 rounded-lg border p-3">
-                <div className="flex items-center gap-2">
-                  <SignalBadge level={signal.level} />
-                  <p className="flex-1 text-sm font-medium">{signal.title}</p>
                   <ConfirmAction
                     appOnly
-                    action={() => deleteDocumentSignal(signal.id, documentId)}
-                    title="확인 사항을 삭제할까요?"
+                    action={() => deleteDocumentField(field.id, documentId)}
+                    title="추출 항목을 삭제할까요?"
                     description="삭제하면 되돌릴 수 없어요."
                     trigger={
-                      <Button size="icon-sm" variant="ghost" aria-label="확인 사항 삭제" disabled={pending}>
+                      <Button size="icon-sm" variant="ghost" aria-label="항목 삭제" disabled={pending}>
                         <Trash2 />
                       </Button>
                     }
                   />
                 </div>
-                {signal.description && <p className="text-sm text-muted-foreground">{signal.description}</p>}
-                {(signal.evidence_text || signal.page) && (
-                  <p className="rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
-                    {signal.page && <span className="mr-1 font-medium">p.{signal.page}</span>}
-                    {signal.evidence_text && `"${signal.evidence_text}"`}
-                  </p>
-                )}
-                {signal.next_action && <p className="text-xs">다음 행동: {signal.next_action}</p>}
-              </div>
-            ))}
-            <SignalForm documentId={documentId} />
+              ))}
+              <FieldForm documentId={documentId} presets={presets} />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="signals" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
+            <div className="space-y-3 pb-1">
+              {signals.length === 0 && (
+                <p className="py-4 text-center text-sm text-muted-foreground">기록된 확인 사항이 없어요.</p>
+              )}
+              {signals.map((signal) => (
+                <div key={signal.id} className="space-y-1.5 rounded-lg border p-3">
+                  <div className="flex items-center gap-2">
+                    <SignalBadge level={signal.level} />
+                    <p className="flex-1 text-sm font-medium">{signal.title}</p>
+                    <ConfirmAction
+                      appOnly
+                      action={() => deleteDocumentSignal(signal.id, documentId)}
+                      title="확인 사항을 삭제할까요?"
+                      description="삭제하면 되돌릴 수 없어요."
+                      trigger={
+                        <Button size="icon-sm" variant="ghost" aria-label="확인 사항 삭제" disabled={pending}>
+                          <Trash2 />
+                        </Button>
+                      }
+                    />
+                  </div>
+                  {signal.description && <p className="text-sm text-muted-foreground">{signal.description}</p>}
+                  {(signal.evidence_text || signal.page) && (
+                    <p className="rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
+                      {signal.page && <span className="mr-1 font-medium">p.{signal.page}</span>}
+                      {signal.evidence_text && `"${signal.evidence_text}"`}
+                    </p>
+                  )}
+                  {signal.next_action && <p className="text-xs">다음 행동: {signal.next_action}</p>}
+                </div>
+              ))}
+              <SignalForm documentId={documentId} />
+            </div>
           </TabsContent>
         </Tabs>
 
-        <div className="flex items-start gap-2 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">
+        <div className="flex shrink-0 items-start gap-2 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-          정리 결과는 업무 참고용이에요. 권리관계 판단이 필요한 경우 법률 전문가의 검토를 받으세요.
+          정리 결과는 업무 참고용이에요. 권리관계 판단이 필요하면 법률 전문가 검토를 받으세요.
         </div>
       </CardContent>
-      <CardFooter className="flex flex-wrap justify-between gap-2">
+      <CardFooter className="shrink-0 flex flex-wrap justify-between gap-2 border-t bg-card">
         <ConfirmAction
           action={() => deleteDocument(documentId)}
           title="문서를 삭제할까요?"

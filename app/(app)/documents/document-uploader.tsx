@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useBusy } from "@/lib/busy";
 import { createDocument } from "@/lib/actions/documents";
 import { DOC_TYPES, type DocType } from "@/lib/constants";
-import { formatFileSize } from "@/lib/format";
+import { formatFileSize, todayKst } from "@/lib/format";
 import { toErrorMessage } from "@/lib/errors";
 import { uploadToStorage } from "@/lib/upload-client";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,7 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
   const [dragging, setDragging] = useState(false);
   const [propertyId, setPropertyId] = useState(defaultPropertyId ?? properties[0]?.value ?? "");
   const [docType, setDocType] = useState<DocType>("등기사항증명서");
-  const [issuedAt, setIssuedAt] = useState("");
+  const [issuedAt, setIssuedAt] = useState(() => todayKst());
   const [pending, startTransition] = useTransition();
   useBusy(pending);
 
@@ -73,7 +73,7 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
           toast.error(result.error ?? "업로드에 실패했어요.");
           return;
         }
-        toast.success("업로드했어요. 핵심 항목을 정리해 주세요.");
+        toast.success(result.message ?? "업로드했어요.");
         router.push(`/documents/${result.id}`);
       } catch (e) {
         toast.error(toErrorMessage(e));

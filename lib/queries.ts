@@ -59,6 +59,8 @@ export interface PropertyListItem {
   title: string;
   address: string;
   region: string | null;
+  building: string | null;
+  unit: string | null;
   deal_type: string;
   property_type: string;
   status: string;
@@ -80,7 +82,7 @@ export async function getPropertyList(limit?: number): Promise<PropertyListItem[
   let query = supabase
     .from("properties")
     .select(
-      "id, title, address, region, deal_type, property_type, status, price, monthly_rent, area_m2, floor, total_floors, direction, created_at, manager:profiles!properties_manager_id_fkey(name), property_photos(storage_path, sort_order), documents(count), customer_properties(count)"
+      "id, title, address, region, building, unit, deal_type, property_type, status, price, monthly_rent, area_m2, floor, total_floors, direction, created_at, manager:profiles!properties_manager_id_fkey(name), property_photos(storage_path, sort_order), documents(count), customer_properties(count)"
     )
     .order("created_at", { ascending: false });
   if (limit) query = query.limit(limit);

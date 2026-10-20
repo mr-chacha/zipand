@@ -5,10 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Download, Printer, RotateCcw, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { ComingSoonButton } from "@/components/coming-soon";
 import { DocumentsWriteControls } from "@/components/deal-forms/contract-write-entry";
+import type { WritePropertyOption } from "@/components/deal-forms/contract-write-dialog";
 import type { WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
 import { PrivacyConsentWriteButton } from "@/components/deal-forms/privacy-consent-dialog";
+import {
+  RegistryInquiryButton,
+  type RegistryPropertyOption,
+} from "@/components/deal-forms/registry-inquiry-dialog";
 import {
   RelatedFormsWriteButton,
   type RelatedFormsOfficeDefaults,
@@ -265,12 +269,18 @@ export function DocumentsTable({
   deals,
   office,
   guaranteeCertificate,
+  properties = [],
+  writeProperties = [],
 }: {
   rows: DocumentRow[];
   deals: DealOption[];
   office: RelatedFormsOfficeDefaults;
   /** 업로드된 공제증서 — 없으면 설정으로 이동 */
   guaranteeCertificate: { url: string; fileName: string } | null;
+  /** 공부서류 발급 안내·업로드용 매물 목록 */
+  properties?: RegistryPropertyOption[];
+  /** 계약서 작성 「연결 매물」 */
+  writeProperties?: WritePropertyOption[];
 }) {
   const isApp = useIsApp();
   const router = useRouter();
@@ -488,7 +498,7 @@ export function DocumentsTable({
       </section>
 
       {!isApp && (
-        <DocumentsWriteControls deals={deals} office={office}>
+        <DocumentsWriteControls properties={writeProperties} deals={deals} office={office}>
           <RelatedFormsWriteButton office={office} />
           <Button size="sm" variant="outline" disabled={!selected.length || pending} onClick={() => setConfirmOpen(true)}>
             <Trash2 data-icon="inline-start" />
@@ -522,7 +532,7 @@ export function DocumentsTable({
             <FormDownloadLink key={f.href} href={f.href} filename={f.filename} label={f.label} />
           ))}
           <PrivacyConsentWriteButton deals={deals} />
-          <ComingSoonButton size="sm">등기열람</ComingSoonButton>
+          <RegistryInquiryButton properties={properties} />
         </DocumentsWriteControls>
       )}
 

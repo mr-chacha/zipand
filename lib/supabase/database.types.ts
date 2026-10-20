@@ -1140,6 +1140,7 @@ export type Database = {
           available_from: string | null
           available_negotiable: boolean
           baths: number | null
+          building: string | null
           caretaker_phone: string | null
           created_at: string
           created_by: string | null
@@ -1154,6 +1155,7 @@ export type Database = {
           maintenance_fee: number | null
           maintenance_items: string[]
           maintenance_status: string | null
+          main_use: string | null
           manager_id: string | null
           monthly_rent: number | null
           office_id: string
@@ -1162,9 +1164,11 @@ export type Database = {
           region: string | null
           rooms: number | null
           status: string
+          structure: string | null
           tenant_phone: string | null
           title: string
           total_floors: number | null
+          unit: string | null
           updated_at: string
         }
         Insert: {
@@ -1173,6 +1177,7 @@ export type Database = {
           available_from?: string | null
           available_negotiable?: boolean
           baths?: number | null
+          building?: string | null
           caretaker_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -1187,6 +1192,7 @@ export type Database = {
           maintenance_fee?: number | null
           maintenance_items?: string[]
           maintenance_status?: string | null
+          main_use?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
           office_id?: string
@@ -1195,9 +1201,11 @@ export type Database = {
           region?: string | null
           rooms?: number | null
           status?: string
+          structure?: string | null
           tenant_phone?: string | null
           title: string
           total_floors?: number | null
+          unit?: string | null
           updated_at?: string
         }
         Update: {
@@ -1206,6 +1214,7 @@ export type Database = {
           available_from?: string | null
           available_negotiable?: boolean
           baths?: number | null
+          building?: string | null
           caretaker_phone?: string | null
           created_at?: string
           created_by?: string | null
@@ -1220,6 +1229,7 @@ export type Database = {
           maintenance_fee?: number | null
           maintenance_items?: string[]
           maintenance_status?: string | null
+          main_use?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
           office_id?: string
@@ -1228,9 +1238,11 @@ export type Database = {
           region?: string | null
           rooms?: number | null
           status?: string
+          structure?: string | null
           tenant_phone?: string | null
           title?: string
           total_floors?: number | null
+          unit?: string | null
           updated_at?: string
         }
         Relationships: [

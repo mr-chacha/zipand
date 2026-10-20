@@ -24,7 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DEAL_TYPES, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/constants";
-import { formatDate, formatPrice, toPyeong } from "@/lib/format";
+import { formatDate, formatPrice, formatPropertyAddress, toPyeong } from "@/lib/format";
 import type { PropertyListItem } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +78,8 @@ export function PropertyList({
           (dealType === ALL || p.deal_type === dealType) &&
           (propertyType === ALL || p.property_type === propertyType) &&
           (status === ALL || p.status === status) &&
-          (query === "" || `${p.title} ${p.address} ${p.region ?? ""}`.includes(query))
+          (query === "" ||
+            `${p.title} ${p.address} ${p.region ?? ""} ${p.building ?? ""} ${p.unit ?? ""}`.includes(query))
       ),
     [properties, dealType, propertyType, status, query]
   );
@@ -170,7 +171,9 @@ export function PropertyList({
                         />
                         <div className="min-w-0">
                           <p className="max-w-64 truncate font-medium">{p.title}</p>
-                          <p className="max-w-64 truncate text-xs text-muted-foreground">{p.address}</p>
+                          <p className="max-w-64 truncate text-xs text-muted-foreground">
+                            {formatPropertyAddress(p)}
+                          </p>
                         </div>
                       </Link>
                     </TableCell>
@@ -225,7 +228,7 @@ export function PropertyList({
                   </div>
                   <div>
                     <p className="truncate font-semibold">{p.title}</p>
-                    <p className="truncate text-xs text-muted-foreground">{p.address}</p>
+                    <p className="truncate text-xs text-muted-foreground">{formatPropertyAddress(p)}</p>
                   </div>
                   <p className="text-lg font-bold text-primary">
                     <span className="mr-1.5 text-sm font-medium text-foreground">{p.deal_type}</span>
@@ -234,6 +237,8 @@ export function PropertyList({
                   <p className="text-xs text-muted-foreground">
                     {[
                       p.property_type,
+                      p.building && `${p.building}동`,
+                      p.unit && `${p.unit}호`,
                       p.area_m2 && `${p.area_m2}㎡ (${toPyeong(p.area_m2)}평)`,
                       p.floor && `${p.floor}${p.total_floors ? `/${p.total_floors}` : ""}층`,
                       p.direction,

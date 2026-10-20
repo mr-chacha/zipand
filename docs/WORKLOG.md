@@ -4,14 +4,15 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 웹 서식 작성 개발 중 (`feat/contract-forms`) — 계약관리 = 작성된 계약서 테이블
-  - **웹**: `/contracts`에 계약서 목록·유형 필터 + 「계약서 작성」(일반/표준임대차)·저장·인쇄. 확인설명서 4쪽. 표준임대차 6쪽(별지 제24호서식 원문). `/contracts/documents`는 `/contracts`로 리다이렉트. 영수증·기타는 초안/공유 뼈대
-  - **앱**: 확정된 서식만 열람·공유 (`/f/[token]`)
-  - 안드로이드 앱 1·2단계·일정 알림은 `develop` 반영 완료 (PR #2)
-- **실기기 테스트 방법**: USB `adb reverse` + `npm run app:serve` / `app:usb` (기존과 동일)
-- **웹**: 확인설명서·표준임대차·일반계약서 조항 PDF 맞춤까지 반영. 영수증 UI·기타 서식·커뮤니티·AI·결제는 미진행
-- **완료**: 인증/사무소, 매물·사진·동영상·임장, 문서, 브리핑·리스트 공유, 고객·상담, 계약관리(계약서 테이블), 설정, 대시보드 캘린더, 안드로이드 앱 1·2단계, 일정 알림, 계약서 PDF형 양식·인쇄·전세/월세 특약·조항, 확인설명서 4쪽, 표준임대차 6쪽, 일반계약서 조항 협회 PDF 원문 맞춤
-- **환경**: 원격 Supabase. 새 마이그레이션 `20261016120000_deal_forms` — **`npm run db:push` 필요**. 타입은 로컬 `database.types.ts`에 반영됨
+- **단계**: 공부서류 업로드·PDF 자동 추출 → 계약서·확인설명서 반영 (브랜치 `feat/codef-property-docs`)
+  - **매물**: 카카오 주소검색, 동·호·구조·주용도 필드
+  - **문서**: PDF 업로드 시 자동 추출(텍스트 PDF). 등기 갑구·을구, 건축물대장(허가일·면적·구조·주용도 등), 종합공부(공시지가·건폐율·용적률 등)
+  - **계약서**: 연결 매물 선택 시 주소·동호·면적·구조·주용도·대지면적 등 prefill
+  - **확인설명서**: 열 때·거래 연결 시 서류 반영, 「매물 서류에서 채우기」·「건축HUB 채우기」
+  - **문서 상세 UI**: 원문 크게 보기·다운로드·인쇄, 추출 항목 패널 스크롤
+  - **한계**: 스캔 PDF는 인식 실패 가능 → 수동 입력/건축HUB. CODEF 자동 등기 PDF는 보류
+- **다음 작업 시작 지점**: `npm run db:push`(마이그레이션 4건) 후 실제 등기·대장 PDF로 추출→계약서·확인설명서 스모크
+- **환경**: 원격 Supabase. `20261020140000`~`20261020170000` — **`npm run db:push` 필요**
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -20,7 +21,8 @@
 > 웹 작업을 이어서 할 때 커뮤니티 우선순위를 정한다.
 
 - **다음 작업** (우선순위 순)
-  0. **시작 지점**: 표준임대차·일반계약서 작성→저장→인쇄 실사용 검증 / 확인설명서 필드·레이아웃 PDF 추가 맞춤
+  0. **시작 지점**: `npm run db:push` → 매물에 등기 PDF 업로드 → 문서 상세에서 소유자·면적 입력 → 확인설명서에서 거래 연결·「매물 서류에서 채우기」확인
+  0. (보류) CODEF 등기 PDF 자동 열람 — 데모 응답 PDF 공란 이슈, 정식 API 검증 후 재개
   0. `npm run db:push` 후 계약서·확인설명서·표준임대차 저장→인쇄 재확인
   0. (선택) 거래 체크리스트·특약 라이브러리는 거래 상세(`/contracts/[id]`)·별도 진입으로 유지할지 정리
   0. 사용자 확인 필요: 계약 취소 시 고객 상태를 '관심 고객'으로 되돌리는 규칙 유지 여부, 개인정보처리방침의 '중개사 자격번호' 항목 삭제 여부
@@ -61,6 +63,118 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-21 — 공부서류 자동 추출·매물 동호·서식 연동
+**작업 요약**
+- 매물 동·호·구조·주용도 + 카카오 주소검색
+- 공부서류 PDF 업로드 시 규칙 기반 자동 추출(등기 갑구·을구, 건축물대장, 종합공부 등) → 매물·계약서·확인설명서 반영
+- 문서 상세: 원문 크게 보기·다운로드·인쇄, 추출 목록 스크롤
+- 등기·공부 발급 안내 UI, 서류 종류·MIME 마이그레이션, 건축HUB·CODEF 클라이언트(등기 자동 PDF는 보류)
+
+**변경 파일**
+- `lib/doc-extract/*`, `lib/actions/document-extract.ts`, `lib/disclosure-from-docs.ts`, `lib/kakao-postcode.ts`, `lib/codef/*`, `lib/building-hub.ts`
+- `app/(app)/documents/**`, `app/(app)/properties/**`, `app/(app)/contracts/page.tsx`
+- `components/deal-forms/*`, `supabase/migrations/2026102014*`~`20170000*`, `docs/WORKLOG.md`, `package.json`(unpdf)
+
+**남은 TODO**
+- `db:push` 후 실 PDF 스모크. CODEF 정식 API PDF·스캔본 LLM OCR은 추후
+
+### 2026-10-20 — 공부서류 PDF 자동 추출
+**작업 요약**
+- 문서 상세 「자동 추출」: 텍스트 PDF에서 전용면적·구조·소유자 등 규칙 추출 → `document_fields`·확인 사항
+- 계약서·표준임대차·확인설명서 prefill에 면적·구조·주용도 반영 (건축물대장 우선)
+- 매물 `area_m2` 비어 있으면 추출된 전용면적으로 채움. 스캔 PDF는 실패 안내
+
+**변경 파일**
+- `lib/doc-extract/*`, `lib/actions/document-extract.ts`, `app/(app)/documents/[id]/document-review.tsx`
+- `app/(app)/documents/page.tsx`, `app/(app)/contracts/page.tsx`, `lib/deal-forms.ts`, `lib/disclosure-defaults.ts`, `lib/standard-lease.ts`
+- `unpdf` 의존성, `docs/WORKLOG.md`
+
+**남은 TODO**
+- 실제 세움터·등기 PDF로 스모크. 스캔본은 추후 LLM OCR 또는 건축HUB
+
+### 2026-10-20 — 공부서류 수동 발급·확인설명서 서류 반영 (AI 제외)
+**작업 요약**
+- 「등기열람」CODEF 자동 호출 UI를 「등기·공부 발급」안내로 교체 (인터넷등기소·세움터·토지이음 + 서류함 업로드)
+- 서류 종류 확장(토지대장·지적도·토지이용계획·종합공부). 확인설명서에 매물 업로드 서류·수동 필드 매핑·「매물 서류에서 채우기」
+
+**변경 파일**
+- `components/deal-forms/registry-inquiry-dialog.tsx`, `disclosure-write-dialog.tsx`, `contract-write-dialog.tsx`
+- `lib/disclosure-from-docs.ts`, `lib/actions/disclosure-docs.ts`, `lib/disclosure-form.ts`, `lib/disclosure-defaults.ts`, `lib/constants.ts`
+- `app/(app)/contracts/page.tsx`, `app/(app)/documents/page.tsx`
+- `supabase/migrations/20261020150000_documents_doc_types.sql`, `docs/WORKLOG.md`
+
+**남은 TODO**
+- `db:push` 후 스모크. AI OCR은 추후. CODEF 자동 열람은 정식 API 검증 후
+
+### 2026-10-20 — CODEF 요청 body URL 인코딩
+**작업 요약**
+- 공식 codef-node와 같이 `encodeURIComponent(JSON.stringify(body))`로 전송 (데모 `development.codef.io` 유지)
+- ePrepayPass Base64 깨짐 → 「선불전자지급수단 비밀번호 자리수 오류」완화
+
+**변경 파일**
+- `lib/codef/registry.ts`, `docs/WORKLOG.md`
+
+### 2026-10-20 — 토지등기 컨펌·건축HUB 확인설명서 채우기
+**작업 요약**
+- 집합건물 등기 열람 전 「토지등기도 함께?」컨펌 → 이어서 realtyType=0 열람·저장
+- 건축HUB(공공데이터) 표제부·전유면적 조회 → 확인설명서 대지/전용/용도/구조/준공년도 반영
+
+**변경 파일**
+- `lib/building-hub.ts`, `lib/actions/building-hub.ts`
+- `components/deal-forms/registry-inquiry-dialog.tsx`, `disclosure-write-dialog.tsx`
+- `lib/kakao-postcode.ts`, `lib/disclosure-form.ts`, `lib/actions/codef-registry.ts`, `.env.example`
+
+**남은 TODO**
+- 24시간 재열람 컨펌 / 공식 건축물대장 PDF(CODEF) / 지적도
+
+### 2026-10-20 — 등기열람 addr_sido·응답 디코드 수정
+**작업 요약**
+- CODEF `CF-12411` 대응: `addr_sido` 전송 (카카오 `sido` → 경기도 등 정식명)
+- URL 인코딩된 CODEF 응답 본문 파싱
+
+**변경 파일**
+- `lib/codef/registry.ts`, `lib/kakao-postcode.ts`, `lib/actions/codef-registry.ts`, `registry-inquiry-dialog.tsx`
+
+### 2026-10-20 — 등기열람에 카카오 주소검색
+**작업 요약**
+- 카카오 우편번호(Postcode JS, 키 불필요)로 시군구·도로명·건물번호 자동 채움
+- `lib/kakao-postcode.ts` + 등기열람 다이얼로그 「주소 검색」버튼
+
+**변경 파일**
+- `lib/kakao-postcode.ts`, `components/deal-forms/registry-inquiry-dialog.tsx`, `docs/WORKLOG.md`
+
+### 2026-10-20 — 계약관리 「등기열람」CODEF 연동
+**작업 요약**
+- ComingSoon 제거 → `RegistryInquiryButton` / 다이얼로그
+- 서버: OAuth → 도로명 등기 열람 → 2Way 주소 선택 → PDF Base64 → Storage/`documents`(등기사항증명서)
+- RSA PKCS1로 `password`·`ePrepayPass` 암호화
+
+**변경 파일**
+- `lib/codef/{config,crypto,registry,client,index}.ts`, `lib/actions/codef-registry.ts`
+- `components/deal-forms/registry-inquiry-dialog.tsx`, `documents-table.tsx`
+- `app/(app)/contracts/page.tsx`, `.env.example`, `docs/WORKLOG.md`
+
+**결정**
+- 열람(`issueType=1`) 기본. 등기소 비회원 `CODEF_PHONE_NO`/`CODEF_PASSWORD` + 전자민원캐시 필수
+- 매물 미선택 시 다운로드만
+
+**남은 TODO**
+- `.env.local` 키 기입 후 스모크 / 건축물대장·지적도 / 주소 자동 파싱
+
+### 2026-10-20 — CODEF 공부서류 자동 발급 브랜치 시작
+**작업 요약**
+- `feat/codef-property-docs` 브랜치 생성 (`develop` 기준, PR #3 머지 이후)
+- 목표: 주소 입력만으로 등기부등본·건축물대장·지적도 등을 CODEF로 받아 Storage에 올리고 계약서에 연결
+- README PR #3 링크 보정, `.env.example`에 CODEF 서버 전용 환경변수 자리 추가
+
+**변경 파일**
+- `docs/WORKLOG.md`, `README.md`, `.env.example`, `lib/codef/`(스켈레톤)
+
+**남은 TODO**
+- CODEF OAuth·등기부등본 API 연동
+- 건축물대장·지적도 상품 확인 후 동일 파이프라인
+- 계약관리 「등기열람」ComingSoon 교체 및 확인설명서/계약서 반영
 
 ### 2026-10-20 — 표준임대차 6쪽·목록 필터·일반계약서 조항 PDF 원문
 **작업 요약**

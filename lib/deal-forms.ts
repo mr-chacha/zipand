@@ -35,6 +35,20 @@ export type DealFormPrefill = {
   propertyTitle: string;
   propertyAddress: string;
   propertyType: string;
+  building?: string | null;
+  unit?: string | null;
+  /** 전용면적(㎡) — 매물·건축물대장 추출 */
+  buildingArea?: string | null;
+  buildingStructure?: string | null;
+  buildingUse?: string | null;
+  /** 대지면적(㎡) — 종합공부·토지대장 */
+  landArea?: string | null;
+  landCategory?: string | null;
+  landPricePerM2?: string | null;
+  buildingCoverage?: string | null;
+  floorAreaRatio?: string | null;
+  archArea?: string | null;
+  totalFloorArea?: string | null;
   amount: number | null;
   monthlyRent: number | null;
   downPayment: number | null;
@@ -131,21 +145,21 @@ export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): R
         lease_months: p.dealType === "매매" ? "" : "24",
         day_count_rule: p.dealType === "매매" ? "" : "초일불산입",
         rent_arrears_periods: p.dealType === "매매" ? "" : "2기",
-        building: "",
-        unit: "",
+        building: str(p.building),
+        unit: str(p.unit),
         leased_portion: "",
         leased_portion_area: "",
         rent_pay_day: "",
         rent_pay_timing: "후불",
-        land_category: "대",
-        land_area: "",
+        land_category: str(p.landCategory) || "대",
+        land_area: str(p.landArea),
         land_right_type: "",
         land_right_ratio: "",
         land_right_ratio_den: "",
         land_right_ratio_num: "",
-        building_structure: "철근콘크리트구조",
-        building_use: p.propertyType || "아파트",
-        building_area: "",
+        building_structure: str(p.buildingStructure) || "철근콘크리트구조",
+        building_use: str(p.buildingUse) || p.propertyType || "아파트",
+        building_area: str(p.buildingArea),
         memo: "",
         completed: "",
         sender_name: "",

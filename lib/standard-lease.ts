@@ -70,11 +70,11 @@ export function buildStandardLeaseDefaults(p: DealFormPrefill): Record<string, s
     agent_phone: str(p.agentPhone),
 
     // 3. 물건
-    building: "",
-    unit: "",
-    building_area: "",
-    land_area: "",
-    housing_type: str(p.propertyType) || "아파트",
+    building: str(p.building),
+    unit: str(p.unit),
+    building_area: str(p.buildingArea),
+    land_area: str(p.landArea),
+    housing_type: str(p.buildingUse) || str(p.propertyType) || "아파트",
     rental_reg_type: "미등록",
 
     // 4. 계약조건
