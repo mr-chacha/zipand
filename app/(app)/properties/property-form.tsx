@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { AdCopyButton } from "@/components/ai/ad-copy-button";
 import { ComingSoonPanel } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
 import { FormActions } from "@/components/form/form-actions";
@@ -400,8 +401,12 @@ export function PropertyForm({
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="description">매물 설명 (고객 공개)</Label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Label htmlFor="description">매물 설명 (고객 공개)</Label>
+              <AdCopyButton />
+            </div>
             <Textarea id="description" name="description" rows={3} defaultValue={d?.description ?? ""} placeholder="예) 한강 조망, 초등학교 도보 5분" />
+            <p className="text-xs text-muted-foreground">주소·유형·가격을 바탕으로 AI 초안을 채운 뒤 수정해 저장하세요.</p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="highlights">장점 키워드 (쉼표 또는 줄바꿈으로 구분)</Label>

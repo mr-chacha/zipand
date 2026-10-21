@@ -169,8 +169,81 @@ export const DEFAULT_DEAL_CHECKLIST: { stage: DealChecklistStage; category: stri
 export const DEAL_AMOUNT_LABEL: Record<string, string> = { 매매: "매매금", 전세: "전세금", 월세: "보증금" };
 
 export const PLANS = [
-  { id: "free", name: "Free", price: 0, description: "매물 기록과 기본 브리핑", features: ["매물·고객 관리", "기본 브리핑 링크", "문서 보관 1GB"] },
-  { id: "basic", name: "Basic", price: 19000, description: "1인 중개사", features: ["Free 기능 전체", "AI 임장 정리", "AI 문서 분석", "브리핑 무제한"] },
-  { id: "pro", name: "Pro", price: 39000, description: "높은 사용량", features: ["Basic 기능 전체", "상담 요약", "특약 추천", "우선 지원"] },
-  { id: "office", name: "Office", price: 79000, description: "다중 사용자 사무소", features: ["Pro 기능 전체", "구성원 권한 관리", "공용 데이터", "감사 로그"] },
+  {
+    id: "free",
+    name: "Free",
+    price: 0,
+    description: "매물 기록과 기본 브리핑",
+    features: ["매물·고객 관리", "기본 브리핑 링크", "문서 보관 1GB"],
+    aiIncluded: "AI 미포함",
+  },
+  {
+    id: "basic",
+    name: "Basic",
+    price: 19000,
+    description: "1인 중개사",
+    features: ["Free 기능 전체", "AI 임장 정리", "AI 문서 분석", "브리핑 무제한"],
+    aiIncluded: "통화 요약 20회 · 문구·입지 50회 /월",
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    price: 39000,
+    description: "높은 사용량",
+    features: ["Basic 기능 전체", "상담 요약", "특약 추천", "우선 지원"],
+    aiIncluded: "통화 요약 60회 · 문구·입지 150회 /월",
+  },
+  {
+    id: "office",
+    name: "Office",
+    price: 79000,
+    description: "다중 사용자 사무소",
+    features: ["Pro 기능 전체", "구성원 권한 관리", "공용 데이터", "감사 로그"],
+    aiIncluded: "통화 요약 150회 · 문구·입지 400회 /월",
+  },
+] as const;
+
+export type PlanId = (typeof PLANS)[number]["id"];
+
+/** AI 엔진 (사무소당 하나 선택 — 테스트 후 확정) */
+export const AI_PROVIDERS = [
+  {
+    id: "openai",
+    name: "OpenAI GPT",
+    short: "GPT",
+    modelHint: "받아쓰기 gpt-4o-mini-transcribe · 정리 gpt-4o-mini",
+    description: "통화 받아쓰기 정확도가 안정적이고, 구조화 추출에 익숙한 쪽이에요.",
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    short: "제미나이",
+    modelHint: "Flash-Lite · 필요 시 Transcribe / Maps",
+    description: "한국어·입지(지도) 연동에 유리하고, 오디오를 한 번에 넘기기 좋아요.",
+  },
+] as const;
+
+export type AiProviderId = (typeof AI_PROVIDERS)[number]["id"];
+
+/** 과금 방식 — 구독 또는 크레딧(토큰) 충전 중 하나만 */
+export const BILLING_MODES = [
+  {
+    id: "subscription",
+    name: "월 구독",
+    description: "매달 고정 요금에 AI 사용 횟수가 포함돼요. 예측하기 쉬워요.",
+  },
+  {
+    id: "credits",
+    name: "토큰·크레딧 충전",
+    description: "쓴 만큼 차감해요. 사용량이 들쭉날쭉할 때 맞춰요.",
+  },
+] as const;
+
+export type BillingModeId = (typeof BILLING_MODES)[number]["id"];
+
+/** 크레딧 팩 (결제 연동 전 UI·단가 표시용). 1크레딧 ≈ 통화 요약 1회(5분 기준) */
+export const CREDIT_PACKS = [
+  { id: "pack_30", credits: 30, price: 9900, label: "30회 팩" },
+  { id: "pack_100", credits: 100, price: 29000, label: "100회 팩" },
+  { id: "pack_300", credits: 300, price: 79000, label: "300회 팩" },
 ] as const;

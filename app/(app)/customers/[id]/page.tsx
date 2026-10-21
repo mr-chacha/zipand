@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Phone } from "lucide-react";
-import { ComingSoonButton } from "@/components/coming-soon";
 import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { CustomerStatusBadge } from "@/components/status-badge";
@@ -186,11 +186,16 @@ export default async function CustomerDetailPage({ params }: PageProps<"/custome
           <Card>
             <CardHeader>
               <CardTitle>AI 상담 도우미</CardTitle>
-              <CardDescription>통화 녹음 요약, 고객 문자 초안 작성</CardDescription>
+              <CardDescription>
+                상담 기록에 녹음을 붙인 뒤 「AI 요약·고객 반영」을 누르세요. 설정에서 고른 GPT/제미나이를 사용해요.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <ComingSoonButton size="sm">통화 녹음 요약</ComingSoonButton>
-              <ComingSoonButton size="sm">문자 초안 작성</ComingSoonButton>
+            <CardContent className="text-sm text-muted-foreground">
+              문자 초안·추천 매물은 요약 결과 화면에서 확인할 수 있어요. AI 엔진은{" "}
+              <Link href="/settings?tab=subscription" className="text-primary hover:underline">
+                설정 → AI·요금
+              </Link>
+              에서 선택합니다.
             </CardContent>
           </Card>
 

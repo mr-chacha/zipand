@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { FileAudio, Link2, Link2Off, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
+import { FileAudio, Link2, Link2Off, ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConsultResultDialog } from "@/components/ai/consult-result-dialog";
 import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -19,6 +20,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
+import { analyzeConsultation } from "@/lib/actions/ai-assist";
 import {
   addConsultation,
   deleteConsultation,
@@ -26,6 +28,7 @@ import {
   linkCustomerProperty,
   unlinkCustomerProperty,
 } from "@/lib/actions/customers";
+import type { ConsultationDraft, PropertyMatch } from "@/lib/ai/types";
 import { formatDuration } from "@/lib/audio";
 import { CONSULT_CHANNELS } from "@/lib/constants";
 import { formatDateTime, formatPrice, isoToKstLocal } from "@/lib/format";
@@ -82,6 +85,12 @@ export function ConsultationPanel({
 }) {
   const [audio, setAudio] = useState<AttachedAudio | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
+  const [aiPending, startAi] = useTransition();
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiDraft, setAiDraft] = useState<ConsultationDraft | null>(null);
+  const [aiMatches, setAiMatches] = useState<PropertyMatch[]>([]);
+  const [aiConsultId, setAiConsultId] = useState<string | null>(null);
+  useBusy(aiPending);
   const officeGuard = useOfficeGuard("consultation", gate);
   const { state, pending: saving, onSubmit } = useFormAction(addConsultation.bind(null, customerId), {
     onSuccess: (result, form) => {
@@ -91,9 +100,31 @@ export function ConsultationPanel({
     },
   });
 
+  const runAi = (consultationId: string) => {
+    startAi(async () => {
+      const r = await analyzeConsultation(consultationId);
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      setAiDraft(r.draft);
+      setAiMatches(r.matches);
+      setAiConsultId(consultationId);
+      setAiOpen(true);
+    });
+  };
+
   return (
     <div className="space-y-4">
       {officeGuard.dialog}
+      <ConsultResultDialog
+        open={aiOpen}
+        onOpenChange={setAiOpen}
+        customerId={customerId}
+        consultationId={aiConsultId}
+        draft={aiDraft}
+        matches={aiMatches}
+      />
       <form
         onSubmit={(e) => {
           if (officeGuard.blocked) {
@@ -174,6 +205,21 @@ export function ConsultationPanel({
                   ) : (
                     <p className="text-xs text-muted-foreground">녹음 파일을 불러오지 못했어요.</p>
                   )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="mt-1"
+                    disabled={aiPending}
+                    onClick={() => runAi(c.id)}
+                  >
+                    {aiPending ? (
+                      <Loader2 className="animate-spin" data-icon="inline-start" />
+                    ) : (
+                      <Sparkles data-icon="inline-start" />
+                    )}
+                    AI 요약·고객 반영
+                  </Button>
                 </div>
               )}
             </li>

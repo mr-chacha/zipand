@@ -19,7 +19,7 @@ import type { ActionState, Customer } from "@/types";
 interface CustomerFormProps {
   action: (prev: ActionState | null, fd: FormData) => Promise<ActionState>;
   members: { id: string; name: string }[];
-  defaultValues?: Customer;
+  defaultValues?: Partial<Customer>;
   currentUserId: string;
   cancelHref: string;
 }

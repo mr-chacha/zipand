@@ -1,7 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Bot, FileSearch, MessageSquareText, Mic, PenLine, Smartphone, Sparkles } from "lucide-react";
-import { ComingSoonScreen } from "@/components/coming-soon";
+import { ComingSoonBadge, ComingSoonScreen } from "@/components/coming-soon";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getSession } from "@/lib/auth";
+import { AI_PROVIDERS, BILLING_MODES, PLANS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "AI 실무 도우미" };
 
@@ -14,17 +20,43 @@ const features = [
   { icon: Smartphone, title: "모바일 앱", description: "현장에서 사진·음성을 바로 남기고 오프라인에서도 기록해요.", manual: "모바일 웹으로 접속" },
 ];
 
-export default function AssistantPage() {
+export default async function AssistantPage() {
+  const { office } = await getSession();
+  const provider = AI_PROVIDERS.find((p) => p.id === office.ai_provider);
+  const mode = BILLING_MODES.find((m) => m.id === office.billing_mode);
+  const plan = PLANS.find((p) => p.id === office.plan_id) ?? PLANS[0];
+
   return (
     <ComingSoonScreen
       icon={Bot}
       title="AI 실무 도우미를 준비하고 있어요"
-      description="AI와 모바일 앱 기능은 서비스 준비중이에요. 출시 전까지는 각 메뉴에서 같은 작업을 직접 입력하고 검토할 수 있어요."
+      description="기능 호출은 곧 연결돼요. 먼저 설정에서 AI 엔진과 과금 방식을 골라 주세요."
       alternatives={[
+        { label: "AI·요금 설정", href: "/settings?tab=subscription" },
         { label: "매물 관리로 이동", href: "/properties" },
-        { label: "문서 관리", href: "/documents" },
       ]}
     >
+      <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+        <Badge variant={provider ? "secondary" : "outline"}>
+          <Sparkles data-icon="inline-start" />
+          {provider ? provider.name : "AI 엔진 미선택"}
+        </Badge>
+        <Badge variant={mode ? "secondary" : "outline"}>
+          {mode ? mode.name : "과금 방식 미선택"}
+        </Badge>
+        {office.billing_mode === "subscription" && <Badge variant="outline">플랜 {plan.name}</Badge>}
+        {office.billing_mode === "credits" && (
+          <Badge variant="outline">잔액 {(office.ai_credit_balance ?? 0).toLocaleString("ko-KR")} 크레딧</Badge>
+        )}
+        <ComingSoonBadge />
+      </div>
+      <p className="mb-4 text-center text-xs text-muted-foreground">
+        선택이 비어 있으면{" "}
+        <Link href="/settings?tab=subscription" className={cn(buttonVariants({ variant: "link" }), "h-auto p-0 text-xs")}>
+          설정 → AI·요금
+        </Link>
+        에서 고를 수 있어요.
+      </p>
       <div className="grid gap-3 text-left sm:grid-cols-2 lg:grid-cols-3">
         {features.map((f) => (
           <Card key={f.title} size="sm">

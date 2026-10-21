@@ -1,20 +1,30 @@
 import type { Metadata } from "next";
-import { Check } from "lucide-react";
-import { ComingSoonBadge } from "@/components/coming-soon";
 import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSession } from "@/lib/auth";
-import { PLANS } from "@/lib/constants";
+import type { AiProviderId, BillingModeId, PlanId } from "@/lib/constants";
+import { AI_PROVIDERS, BILLING_MODES, PLANS } from "@/lib/constants";
 import { isPast } from "@/lib/format";
 import { signedUrls } from "@/lib/storage";
-import { cn } from "@/lib/utils";
+import { AiBillingSettings } from "./ai-billing-settings";
 import { AccountForms, MemberManager, OfficeInfo } from "./settings-forms";
 
 export const metadata: Metadata = { title: "설정" };
 
 const TABS = ["office", "members", "account", "subscription"] as const;
+
+function asProvider(v: string | null): AiProviderId | null {
+  return AI_PROVIDERS.some((p) => p.id === v) ? (v as AiProviderId) : null;
+}
+
+function asBillingMode(v: string | null): BillingModeId | null {
+  return BILLING_MODES.some((m) => m.id === v) ? (v as BillingModeId) : null;
+}
+
+function asPlanId(v: string | null | undefined): PlanId {
+  return PLANS.some((p) => p.id === v) ? (v as PlanId) : "free";
+}
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const { tab } = await searchParams;
@@ -43,7 +53,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <TabsTrigger value="office">사무소 정보</TabsTrigger>
           <TabsTrigger value="members">구성원</TabsTrigger>
           <TabsTrigger value="account">계정</TabsTrigger>
-          <TabsTrigger value="subscription">구독·결제</TabsTrigger>
+          <TabsTrigger value="subscription">AI·요금</TabsTrigger>
         </TabsList>
 
         <TabsContent value="office" className="pt-4">
@@ -75,43 +85,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <AccountForms profile={profile} />
         </TabsContent>
 
-        <TabsContent value="subscription" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                현재 플랜: Free
-                <ComingSoonBadge />
-              </CardTitle>
-              <CardDescription>결제 서비스 준비중이에요. 출시 전까지 모든 기본 기능을 무료로 사용할 수 있어요.</CardDescription>
-            </CardHeader>
-          </Card>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {PLANS.map((plan) => (
-              <Card key={plan.id} className={cn(plan.id === "free" && "ring-2 ring-primary")}>
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    {plan.name}
-                    {plan.id === "free" && <Badge>사용 중</Badge>}
-                  </CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-2xl font-bold">
-                    {plan.price === 0 ? "무료" : `${plan.price.toLocaleString("ko-KR")}원`}
-                    {plan.price > 0 && <span className="text-sm font-normal text-muted-foreground"> /월</span>}
-                  </p>
-                  <ul className="space-y-1.5 text-sm">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-center gap-2">
-                        <Check className="size-4 text-primary" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+        <TabsContent value="subscription" className="pt-4">
+          <AiBillingSettings
+            isOwner={isOwner}
+            aiProvider={asProvider(office.ai_provider)}
+            billingMode={asBillingMode(office.billing_mode)}
+            planId={asPlanId(office.plan_id)}
+            creditBalance={office.ai_credit_balance ?? 0}
+          />
         </TabsContent>
       </Tabs>
     </div>
