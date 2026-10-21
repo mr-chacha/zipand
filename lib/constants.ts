@@ -1,7 +1,15 @@
 export const DEAL_TYPES = ["매매", "전세", "월세"] as const;
 export const PROPERTY_TYPES = ["아파트", "오피스텔", "빌라", "원룸", "상가"] as const;
 export const PROPERTY_STATUSES = ["임장 전", "광고 중", "계약 진행", "계약 완료", "보류"] as const;
-export const DOC_TYPES = ["등기사항증명서", "건축물대장", "기타"] as const;
+export const DOC_TYPES = [
+  "등기사항증명서",
+  "건축물대장",
+  "토지대장",
+  "지적도",
+  "토지이용계획확인서",
+  "부동산종합공부",
+  "기타",
+] as const;
 export const DOC_STATUSES = ["검토 필요", "검토 완료"] as const;
 export const SIGNAL_LEVELS = ["전문가 검토", "확인 필요", "참고"] as const;
 export const CUSTOMER_STATUSES = ["연락 전", "연락 완료", "진행 중", "관심 고객", "계약 완료", "중개 완료", "종료"] as const;
@@ -67,11 +75,66 @@ export const DEFAULT_VISIT_CHECKLIST = [
   "전기·조명",
 ];
 
-/** 공부서류 주요 추출 항목 프리셋 (기획서 7.4) */
+/** 공부서류 주요 추출 항목 프리셋 (기획서 7.4) — AI 없이 문서 상세에서 수동 입력 */
 export const DOC_FIELD_PRESETS: Record<DocType, string[]> = {
-  등기사항증명서: ["소유자", "소재지", "근저당권 채권최고액", "근저당권자", "압류·가압류", "전세권·임차권", "발급일"],
-  건축물대장: ["주용도", "위반건축물 여부", "전용면적", "사용승인일", "구조", "발급일"],
+  등기사항증명서: [
+    "소유자",
+    "소재지",
+    "갑구",
+    "을구",
+    "갑구 등기목적",
+    "갑구 접수",
+    "갑구 등기원인",
+    "갑구 권리자 및 기타사항",
+    "을구 등기목적",
+    "을구 접수",
+    "을구 등기원인",
+    "을구 권리자 및 기타사항",
+    "근저당권 채권최고액",
+    "근저당권자",
+    "압류·가압류",
+    "전세권·임차권",
+    "발급일",
+  ],
+  건축물대장: [
+    "주용도",
+    "위반건축물 여부",
+    "전용면적",
+    "건축면적",
+    "연면적",
+    "허가일",
+    "사용승인일",
+    "구조",
+    "발급일",
+  ],
+  토지대장: ["지목", "면적", "소유자", "발급일"],
+  지적도: ["소재지", "발급일"],
+  토지이용계획확인서: ["용도지역", "용도지구", "용도구역", "발급일"],
+  부동산종합공부: [
+    "소재지",
+    "지목",
+    "소유자",
+    "주용도",
+    "구조",
+    "대지면적",
+    "건축면적",
+    "연면적",
+    "건폐율",
+    "용적률",
+    "개별공시지가",
+    "발급일",
+  ],
   기타: ["항목"],
+};
+
+/** 서류 종류 → 확인설명서 「근거자료」 체크 필드 */
+export const DOC_TYPE_TO_DISCLOSURE_CHECK: Partial<Record<DocType, string>> = {
+  등기사항증명서: "doc_registry",
+  건축물대장: "doc_building_ledger",
+  토지대장: "doc_land_ledger",
+  지적도: "doc_cadastral",
+  토지이용계획확인서: "doc_land_use",
+  부동산종합공부: "doc_other",
 };
 
 export type DealChecklistStage = (typeof DEAL_CHECKLIST_STAGES)[number];

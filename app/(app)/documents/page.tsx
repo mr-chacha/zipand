@@ -1,53 +1,78 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FileText, ShieldCheck } from "lucide-react";
-import { ComingSoonPanel } from "@/components/coming-soon";
+import { FileSearch, ShieldCheck } from "lucide-react";
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
-import { DocStatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
-import { formatDate, formatDateTime, formatFileSize } from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
 import { getPropertyOptions } from "@/lib/queries";
 import { DocumentUploader } from "./document-uploader";
+import {
+  PropertyDocumentsTable,
+  type PropertyDocumentRow,
+  type PropertyWithDocuments,
+} from "./property-documents-table";
 
 export const metadata: Metadata = { title: "문서 관리" };
 
 export default async function DocumentsPage({ searchParams }: PageProps<"/documents">) {
-  const { property, status, q } = await searchParams;
+  const { property, q } = await searchParams;
   const keyword = typeof q === "string" ? q.trim() : "";
+  const selectedPropertyId = typeof property === "string" ? property : "";
   const { supabase, office } = await getSession();
 
-  let query = supabase
-    .from("documents")
-    .select("id, doc_type, file_name, file_size, status, issued_at, created_at, property:properties(id, title)")
-    .order("created_at", { ascending: false });
-  if (typeof status === "string" && status) query = query.eq("status", status);
-  const [{ data: allDocuments }, propertyOptions, gate] = await Promise.all([query, getPropertyOptions(), getOfficeGate()]);
-  const documents = keyword
-    ? (allDocuments ?? []).filter((d) => `${d.doc_type} ${d.file_name} ${d.property?.title ?? ""}`.includes(keyword))
-    : allDocuments;
+  const [{ data: propertyRows }, propertyOptions, gate] = await Promise.all([
+    supabase
+      .from("properties")
+      .select(
+        "id, title, address, property_type, deal_type, updated_at, documents(id, doc_type, file_name, status, issued_at, created_at)"
+      )
+      .order("updated_at", { ascending: false }),
+    getPropertyOptions(),
+    getOfficeGate(),
+  ]);
 
-  const filters = [
-    { label: "전체", value: "" },
-    { label: "검토 필요", value: "검토 필요" },
-    { label: "검토 완료", value: "검토 완료" },
-  ];
-  const currentStatus = typeof status === "string" ? status : "";
+  let properties: PropertyWithDocuments[] = (propertyRows ?? []).map((p) => {
+    const docs = Array.isArray(p.documents) ? p.documents : [];
+    return {
+      id: p.id,
+      title: p.title,
+      address: p.address,
+      property_type: p.property_type,
+      deal_type: p.deal_type,
+      documents: docs as PropertyDocumentRow[],
+    };
+  });
+
+  if (selectedPropertyId) {
+    properties = properties.filter((p) => p.id === selectedPropertyId);
+  }
+  if (keyword) {
+    properties = properties.filter((p) =>
+      `${p.title} ${p.address} ${p.documents.map((d) => `${d.doc_type} ${d.file_name}`).join(" ")}`.includes(
+        keyword
+      )
+    );
+  }
+
+  const totalDocs = properties.reduce((n, p) => n + p.documents.length, 0);
+  const selectedTitle = selectedPropertyId
+    ? (propertyRows ?? []).find((p) => p.id === selectedPropertyId)?.title
+    : null;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="문서 관리"
-        description="등기사항증명서·건축물대장을 매물에 연결해 보관하고, 핵심 항목과 확인할 사항을 원문 근거와 함께 정리해요."
+        description="등록한 매물별로 등기·건축물대장·지적도 등 보관 서류를 보고, 업로드·검토할 수 있어요. 문서 상세에서 PDF 자동 추출로 면적·구조를 채울 수 있어요."
       />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle>서류 업로드</CardTitle>
-            <CardDescription>PDF, JPG, PNG · 최대 20MB</CardDescription>
+            <CardDescription>PDF, JPG, PNG · 최대 20MB · 매물에 연결해 보관</CardDescription>
           </CardHeader>
           <CardContent>
             {gate.blocked.document ? (
@@ -56,16 +81,24 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
               <DocumentUploader
                 officeId={office.id}
                 properties={propertyOptions.map((p) => ({ value: p.id, label: p.title }))}
-                defaultPropertyId={typeof property === "string" ? property : undefined}
+                defaultPropertyId={selectedPropertyId || undefined}
               />
             )}
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
-          <ComingSoonPanel
-            title="AI 문서 분석"
-            description="OCR로 소유자·근저당권·위반건축물 등 핵심 항목을 자동 추출하고 원문 근거를 연결하는 기능은 서비스 준비중이에요. 지금은 문서 상세에서 직접 입력하고 검토할 수 있어요."
-          />
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <FileSearch className="size-4 text-primary" />
+                PDF 자동 추출
+              </CardTitle>
+              <CardDescription>
+                PDF를 올리면 전용면적·구조·소유자 등을 자동으로 읽어요. 문서 상세에서 값을 검토하면 확인설명서·계약서에 반영됩니다.
+                스캔(사진) PDF는 인식이 어려울 수 있어요 — 그때는 「자동 추출」을 다시 누르거나 직접 입력하세요.
+              </CardDescription>
+            </CardHeader>
+          </Card>
           <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
             <ShieldCheck className="mt-0.5 size-4 shrink-0" />
             업로드한 문서는 비공개 저장소에 보관되고, 같은 사무소 구성원만 열람할 수 있어요. 열람 링크는 1시간 후 만료돼요.
@@ -73,55 +106,41 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {keyword ? `'${keyword}' 검색 결과` : "보관 문서"} ({documents?.length ?? 0})
-          </CardTitle>
-          <div className="flex gap-1 pt-1">
-            {filters.map((f) => (
-              <Link
-                key={f.label}
-                href={`/documents?${new URLSearchParams({ ...(f.value && { status: f.value }), ...(keyword && { q: keyword }) })}`}
-                className={`rounded-full px-3 py-1 text-xs ${
-                  currentStatus === f.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {f.label}
-              </Link>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {(documents ?? []).length === 0 && (
-            <p className="py-10 text-center text-sm text-muted-foreground">문서가 없어요.</p>
-          )}
-          {documents?.map((doc) => (
-            <Link
-              key={doc.id}
-              href={`/documents/${doc.id}`}
-              className="flex flex-col gap-2 rounded-lg border p-3 hover:bg-muted/50 sm:flex-row sm:items-center"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted">
-                <FileText className="size-5 text-muted-foreground" />
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold">
+              매물별 보관 문서
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                매물 {properties.length} · 서류 {totalDocs}건
               </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium">{doc.doc_type}</p>
-                  <DocStatusBadge status={doc.status} />
-                </div>
-                <p className="truncate text-sm text-muted-foreground">
-                  {doc.property?.title} · {doc.file_name} · {formatFileSize(doc.file_size)}
-                </p>
-              </div>
-              <div className="text-xs text-muted-foreground sm:text-right">
-                <p>업로드 {formatDateTime(doc.created_at)}</p>
-                <p>발급일 {formatDate(doc.issued_at)}</p>
-              </div>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+            </h2>
+            {selectedTitle ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                「{selectedTitle}」만 보는 중 ·{" "}
+                <Link href="/documents" className="underline underline-offset-2">
+                  전체 매물 보기
+                </Link>
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                칸의 — 는 미등록 · 배지를 누르면 문서 검토로 이동합니다.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <PropertyDocumentsTable
+          properties={properties}
+          emptyHint={
+            selectedPropertyId
+              ? "해당 매물을 찾을 수 없어요."
+              : keyword
+                ? "검색 조건에 맞는 매물이 없어요."
+                : "등록한 매물이 없어요. 매물을 먼저 등록한 뒤 서류를 올려 주세요."
+          }
+        />
+      </div>
     </div>
   );
 }

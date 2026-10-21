@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
 import { DocStatusBadge } from "@/components/status-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
 import { DOC_FIELD_PRESETS, type DocType } from "@/lib/constants";
-import { formatDateTime, formatFileSize } from "@/lib/format";
 import { signedUrls } from "@/lib/storage";
+import { DocumentOriginal } from "./document-original";
 import { DocumentReview } from "./document-review";
 
 export const metadata: Metadata = { title: "문서 검토" };
@@ -31,71 +28,34 @@ export default async function DocumentDetailPage({ params }: PageProps<"/documen
     supabase.from("document_signals").select("*").eq("document_id", id).order("created_at"),
     signedUrls(supabase, "documents", [doc.storage_path]),
   ]);
-  const fileUrl = urls[doc.storage_path];
+  const fileUrl = urls[doc.storage_path] ?? null;
   const isPdf = doc.file_name.toLowerCase().endsWith(".pdf");
+  const property = Array.isArray(doc.property) ? doc.property[0] : doc.property;
+  const uploader = Array.isArray(doc.uploader) ? doc.uploader[0] : doc.uploader;
+  const reviewer = Array.isArray(doc.reviewer) ? doc.reviewer[0] : doc.reviewer;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={doc.doc_type}
-        description={`${doc.property?.title ?? ""} · ${doc.file_name}`}
+        description={`${property?.title ?? ""} · ${doc.file_name}`}
         backHref="/documents"
         backLabel="문서 관리"
         actions={<DocStatusBadge status={doc.status} />}
       />
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card className="overflow-hidden">
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle>원문</CardTitle>
-            {fileUrl && (
-              <a href={fileUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-primary hover:underline">
-                새 창에서 열기
-                <ExternalLink className="size-3" />
-              </a>
-            )}
-          </CardHeader>
-          <CardContent>
-            {!fileUrl ? (
-              <p className="py-20 text-center text-sm text-muted-foreground">파일을 불러오지 못했어요.</p>
-            ) : isPdf ? (
-              <iframe src={fileUrl} title={doc.file_name} className="h-[70vh] w-full rounded-lg border" />
-            ) : (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={fileUrl} alt={doc.file_name} className="w-full rounded-lg border" />
-            )}
-            <dl className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-              <div>
-                <dt>매물</dt>
-                <dd className="text-foreground">
-                  {doc.property ? (
-                    <Link href={`/properties/${doc.property.id}`} className="hover:underline">
-                      {doc.property.title}
-                    </Link>
-                  ) : (
-                    "-"
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt>파일 크기</dt>
-                <dd className="text-foreground">{formatFileSize(doc.file_size)}</dd>
-              </div>
-              <div>
-                <dt>업로드</dt>
-                <dd className="text-foreground">
-                  {formatDateTime(doc.created_at)} {doc.uploader?.name && `· ${doc.uploader.name}`}
-                </dd>
-              </div>
-              <div>
-                <dt>검토</dt>
-                <dd className="text-foreground">
-                  {doc.reviewed_at ? `${formatDateTime(doc.reviewed_at)} · ${doc.reviewer?.name ?? ""}` : "-"}
-                </dd>
-              </div>
-            </dl>
-          </CardContent>
-        </Card>
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
+        <DocumentOriginal
+          fileUrl={fileUrl}
+          fileName={doc.file_name}
+          isPdf={isPdf}
+          fileSize={doc.file_size}
+          property={property ? { id: property.id, title: property.title } : null}
+          createdAt={doc.created_at}
+          uploaderName={uploader?.name ?? null}
+          reviewedAt={doc.reviewed_at}
+          reviewerName={reviewer?.name ?? null}
+        />
 
         <DocumentReview
           documentId={id}

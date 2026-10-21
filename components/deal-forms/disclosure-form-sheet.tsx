@@ -478,7 +478,7 @@ export function DisclosureFormSheet({
               </Td>
             </tr>
             <tr>
-              <Th rowSpan={5}>건축물</Th>
+              <Th rowSpan={7}>건축물</Th>
               <Th>전용면적</Th>
               <Td>
                 <div className="flex items-center gap-1">
@@ -493,6 +493,32 @@ export function DisclosureFormSheet({
               <Th>용도</Th>
               <Td>
                 <Cell name="building_use" data={data} />
+              </Td>
+            </tr>
+            <tr>
+              <Th>건축면적</Th>
+              <Td>
+                <div className="flex items-center gap-1">
+                  <Cell name="arch_area" data={data} className="w-24" inputMode="decimal" />
+                  <span>㎡</span>
+                </div>
+              </Td>
+              <Th>연면적</Th>
+              <Td colSpan={3}>
+                <div className="flex items-center gap-1">
+                  <Cell name="total_floor_area" data={data} className="w-28" inputMode="decimal" />
+                  <span>㎡</span>
+                </div>
+              </Td>
+            </tr>
+            <tr>
+              <Th>허가일</Th>
+              <Td>
+                <Cell name="permit_date" data={data} className="w-32" placeholder="YYYY.MM.DD" />
+              </Td>
+              <Th>사용승인일</Th>
+              <Td colSpan={3}>
+                <Cell name="use_approval_date" data={data} className="w-32" placeholder="YYYY.MM.DD" />
               </Td>
             </tr>
             <tr>

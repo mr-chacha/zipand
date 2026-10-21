@@ -1,5 +1,19 @@
 const TIME_ZONE = "Asia/Seoul";
 
+/** 주소 + 동·호수 한 줄 (동/호 숫자만 있으면 접미사 붙임) */
+export function formatPropertyAddress(p: {
+  address: string;
+  building?: string | null;
+  unit?: string | null;
+}) {
+  const parts = [p.address.trim()].filter(Boolean);
+  const building = p.building?.trim();
+  const unit = p.unit?.trim();
+  if (building) parts.push(/동\s*$/.test(building) ? building : `${building}동`);
+  if (unit) parts.push(/호\s*$/.test(unit) ? unit : `${unit}호`);
+  return parts.join(" ");
+}
+
 /** 만원 단위 금액을 "3억 5,000" 형태로 표기 */
 export function formatManwon(value: number | null | undefined) {
   if (value === null || value === undefined) return "-";

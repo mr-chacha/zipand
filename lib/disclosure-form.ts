@@ -17,6 +17,7 @@ const COPY_KEYS = [
   "building_area",
   "building_structure",
   "building_use",
+  "building_year",
   "lessor_name",
   "lessor_phone",
   "lessor_address",
@@ -82,6 +83,28 @@ export function mergeContractIntoDisclosure(
     out.amount = String(Math.floor(manwon));
     out.deal_amount_won = String(Math.floor(manwon) * 10_000);
     if (!out.fee_base_won) out.fee_base_won = out.deal_amount_won;
+  }
+  return out;
+}
+
+/**
+ * 매물 서류·건축HUB 등 패치를 확인설명서에 덮어쓴다.
+ * doc_* 체크는 "0"/"1"을 유지하고, 그 외는 비어 있지 않은 값만 반영한다.
+ */
+export function mergeDisclosurePatch(
+  base: Record<string, string>,
+  patch: Record<string, string> | null | undefined
+): Record<string, string> {
+  if (!patch) return base;
+  const out = { ...base };
+  for (const [k, raw] of Object.entries(patch)) {
+    if (typeof raw !== "string") continue;
+    if (k.startsWith("doc_") && (raw === "0" || raw === "1" || raw === "")) {
+      out[k] = raw;
+      continue;
+    }
+    const v = raw.trim();
+    if (v) out[k] = v;
   }
   return out;
 }

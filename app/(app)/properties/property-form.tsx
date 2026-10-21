@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { ComingSoonPanel } from "@/components/coming-soon";
 import { FormMessage } from "@/components/form/form-message";
 import { FormActions } from "@/components/form/form-actions";
@@ -9,12 +10,13 @@ import { AreaInput, MoneyInput } from "@/components/form/number-input";
 import { NativeSelect } from "@/components/form/native-select";
 import { SubmitButton } from "@/components/form/submit-button";
 import { DatePicker } from "@/components/form/date-picker";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { DEAL_TYPES, DIRECTIONS, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/constants";
+import { pickKakaoPostcode, toPropertyAddressFields } from "@/lib/kakao-postcode";
 import { useFormAction } from "@/lib/use-form-action";
 import { removeFromStorage, uploadToStorage } from "@/lib/upload-client";
 import type { ActionState, Property } from "@/types";
@@ -130,6 +132,25 @@ export function PropertyForm({
   const [dealType, setDealType] = useState<string>(d?.deal_type ?? "전세");
   const [propertyType, setPropertyType] = useState<string>(d?.property_type ?? "아파트");
   const [availableMode, setAvailableMode] = useState(d?.available_negotiable ? "negotiable" : d?.available_from ? "date" : "");
+  const [address, setAddress] = useState(d?.address ?? "");
+  const [region, setRegion] = useState(d?.region ?? "");
+  const [addressSearching, setAddressSearching] = useState(false);
+
+  const searchAddress = async () => {
+    setAddressSearching(true);
+    try {
+      const data = await pickKakaoPostcode();
+      if (!data) return;
+      const fields = toPropertyAddressFields(data);
+      setAddress(fields.address);
+      if (fields.region) setRegion(fields.region);
+      toast.success(fields.apartment ? "주소를 선택했어요. 동·호수를 입력해 주세요." : "주소를 선택했어요.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "주소 검색에 실패했어요.");
+    } finally {
+      setAddressSearching(false);
+    }
+  };
 
   return (
     <form onSubmit={onSubmit} className="space-y-6">
@@ -161,12 +182,78 @@ export function PropertyForm({
           </div>
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="address">주소 *</Label>
-              <Input id="address" name="address" defaultValue={d?.address} placeholder="예) 서울시 마포구 월드컵북로 123" required />
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="address">주소 *</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending || addressSearching}
+                  onClick={() => void searchAddress()}
+                >
+                  {addressSearching ? "검색 중…" : "주소 검색"}
+                </Button>
+              </div>
+              <Input
+                id="address"
+                name="address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="주소 검색으로 선택하거나 직접 입력"
+                required
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="region">지역 (시·구)</Label>
-              <Input id="region" name="region" defaultValue={d?.region ?? ""} placeholder="예) 마포구" />
+              <Input
+                id="region"
+                name="region"
+                value={region}
+                onChange={(e) => setRegion(e.target.value)}
+                placeholder="예) 마포구"
+              />
+            </div>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="building">동</Label>
+              <Input
+                id="building"
+                name="building"
+                defaultValue={d?.building ?? ""}
+                placeholder="예) 109"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="unit">호수</Label>
+              <Input
+                id="unit"
+                name="unit"
+                defaultValue={d?.unit ?? ""}
+                placeholder="예) 802"
+              />
+            </div>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="structure">구조</Label>
+              <Input
+                id="structure"
+                name="structure"
+                defaultValue={d?.structure ?? ""}
+                placeholder="예) 철근콘크리트구조"
+              />
+              <p className="text-xs text-muted-foreground">해당 동 기준 · 건축물대장 업로드 시 자동 채움</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="main_use">주용도</Label>
+              <Input
+                id="main_use"
+                name="main_use"
+                defaultValue={d?.main_use ?? ""}
+                placeholder="예) 공동주택"
+              />
+              <p className="text-xs text-muted-foreground">해당 동 기준 · 건축물대장 업로드 시 자동 채움</p>
             </div>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Compass, FileText, Layers, Lock, Maximize, Mic, Phone, Presentation, Upload, Users } from "lucide-react";
+import { Building2, Compass, FileText, Layers, Lock, Maximize, Mic, Phone, Presentation, Upload, Users } from "lucide-react";
 import { GatedLink } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { DocStatusBadge } from "@/components/status-badge";
@@ -9,7 +9,15 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSession } from "@/lib/auth";
-import { formatAvailableFrom, formatDate, formatMaintenance, formatDateTime, formatPrice, toPyeong } from "@/lib/format";
+import {
+  formatAvailableFrom,
+  formatDate,
+  formatMaintenance,
+  formatDateTime,
+  formatPrice,
+  formatPropertyAddress,
+  toPyeong,
+} from "@/lib/format";
 import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
@@ -61,7 +69,16 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
   const latestVisit = visits.data?.[0];
   const linkedCustomers = (links.data ?? []).map((l) => l.customer).filter((c) => c !== null);
 
+  const dongHo =
+    formatPropertyAddress({ address: "", building: property.building, unit: property.unit }) || "-";
   const specs = [
+    { icon: Building2, label: "동·호", value: dongHo },
+    {
+      icon: Layers,
+      label: "구조·주용도",
+      value:
+        [property.structure, property.main_use].filter(Boolean).join(" · ") || "-",
+    },
     { icon: Maximize, label: "전용면적", value: property.area_m2 ? `${property.area_m2}㎡ (${toPyeong(property.area_m2)}평)` : "-" },
     { icon: Layers, label: "층", value: property.floor ? `${property.floor}층${property.total_floors ? ` / ${property.total_floors}층` : ""}` : "-" },
     { icon: Compass, label: "방향", value: property.direction ?? "-" },
@@ -72,7 +89,7 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
     <div className="space-y-6">
       <PageHeader
         title={property.title}
-        description={property.address}
+        description={formatPropertyAddress(property)}
         backHref="/properties"
         backLabel="매물 목록"
         actions={<PropertyHeaderActions propertyId={id} />}
