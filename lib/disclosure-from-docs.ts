@@ -131,9 +131,9 @@ export function mapPropertyDocsToDisclosure(
       }
       if (
         label === "갑구 등기목적" ||
-        label === "갑구 접수" ||
         label === "갑구 등기원인" ||
-        label === "갑구 권리자 및 기타사항"
+        label === "갑구 권리자 및 기타사항" ||
+        label === "갑구 접수" // 과거 추출분
       ) {
         if (!out.ownership_building) {
           out.ownership_building = appendLine(out.ownership_building, `${label.replace(/^갑구\s*/, "")}: ${value}`);
@@ -142,9 +142,9 @@ export function mapPropertyDocsToDisclosure(
       }
       if (
         label === "을구 등기목적" ||
-        label === "을구 접수" ||
         label === "을구 등기원인" ||
-        label === "을구 권리자 및 기타사항"
+        label === "을구 권리자 및 기타사항" ||
+        label === "을구 접수" // 과거 추출분
       ) {
         if (!out.rights_building) {
           out.rights_building = appendLine(out.rights_building, `${label.replace(/^을구\s*/, "")}: ${value}`);

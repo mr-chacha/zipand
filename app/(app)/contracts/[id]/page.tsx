@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ComingSoonButton } from "@/components/coming-soon";
+import { ClauseSuggestButton } from "@/components/ai/clause-suggest-button";
 import { PageHeader } from "@/components/page-header";
+import { hasAiAccess } from "@/lib/ai/access";
 import { DealStageBadge, DocStatusBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +23,8 @@ export const metadata: Metadata = { title: "거래 상세" };
 export default async function DealDetailPage({ params, searchParams }: PageProps<"/contracts/[id]">) {
   const { id } = await params;
   const { step: stepParam } = await searchParams;
-  const [{ supabase }, isApp] = await Promise.all([getSession(), isAppRequest()]);
+  const [{ supabase, office }, isApp] = await Promise.all([getSession(), isAppRequest()]);
+  const aiAvailable = hasAiAccess(office);
 
   const { data: deal } = await supabase
     .from("deals")
@@ -212,8 +214,8 @@ export default async function DealDetailPage({ params, searchParams }: PageProps
               <Link href={`/contracts/${id}/forms`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "inline-flex")}>
                 서식 {isApp ? "보기·공유" : "작성·관리"}
               </Link>
-              <div className="flex flex-wrap gap-2 pt-1">
-                <ComingSoonButton size="sm">AI 특약 추천</ComingSoonButton>
+              <div className="pt-1">
+                <ClauseSuggestButton dealId={id} aiAvailable={aiAvailable} />
               </div>
             </CardContent>
           </Card>

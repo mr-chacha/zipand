@@ -4,15 +4,13 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 공부서류 업로드·PDF 자동 추출 → 계약서·확인설명서 반영 (브랜치 `feat/codef-property-docs`)
-  - **매물**: 카카오 주소검색, 동·호·구조·주용도 필드
-  - **문서**: PDF 업로드 시 자동 추출(텍스트 PDF). 등기 갑구·을구, 건축물대장(허가일·면적·구조·주용도 등), 종합공부(공시지가·건폐율·용적률 등)
-  - **계약서**: 연결 매물 선택 시 주소·동호·면적·구조·주용도·대지면적 등 prefill
-  - **확인설명서**: 열 때·거래 연결 시 서류 반영, 「매물 서류에서 채우기」·「건축HUB 채우기」
-  - **문서 상세 UI**: 원문 크게 보기·다운로드·인쇄, 추출 항목 패널 스크롤
-  - **한계**: 스캔 PDF는 인식 실패 가능 → 수동 입력/건축HUB. CODEF 자동 등기 PDF는 보류
-- **다음 작업 시작 지점**: `npm run db:push`(마이그레이션 4건) 후 실제 등기·대장 PDF로 추출→계약서·확인설명서 스모크
-- **환경**: 원격 Supabase. `20261020140000`~`20261020170000` — **`npm run db:push` 필요**
+- **단계**: AI·매물 UX·공부서류 추출 보강 (브랜치 `feat/ai-assist`)
+  - AI ComingSoon → 실제 호출 + `hasAiAccess`(구독/크레딧) 뱃지. 임장 STT·항목 정리, 특약·브리핑·문서 AI 러너 분리
+  - 매물: 사진 옆 동영상 최대 1개, 하위 탭(상세·임장·서류·연결 고객·브리핑), 선택 탭 primary 강조
+  - 등기 자동 추출: 8항목·소재지 `[집합건물]`·등기목적/원인/권리자(칸 전체·거래가액) 파싱 개선. 문서 AI 추출 UI는 일시 비활성
+  - 문서 검토: 전체 확인·카드 클릭 토글, 뒤로가기=매물 `?tab=docs`, 서명 URL 만료 캐시 수정, 목록 업로드 버튼 제거
+- **다음 작업 시작 지점**: `feat/ai-assist` → `develop` PR 리뷰·머지 후, 등기 권리자·임장 AI·크레딧 스모크 / 결제·문서 AI UI 복구 여부 결정
+- **환경**: 원격 Supabase + AI 키. 마이그레이션 **`20261021120000` 필요**(이전과 동일)
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -36,7 +34,7 @@
   3. 목록 페이지네이션(현재 전체 조회), 비밀번호 재설정(이메일) 흐름
   4. 약관·처리방침의 사업자 정보(회사명, 보호책임자, 국외 이전 항목) 확정 후 반영
   5. 소셜 로그인(카카오·네이버·구글) — 현재 "서비스 준비중"
-  6. AI 기능(임장 STT·정리, 문서 OCR·추출, 브리핑 작성, 상담 요약, 특약 추천) 및 결제 연동
+  6. ~~AI 기능~~ → `feat/ai-assist`에서 진행 (프로바이더 Gemini/GPT 택1, 디테일 보완 병행). 결제는 별도
 
 ## 로컬 개발
 ```bash
@@ -63,6 +61,38 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-22 — AI 실사용·매물 서브내비·등기 추출·문서 UX
+**작업 요약**
+- AI: ComingSoon 해제, 접근 뱃지, 임장·특약·브리핑·문서 러너, 방문 폼 페이월 안내
+- 매물: 미디어(사진+영상1), `PropertySubnav`, 연결 고객 탭
+- 등기 파싱: 8필드, 권리자 전체(이름·주소·거래가액), 서명 URL `fresh`·JWT exp 캐시
+- 문서 검토: 전체/카드 체크, 매물 문서로 뒤로가기, 목록 업로드 버튼 제거, 버튼 `cursor-pointer`
+
+**변경 파일**
+- `lib/ai/*`, `lib/actions/ai-*`, `lib/doc-extract/parse.ts`, `lib/storage.ts`, `lib/actions/documents.ts`
+- `components/property-subnav.tsx`, `components/ai/*`, `components/ui/button.tsx`
+- `properties/**`, `documents/**`, `visit-form.tsx`, `docs/WORKLOG.md`
+
+**남은 TODO**
+- 실 PDF로 권리자·서명 URL 재확인. AI 결제·구독 한도. 문서 AI 추출 UI 복구 여부
+
+### 2026-10-21 — AI 엔진 선택 UI + 통화·광고·입지 기능
+**작업 요약**
+- 설정 AI·요금: GPT/Gemini·구독/크레딧 선택 저장
+- `lib/ai` + 서버 액션: 통화 분석, 광고 문구, 확인설명서 입지 (선택 엔진 사용)
+- 고객 등록 녹음 초안, 상담 「AI 요약·고객 반영」, 매물 AI 광고 문구, 확인설명서 AI 입지
+
+**변경 파일**
+- `lib/ai/*`, `lib/actions/ai-assist.ts`, `lib/actions/ai-billing.ts`, `lib/constants.ts`
+- `components/ai/*`, `customers/**`, `properties/property-form.tsx`, `disclosure-write-dialog.tsx`
+- `settings/*`, `.env.example`, migration `20261021120000`, `docs/WORKLOG.md`, `package.json`(openai, @google/generative-ai)
+
+**남은 TODO**
+- `db:push`·API 키·실녹음 스모크. 구독 AI 횟수 한도·실결제. 입지 Maps grounding 강화
+
+### 2026-10-21 — AI 엔진·과금 방식 선택 UI (부분)
+**작업 요약** — 위 항목에 통합
 
 ### 2026-10-21 — 공부서류 자동 추출·매물 동호·서식 연동
 **작업 요약**

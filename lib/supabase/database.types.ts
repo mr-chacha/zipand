@@ -1038,6 +1038,9 @@ export type Database = {
       offices: {
         Row: {
           address: string | null
+          ai_credit_balance: number
+          ai_provider: string | null
+          billing_mode: string | null
           business_no: string | null
           created_at: string
           guarantee_certificate_name: string | null
@@ -1045,6 +1048,7 @@ export type Database = {
           id: string
           name: string
           phone: string | null
+          plan_id: string
           registered_at: string | null
           registration_no: string | null
           registry_data: Json | null
@@ -1052,6 +1056,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          ai_credit_balance?: number
+          ai_provider?: string | null
+          billing_mode?: string | null
           business_no?: string | null
           created_at?: string
           guarantee_certificate_name?: string | null
@@ -1059,6 +1066,7 @@ export type Database = {
           id?: string
           name: string
           phone?: string | null
+          plan_id?: string
           registered_at?: string | null
           registration_no?: string | null
           registry_data?: Json | null
@@ -1066,6 +1074,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          ai_credit_balance?: number
+          ai_provider?: string | null
+          billing_mode?: string | null
           business_no?: string | null
           created_at?: string
           guarantee_certificate_name?: string | null
@@ -1073,6 +1084,7 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          plan_id?: string
           registered_at?: string | null
           registration_no?: string | null
           registry_data?: Json | null

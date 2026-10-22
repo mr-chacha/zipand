@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { useEffect, useState, useTransition } from "react";
+import { AlertTriangle, CheckCircle2, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -18,6 +18,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
 import { extractDocumentFields } from "@/lib/actions/document-extract";
+// TODO(문서 AI 추출): UI에서 당분간 비활성. 다시 켤 때 extractDocumentFieldsAi + AiAccessBadge 복구.
+// import { extractDocumentFieldsAi } from "@/lib/actions/document-extract";
 import {
   addDocumentField,
   addDocumentSignal,
@@ -26,10 +28,12 @@ import {
   deleteDocumentField,
   deleteDocumentSignal,
   reopenReview,
+  setAllFieldsReviewed,
   setFieldReviewed,
   updateDocumentIssuedAt,
 } from "@/lib/actions/documents";
 import { SIGNAL_LEVELS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { useFormAction } from "@/lib/use-form-action";
 import type { DocumentField, DocumentSignal } from "@/types";
 
@@ -42,12 +46,26 @@ interface DocumentReviewProps {
   signals: DocumentSignal[];
 }
 
-export function DocumentReview({ documentId, status, issuedAt, presets, fields, signals }: DocumentReviewProps) {
+export function DocumentReview({
+  documentId,
+  status,
+  issuedAt,
+  presets,
+  fields,
+  signals,
+}: DocumentReviewProps) {
   const [pending, startTransition] = useTransition();
+  const [, startReviewToggle] = useTransition();
   const [extracting, setExtracting] = useState(false);
+  const [localFields, setLocalFields] = useState(fields);
   useBusy(pending || extracting);
-  const reviewedCount = fields.filter((f) => f.reviewed).length;
+  const reviewedCount = localFields.filter((f) => f.reviewed).length;
+  const allReviewed = localFields.length > 0 && reviewedCount === localFields.length;
   const done = status === "검토 완료";
+
+  useEffect(() => {
+    setLocalFields(fields);
+  }, [fields]);
 
   const run = (fn: () => Promise<{ error?: string; message?: string }>) =>
     startTransition(async () => {
@@ -55,6 +73,31 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
       if (result.error) toast.error(result.error);
       else if (result.message) toast.success(result.message);
     });
+
+  const toggleReviewed = (fieldId: string, reviewed: boolean) => {
+    const prev = localFields;
+    setLocalFields((rows) => rows.map((f) => (f.id === fieldId ? { ...f, reviewed } : f)));
+    startReviewToggle(async () => {
+      const result = await setFieldReviewed(fieldId, documentId, reviewed);
+      if (result.error) {
+        setLocalFields(prev);
+        toast.error(result.error);
+      }
+    });
+  };
+
+  const toggleAllReviewed = (reviewed: boolean) => {
+    if (!localFields.length) return;
+    const prev = localFields;
+    setLocalFields((rows) => rows.map((f) => ({ ...f, reviewed })));
+    startReviewToggle(async () => {
+      const result = await setAllFieldsReviewed(documentId, reviewed);
+      if (result.error) {
+        setLocalFields(prev);
+        toast.error(result.error);
+      }
+    });
+  };
 
   const runExtract = () => {
     setExtracting(true);
@@ -76,11 +119,11 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
           <div className="space-y-1">
             <CardTitle>핵심 항목 정리</CardTitle>
             <CardDescription>
-              원문과 대조해 확인하세요. 항목이 많으면 아래 목록을 스크롤할 수 있어요.
+              체크는 「원문과 대조했다」는 표시예요. 전부 체크해야 검토 완료할 수 있어요.
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={pending || extracting || done} onClick={runExtract}>
-            <Sparkles data-icon="inline-start" />
+            {extracting ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
             {extracting ? "추출 중…" : "자동 추출"}
           </Button>
         </div>
@@ -110,16 +153,58 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
 
           <TabsContent value="fields" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
             <div className="space-y-3 pb-1">
-              {fields.length === 0 && (
+              {localFields.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">아직 입력한 항목이 없어요.</p>
               )}
-              {fields.map((field) => (
-                <div key={field.id} className="flex gap-3 rounded-lg border p-3">
+              {localFields.length > 0 && (
+                <label
+                  className={cn(
+                    "flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm",
+                    done ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40"
+                  )}
+                >
+                  <Checkbox
+                    checked={allReviewed}
+                    disabled={done}
+                    onCheckedChange={(v) => toggleAllReviewed(Boolean(v))}
+                    aria-label="추출 항목 전체 확인"
+                  />
+                  <span className="font-medium">전체 확인</span>
+                  <span className="text-xs text-muted-foreground">
+                    ({reviewedCount}/{localFields.length})
+                  </span>
+                </label>
+              )}
+              {localFields.map((field) => (
+                <div
+                  key={field.id}
+                  role="button"
+                  tabIndex={done ? -1 : 0}
+                  aria-pressed={field.reviewed}
+                  aria-label={`${field.label} 원문 대조 ${field.reviewed ? "확인됨" : "미확인"}`}
+                  onClick={() => {
+                    if (!done) toggleReviewed(field.id, !field.reviewed);
+                  }}
+                  onKeyDown={(e) => {
+                    if (done) return;
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      toggleReviewed(field.id, !field.reviewed);
+                    }
+                  }}
+                  className={cn(
+                    "flex gap-3 rounded-lg border p-3 outline-none transition-colors",
+                    done ? "cursor-default" : "cursor-pointer hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50",
+                    field.reviewed && "border-primary/30 bg-primary/5"
+                  )}
+                >
                   <Checkbox
                     checked={field.reviewed}
-                    disabled={pending}
-                    onCheckedChange={(v) => run(() => setFieldReviewed(field.id, documentId, Boolean(v)))}
-                    aria-label="확인 완료"
+                    disabled={done}
+                    tabIndex={-1}
+                    onClick={(e) => e.stopPropagation()}
+                    onCheckedChange={(v) => toggleReviewed(field.id, Boolean(v))}
+                    aria-label="원문과 대조 확인"
                     className="mt-0.5"
                   />
                   <div className="min-w-0 flex-1 space-y-1">
@@ -134,17 +219,22 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
                       </p>
                     )}
                   </div>
-                  <ConfirmAction
-                    appOnly
-                    action={() => deleteDocumentField(field.id, documentId)}
-                    title="추출 항목을 삭제할까요?"
-                    description="삭제하면 되돌릴 수 없어요."
-                    trigger={
-                      <Button size="icon-sm" variant="ghost" aria-label="항목 삭제" disabled={pending}>
-                        <Trash2 />
-                      </Button>
-                    }
-                  />
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <ConfirmAction
+                      appOnly
+                      action={() => deleteDocumentField(field.id, documentId)}
+                      title="추출 항목을 삭제할까요?"
+                      description="삭제하면 되돌릴 수 없어요."
+                      trigger={
+                        <Button size="icon-sm" variant="ghost" aria-label="항목 삭제" disabled={pending}>
+                          <Trash2 />
+                        </Button>
+                      }
+                    />
+                  </div>
                 </div>
               ))}
               <FieldForm documentId={documentId} presets={presets} />
@@ -190,7 +280,7 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
 
         <div className="flex shrink-0 items-start gap-2 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-          정리 결과는 업무 참고용이에요. 권리관계 판단이 필요하면 법률 전문가 검토를 받으세요.
+          정리 결과는 업무 참고용입니다.<br/>정리 결과를 확인후 계약서를 작성해주세요.
         </div>
       </CardContent>
       <CardFooter className="shrink-0 flex flex-wrap justify-between gap-2 border-t bg-card">
@@ -211,7 +301,15 @@ export function DocumentReview({ documentId, status, issuedAt, presets, fields, 
             다시 검토
           </Button>
         ) : (
-          <Button disabled={pending || fields.length === 0} onClick={() => run(() => completeReview(documentId))}>
+          <Button
+            disabled={pending || localFields.length === 0 || reviewedCount < localFields.length}
+            onClick={() => run(() => completeReview(documentId))}
+            title={
+              localFields.length > 0 && reviewedCount < localFields.length
+                ? `확인하지 않은 항목이 ${localFields.length - reviewedCount}개 있어요`
+                : undefined
+            }
+          >
             <CheckCircle2 data-icon="inline-start" />
             검토 완료
           </Button>

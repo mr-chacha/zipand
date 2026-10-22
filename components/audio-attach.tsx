@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { FileAudio, Loader2, Mic, RotateCcw, Square, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AUDIO_MAX_BYTES, formatDuration, normalizeAudioFile, readAudioDuration } from "@/lib/audio";
 import { toErrorMessage } from "@/lib/errors";
 import { formatFileSize } from "@/lib/format";
+import { hasNativeRecorder } from "@/lib/native-recorder";
 import type { Bucket } from "@/lib/storage";
 import { discardRecording, useAudioRecorder, type Recording } from "@/lib/use-audio-recorder";
 import { removeFromStorage, uploadToStorage } from "@/lib/upload-client";
@@ -18,8 +19,10 @@ export interface AttachedAudio {
   durationSec: number | null;
 }
 
+const noopSubscribe = () => () => {};
+
 /**
- * 녹음하기 / 녹음 파일 선택 → Storage 업로드 후 hidden input(audio_path·audio_name·audio_size·audio_duration_sec)으로 폼에 전달.
+ * 녹음하기(앱 전용) / 녹음 파일 선택(웹·앱) → Storage 업로드 후 hidden input으로 폼에 전달.
  * 앱에서는 화면이 꺼져도 녹음이 이어진다. 업로드 실패 시 녹음을 보관해 다시 시도할 수 있다.
  */
 export function AudioAttach({
@@ -31,7 +34,7 @@ export function AudioAttach({
   onChange,
   onBusyChange,
   fileLabel = "파일 업로드",
-  idleText = "버튼을 눌러 녹음을 시작하세요",
+  idleText,
 }: {
   bucket: Bucket;
   officeId: string;
@@ -46,6 +49,7 @@ export function AudioAttach({
   const [uploading, setUploading] = useState(false);
   const [failed, setFailed] = useState<Recording | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const canRecord = useSyncExternalStore(noopSubscribe, hasNativeRecorder, () => false);
 
   const setBusy = setUploading;
 
@@ -90,6 +94,9 @@ export function AudioAttach({
     onChange(null);
   };
 
+  const defaultIdle = canRecord
+    ? "버튼을 눌러 녹음을 시작하세요"
+    : "녹음 파일을 업로드 해주세요.";
   const status = recorder.recording
     ? `녹음 중… ${formatDuration(recorder.elapsedSec)}`
     : uploading
@@ -98,7 +105,7 @@ export function AudioAttach({
         ? "업로드에 실패했어요"
         : value
           ? "녹음이 첨부됐어요"
-          : idleText;
+          : (idleText ?? defaultIdle);
 
   return (
     <div className="space-y-2">
@@ -107,23 +114,27 @@ export function AudioAttach({
       <input type="hidden" name="audio_size" value={value?.size ?? ""} />
       <input type="hidden" name="audio_duration_sec" value={value?.durationSec ?? ""} />
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-muted/50 p-3">
-        <Button
-          type="button"
-          size="icon-lg"
-          variant={recorder.recording ? "destructive" : "default"}
-          className="size-12 shrink-0 rounded-full"
-          onClick={recorder.recording ? recorder.stop : recorder.start}
-          disabled={uploading}
-          aria-label={recorder.recording ? "녹음 중지" : "녹음 시작"}
-        >
-          {recorder.recording ? <Square className="size-5" /> : <Mic className="size-5" />}
-        </Button>
+        {canRecord ? (
+          <Button
+            type="button"
+            size="icon-lg"
+            variant={recorder.recording ? "destructive" : "default"}
+            className="size-12 shrink-0 rounded-full"
+            onClick={recorder.recording ? recorder.stop : recorder.start}
+            disabled={uploading}
+            aria-label={recorder.recording ? "녹음 중지" : "녹음 시작"}
+          >
+            {recorder.recording ? <Square className="size-5" /> : <Mic className="size-5" />}
+          </Button>
+        ) : (
+          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground">
+            <FileAudio className="size-5" />
+          </span>
+        )}
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className="text-sm font-medium">{status}</p>
           {recorder.recording && (
-            <p className="text-xs text-muted-foreground">
-              {recorder.native ? "화면을 꺼도 녹음이 계속돼요" : "녹음이 끝날 때까지 이 화면을 켜 두세요"}
-            </p>
+            <p className="text-xs text-muted-foreground">화면을 꺼도 녹음이 계속돼요</p>
           )}
           {value && !recorder.recording && (
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">

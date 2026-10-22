@@ -3,10 +3,12 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, Circle, Trash2 } from "lucide-react";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { PageHeader } from "@/components/page-header";
+import { PropertySubnav } from "@/components/property-subnav";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { deleteVisit } from "@/lib/actions/visits";
+import { hasAiAccess } from "@/lib/ai/access";
 import { getSession } from "@/lib/auth";
 import { formatDateTime } from "@/lib/format";
 import { signedUrls } from "@/lib/storage";
@@ -39,13 +41,14 @@ export default async function VisitPage({ params }: PageProps<"/properties/[id]/
       <PageHeader
         title="스마트 임장장"
         description={`${property.title} · ${property.address}`}
-        backHref={`/properties/${id}`}
-        backLabel="매물 상세"
+        backHref="/properties"
+        backLabel="매물 목록"
       />
+      <PropertySubnav propertyId={id} active="visit" />
 
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="lg:col-span-3">
-          <VisitForm officeId={office.id} propertyId={id} />
+          <VisitForm officeId={office.id} propertyId={id} aiAvailable={hasAiAccess(office)} />
         </div>
 
         <div className="space-y-4 lg:col-span-2">

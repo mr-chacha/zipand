@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, Compass, FileText, Layers, Lock, Maximize, Mic, Phone, Presentation, Upload, Users } from "lucide-react";
-import { GatedLink } from "@/components/office-gate";
+import { Building2, Compass, FileText, Layers, Lock, Maximize, Phone, Users } from "lucide-react";
+import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
+import { PropertySubnav } from "@/components/property-subnav";
 import { DocStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DocumentUploader } from "@/app/(app)/documents/document-uploader";
 import { getSession } from "@/lib/auth";
 import {
   formatAvailableFrom,
   formatDate,
   formatMaintenance,
-  formatDateTime,
   formatPrice,
   formatPropertyAddress,
   toPyeong,
@@ -21,9 +21,7 @@ import {
 import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
-import type { VisitField } from "@/types";
 import { PhotoManager } from "./photo-manager";
-import { VideoManager } from "./video-manager";
 import { LinkedCustomers, PropertyHeaderActions, PropertyStatusSelect } from "./property-actions";
 
 export async function generateMetadata({ params }: PageProps<"/properties/[id]">) {
@@ -33,8 +31,12 @@ export async function generateMetadata({ params }: PageProps<"/properties/[id]">
   return { title: data?.title ?? "매물 상세" };
 }
 
-export default async function PropertyDetailPage({ params }: PageProps<"/properties/[id]">) {
+export default async function PropertyDetailPage({ params, searchParams }: PageProps<"/properties/[id]">) {
   const { id } = await params;
+  const { tab } = await searchParams;
+  const docsMode = tab === "docs";
+  const customersMode = tab === "customers";
+  const subnavActive = docsMode ? "docs" : customersMode ? "customers" : "detail";
   const { supabase, office } = await getSession();
 
   const { data: property } = await supabase
@@ -44,7 +46,7 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
     .maybeSingle();
   if (!property) notFound();
 
-  const [photos, videos, visits, docs, links, events, customerOptions, gate] = await Promise.all([
+  const [photos, videos, docs, links, customerOptions, gate] = await Promise.all([
     supabase.from("property_photos").select("id, storage_path").eq("property_id", id).order("sort_order").order("created_at"),
     supabase
       .from("property_videos")
@@ -52,10 +54,8 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
       .eq("property_id", id)
       .order("sort_order")
       .order("created_at"),
-    supabase.from("property_visits").select("id, visited_at, fields, memo").eq("property_id", id).order("visited_at", { ascending: false }).limit(5),
     supabase.from("documents").select("id, doc_type, file_name, status, created_at").eq("property_id", id).order("created_at", { ascending: false }),
     supabase.from("customer_properties").select("customer:customers(id, name, status, phone)").eq("property_id", id),
-    supabase.from("property_events").select("id, message, created_at, actor:profiles(name)").eq("property_id", id).order("created_at", { ascending: false }).limit(30),
     getCustomerOptions(),
     getOfficeGate(),
   ]);
@@ -66,7 +66,6 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
     signedUrls(supabase, "property-photos", photoRows.map((p) => p.storage_path)),
     signedUrls(supabase, "property-videos", videoRows.map((v) => v.storage_path)),
   ]);
-  const latestVisit = visits.data?.[0];
   const linkedCustomers = (links.data ?? []).map((l) => l.customer).filter((c) => c !== null);
 
   const dongHo =
@@ -95,281 +94,207 @@ export default async function PropertyDetailPage({ params }: PageProps<"/propert
         actions={<PropertyHeaderActions propertyId={id} />}
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Link href={`/properties/${id}/visit`} className={buttonVariants({ variant: "outline" })}>
-          <Mic data-icon="inline-start" />
-          임장 기록
-        </Link>
-        <GatedLink
-          href={`/documents?property=${id}`}
-          kind="document"
-          blocked={gate.blocked.document}
-          isOwner={gate.isOwner}
-          className={buttonVariants({ variant: "outline" })}
-        >
-          <Upload data-icon="inline-start" />
-          서류 업로드
-        </GatedLink>
-        <GatedLink
-          href={`/properties/${id}/briefing`}
-          kind="briefing"
-          blocked={gate.blocked.briefing}
-          isOwner={gate.isOwner}
-          className={buttonVariants()}
-        >
-          <Presentation data-icon="inline-start" />
-          고객 브리핑
-        </GatedLink>
-      </div>
+      <PropertySubnav propertyId={id} active={subnavActive} />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <PhotoManager
-            officeId={office.id}
-            propertyId={id}
-            propertyType={property.property_type}
-            photos={photoRows.map((p) => ({ id: p.id, url: urls[p.storage_path] ?? null }))}
-          />
-          <VideoManager
-            officeId={office.id}
-            propertyId={id}
-            videos={videoRows.map((v) => ({
-              id: v.id,
-              url: videoUrls[v.storage_path] ?? null,
-              name: v.file_name,
-              size: v.size_bytes,
-            }))}
-          />
-
-          <Tabs defaultValue="info">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="info">기본 정보</TabsTrigger>
-              <TabsTrigger value="visit">임장 기록 ({visits.data?.length ?? 0})</TabsTrigger>
-              <TabsTrigger value="docs">서류 ({docs.data?.length ?? 0})</TabsTrigger>
-              <TabsTrigger value="customers">연결 고객 ({linkedCustomers.length})</TabsTrigger>
-              <TabsTrigger value="history">변경 이력</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="info" className="mt-4">
-              <Card>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                    {specs.map((spec) => (
-                      <div key={spec.label} className="space-y-1">
-                        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <spec.icon className="size-3.5" />
-                          {spec.label}
-                        </p>
-                        <p className="text-sm font-medium">{spec.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">매물 설명</p>
-                    <p className="text-sm whitespace-pre-wrap text-muted-foreground">
-                      {property.description || "등록된 설명이 없어요."}
-                    </p>
-                  </div>
-                  {property.highlights.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                      {property.highlights.map((h) => (
-                        <Badge key={h} variant="secondary">
-                          {h}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="visit" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>최근 임장 기록</CardTitle>
-                  {latestVisit && <CardDescription>{formatDateTime(latestVisit.visited_at)}</CardDescription>}
-                  <CardAction>
-                    <Link href={`/properties/${id}/visit`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-                      {latestVisit ? "임장장 열기" : "임장 기록하기"}
-                    </Link>
-                  </CardAction>
-                </CardHeader>
-                <CardContent>
-                  {latestVisit ? (
-                    <dl className="divide-y">
-                      {(latestVisit.fields as unknown as VisitField[]).map((f) => (
-                        <div key={f.label} className="flex items-center gap-3 py-2.5 text-sm">
-                          <dt className="w-24 shrink-0 text-muted-foreground">{f.label}</dt>
-                          <dd className="flex-1">
-                            {f.value}
-                            {f.note && <span className="ml-2 text-xs text-warning">({f.note})</span>}
-                          </dd>
-                        </div>
-                      ))}
-                      {latestVisit.memo && <p className="pt-3 text-sm whitespace-pre-wrap text-muted-foreground">{latestVisit.memo}</p>}
-                    </dl>
-                  ) : (
-                    <p className="py-8 text-center text-sm text-muted-foreground">아직 임장 기록이 없어요.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="docs" className="mt-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>공부서류</CardTitle>
-                  <CardAction>
-                    <GatedLink
-                      href={`/documents?property=${id}`}
-                      kind="document"
-                      blocked={gate.blocked.document}
-                      isOwner={gate.isOwner}
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                    >
-                      <Upload data-icon="inline-start" />
-                      업로드
-                    </GatedLink>
-                  </CardAction>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {(docs.data ?? []).length === 0 && (
-                    <p className="py-8 text-center text-sm text-muted-foreground">등록된 서류가 없어요.</p>
-                  )}
-                  {docs.data?.map((doc) => (
-                    <Link
-                      key={doc.id}
-                      href={`/documents/${doc.id}`}
-                      className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50"
-                    >
-                      <FileText className="size-5 text-muted-foreground" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{doc.doc_type}</p>
-                        <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
-                      </div>
-                      <DocStatusBadge status={doc.status} />
-                    </Link>
-                  ))}
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="customers" className="mt-4">
-              <Card>
-                <CardContent>
-                  <LinkedCustomers
-                    propertyId={id}
-                    linked={linkedCustomers}
-                    options={customerOptions}
-                    gate={{ blocked: gate.blocked.link, isOwner: gate.isOwner }}
-                  />
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="history" className="mt-4">
-              <Card>
-                <CardContent>
-                  {(events.data ?? []).length === 0 ? (
-                    <p className="py-6 text-center text-sm text-muted-foreground">변경 이력이 없어요.</p>
-                  ) : (
-                    <ol className="relative ml-1 space-y-4 border-l pl-5">
-                      {events.data?.map((e) => (
-                        <li key={e.id} className="relative">
-                          <span className="absolute top-1.5 -left-[25px] size-2 rounded-full bg-primary" />
-                          <p className="text-sm">{e.message}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDateTime(e.created_at)} · {e.actor?.name ?? "알 수 없음"}
-                          </p>
-                        </li>
-                      ))}
-                    </ol>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="space-y-6">
+      {docsMode ? (
+        <div className="mx-auto w-full max-w-3xl space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">
-                  {property.property_type} · {property.deal_type}
-                </span>
-                <PropertyStatusSelect propertyId={id} status={property.status} />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-3xl font-bold text-primary">{formatPrice(property)}</p>
-              <dl className="space-y-2 text-sm">
-                {[
-                  ["관리비", formatMaintenance(property) ?? "-"],
-                  ["방 / 욕실", `${property.rooms ?? "-"} / ${property.baths ?? "-"}`],
-                  ["입주 가능일", formatAvailableFrom(property)],
-                  ["담당자", property.manager?.name ?? "-"],
-                  ["지역", property.region ?? "-"],
-                  ["등록일", formatDate(property.created_at)],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="text-right">{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            </CardContent>
-          </Card>
-
-          <Card className="border-dashed">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-1.5 text-sm">
-                <Lock className="size-4" />
-                관계자 연락처
-              </CardTitle>
-              <CardDescription>고객 브리핑에 노출되지 않아요</CardDescription>
+              <CardTitle>서류 업로드</CardTitle>
+              <CardDescription>PDF, JPG, PNG · 최대 20MB · 이 매물에 바로 연결돼요</CardDescription>
             </CardHeader>
             <CardContent>
-              <dl className="space-y-2.5 text-sm">
-                {(
-                  [
-                    ["임대인", property.landlord_phone],
-                    ["관리인", property.caretaker_phone],
-                    ["세입자", property.tenant_phone],
-                  ] as const
-                ).map(([label, phone]) => (
-                  <div key={label} className="flex items-center justify-between gap-4">
-                    <dt className="shrink-0 text-muted-foreground">{label}</dt>
-                    <dd className="min-w-0 text-right">
-                      {phone ? (
-                        <a href={`tel:${phone}`} className="inline-flex items-center gap-1 text-primary">
-                          <Phone className="size-3.5" />
-                          {phone}
-                        </a>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
+              {gate.blocked.document ? (
+                <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
+              ) : (
+                <DocumentUploader
+                  officeId={office.id}
+                  properties={[{ value: id, label: property.title }]}
+                  defaultPropertyId={id}
+                  lockProperty
+                  goToDetail={false}
+                />
+              )}
             </CardContent>
           </Card>
-
-          <Card className="border-dashed">
+          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-1.5 text-sm">
-                <Lock className="size-4" />
-                내부 메모
-              </CardTitle>
-              <CardDescription>고객 브리핑에 노출되지 않아요</CardDescription>
+              <CardTitle>등록된 공부서류 ({docs.data?.length ?? 0})</CardTitle>
+              <CardAction>
+                <Link href={`/documents?property=${id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                  문서 관리에서 보기
+                </Link>
+              </CardAction>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{property.internal_memo || "메모가 없어요."}</p>
+            <CardContent className="space-y-2">
+              {(docs.data ?? []).length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">등록된 서류가 없어요.</p>
+              )}
+              {docs.data?.map((doc) => (
+                <Link
+                  key={doc.id}
+                  href={`/documents/${doc.id}?return=${encodeURIComponent(`/properties/${id}?tab=docs`)}`}
+                  className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50"
+                >
+                  <FileText className="size-5 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{doc.doc_type}</p>
+                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
+                  </div>
+                  <DocStatusBadge status={doc.status} />
+                </Link>
+              ))}
             </CardContent>
           </Card>
         </div>
-      </div>
+      ) : customersMode ? (
+        <div className="mx-auto w-full max-w-3xl">
+          <Card>
+            <CardHeader>
+              <CardTitle>연결 고객 ({linkedCustomers.length})</CardTitle>
+              <CardDescription>이 매물을 소개·관리하는 고객을 연결해요</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <LinkedCustomers
+                propertyId={id}
+                linked={linkedCustomers}
+                options={customerOptions}
+                gate={{ blocked: gate.blocked.link, isOwner: gate.isOwner }}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2">
+            <PhotoManager
+              officeId={office.id}
+              propertyId={id}
+              propertyType={property.property_type}
+              photos={photoRows.map((p) => ({ id: p.id, url: urls[p.storage_path] ?? null }))}
+              videos={videoRows.map((v) => ({
+                id: v.id,
+                url: videoUrls[v.storage_path] ?? null,
+                name: v.file_name,
+                size: v.size_bytes,
+              }))}
+            />
+
+            <Card>
+              <CardHeader>
+                <CardTitle>기본 정보</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                  {specs.map((spec) => (
+                    <div key={spec.label} className="space-y-1">
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <spec.icon className="size-3.5" />
+                        {spec.label}
+                      </p>
+                      <p className="text-sm font-medium">{spec.value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">매물 설명</p>
+                  <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+                    {property.description || "등록된 설명이 없어요."}
+                  </p>
+                </div>
+                {property.highlights.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {property.highlights.map((h) => (
+                      <Badge key={h} variant="secondary">
+                        {h}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    {property.property_type} · {property.deal_type}
+                  </span>
+                  <PropertyStatusSelect propertyId={id} status={property.status} />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-3xl font-bold text-primary">{formatPrice(property)}</p>
+                <dl className="space-y-2 text-sm">
+                  {[
+                    ["관리비", formatMaintenance(property) ?? "-"],
+                    ["방 / 욕실", `${property.rooms ?? "-"} / ${property.baths ?? "-"}`],
+                    ["입주 가능일", formatAvailableFrom(property)],
+                    ["담당자", property.manager?.name ?? "-"],
+                    ["지역", property.region ?? "-"],
+                    ["등록일", formatDate(property.created_at)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="text-right">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <Lock className="size-4" />
+                  관계자 연락처
+                </CardTitle>
+                <CardDescription>고객 브리핑에 노출되지 않아요</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="space-y-2.5 text-sm">
+                  {(
+                    [
+                      ["임대인", property.landlord_phone],
+                      ["관리인", property.caretaker_phone],
+                      ["세입자", property.tenant_phone],
+                    ] as const
+                  ).map(([label, phone]) => (
+                    <div key={label} className="flex items-center justify-between gap-4">
+                      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+                      <dd className="min-w-0 text-right">
+                        {phone ? (
+                          <a href={`tel:${phone}`} className="inline-flex items-center gap-1 text-primary">
+                            <Phone className="size-3.5" />
+                            {phone}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </CardContent>
+            </Card>
+
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-1.5 text-sm">
+                  <Lock className="size-4" />
+                  내부 메모
+                </CardTitle>
+                <CardDescription>고객 브리핑에 노출되지 않아요</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{property.internal_memo || "메모가 없어요."}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

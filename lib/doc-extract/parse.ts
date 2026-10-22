@@ -171,8 +171,9 @@ type RegistryRow = {
   holder: string;
 };
 
+/** 등기목적 — 키워드만(뒤에 날짜·접수호가 붙지 않게) */
 const REGISTRY_PURPOSE =
-  "(?:소유권보존|소유권이전|소유권경정|근저당권설정|근저당권이전|근저당권변경|근저당권말소|저당권설정|전세권설정|전세권이전|전세권말소|임차권설정|임차권등기명령|가압류|압류|경매개시결정|임의경매|강제경매|지상권설정|지역권설정|말소|경정|변경|이전|설정|보존)[가-힣0-9()\\s]{0,24}";
+  "소유권보존|소유권이전|소유권경정|근저당권설정|근저당권이전|근저당권변경|근저당권말소|저당권설정|전세권설정|전세권이전|전세권말소|임차권설정|임차권등기명령|가압류|압류|경매개시결정|임의경매|강제경매|지상권설정|지역권설정";
 
 function sliceRegistrySection(text: string, kind: "갑구" | "을구"): string {
   const startRe =
@@ -194,18 +195,6 @@ function sliceRegistrySection(text: string, kind: "갑구" | "을구"): string {
     .trim();
 }
 
-function formatRegistryRow(r: RegistryRow): string {
-  return [
-    r.rank && `[${r.rank}]`,
-    r.purpose && `등기목적: ${r.purpose}`,
-    r.receipt && `접수: ${r.receipt}`,
-    r.cause && `등기원인: ${r.cause}`,
-    r.holder && `권리자 및 기타사항: ${r.holder}`,
-  ]
-    .filter(Boolean)
-    .join(" / ");
-}
-
 /** 갑구·을구 본문에서 등기 행을 최대한 뽑아낸다 */
 function parseRegistryRows(section: string): RegistryRow[] {
   if (!section || section.replace(/\s/g, "").length < 10) return [];
@@ -213,19 +202,23 @@ function parseRegistryRows(section: string): RegistryRow[] {
   const rows: RegistryRow[] = [];
   const purposeRe = new RegExp(REGISTRY_PURPOSE, "g");
   const purposes = [...section.matchAll(purposeRe)];
+  // PDF 표는 칸이 행 단위로 안 나오고, 주소·거래가액이 다음 등기목적 뒤에 붙는 경우가 많음
+  const sectionHolders = extractRegistryHolders(section);
+
   if (!purposes.length) {
-    const compact = section.replace(/\s+/g, " ").trim().slice(0, 500);
-    if (compact) rows.push({ rank: "", purpose: "", receipt: "", cause: "", holder: compact });
+    const holder = sectionHolders[0] ?? section.replace(/\s+/g, " ").trim().slice(0, 500);
+    if (holder) rows.push({ rank: "", purpose: "", receipt: "", cause: "", holder });
     return rows;
   }
 
   for (let i = 0; i < purposes.length; i++) {
     const m = purposes[i];
-    const purpose = cleanValue(m[0] ?? "").slice(0, 40);
+    // 등기목적은 「소유권이전」만 — 날짜·접수는 넣지 않음
+    const purpose = cleanValue(m[0] ?? "");
     const start = m.index ?? 0;
     const end = i + 1 < purposes.length ? (purposes[i + 1].index ?? section.length) : section.length;
     const before = section.slice(Math.max(0, start - 40), start);
-    const chunk = section.slice(start, Math.min(end, start + 600));
+    const chunk = section.slice(start, Math.min(end, start + 1500));
     const rank =
       before.match(/(?:^|\n)\s*(\d{1,3})\s*$/)?.[1] ||
       before.match(/제\s*(\d+)\s*[호번]/)?.[1] ||
@@ -234,33 +227,18 @@ function parseRegistryRows(section: string): RegistryRow[] {
     const receipt =
       capture(chunk, [
         /(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s*제\s*\d+\s*호)/,
-        /(\d{4}[.\-\/년]\d{1,2}[.\-\/월]\d{1,2}\s*일?\s*제?\s*\d+\s*호?)/,
+        /(\d{4}[.\-\/년]\d{1,2}[.\-\/월]\d{1,2}\s*일?\s*제\s*\d+\s*호)/,
         /접\s*수\s*[:：]?\s*([^\n]{6,40})/,
       ]) ?? "";
 
-    const cause =
-      capture(chunk, [
-        /등기원인\s*[:：]?\s*([^\n]{2,40})/,
-        /(매매|증여|상속|경매|판결|협의분할|교환|신탁|합유|공유|유증|시효취득)/,
-      ]) ?? "";
+    // 등기원인: 「2026년1월27일 매매」— 날짜+원인 (매매만 단독으로 두지 않음)
+    const cause = captureRegistryCause(chunk);
+    // 권리자: 행 chunk에 이름만 있어도 섹션 전체에서 주소·거래가액까지 확장
+    const holder =
+      captureRegistryHolder(chunk, section) ||
+      sectionHolders[i] ||
+      "";
 
-    let holder =
-      capture(chunk, [
-        /권리자\s*및\s*기타사항\s*[:：]?\s*([^\n]{2,120})/,
-        /소유자\s*[:：]?\s*([가-힣A-Za-z0-9()·\s]{2,40})/,
-        /근저당권자\s*[:：]?\s*([^\n]{2,60})/,
-        /채권자\s*[:：]?\s*([^\n]{2,60})/,
-        /전세권자\s*[:：]?\s*([^\n]{2,60})/,
-      ]) ?? "";
-
-    if (!holder) {
-      const afterPurpose = chunk.replace(purpose, "").replace(/\s+/g, " ").trim();
-      const nameHit = afterPurpose.match(/([가-힣]{2,8})\s*(?:\(공유자|\(소유자|외\s*\d)/);
-      const moneyHit = afterPurpose.match(/(채권최고액\s*금?\s*[\d,]+원?)/);
-      holder = [nameHit?.[1], moneyHit?.[1]].filter(Boolean).join(" · ");
-    }
-
-    holder = cleanValue(holder).slice(0, 200);
     if (!purpose && !receipt && !cause && !holder) continue;
     if (rows.some((r) => r.purpose === purpose && r.receipt === receipt && r.holder === holder)) continue;
 
@@ -268,23 +246,284 @@ function parseRegistryRows(section: string): RegistryRow[] {
       rank,
       purpose,
       receipt: cleanValue(receipt).slice(0, 60),
-      cause: cleanValue(cause).slice(0, 40),
+      cause: cause.slice(0, 80),
       holder,
     });
+  }
+
+  // 행에 권리자가 비었는데 섹션에서만 잡힌 경우 보강
+  if (sectionHolders.length && rows.every((r) => !r.holder || r.holder.length < 20)) {
+    for (let i = 0; i < Math.min(rows.length, sectionHolders.length); i++) {
+      if (!rows[i].holder || rows[i].holder.length < sectionHolders[i].length) {
+        rows[i].holder = sectionHolders[i];
+      }
+    }
   }
 
   return rows.slice(0, 30);
 }
 
+// 「공유」는 「공유자」에 부분 매칭되지 않게 lookaround 사용
+const REGISTRY_CAUSE_KIND =
+  "매매|증여|상속|경매|판결|협의분할|교환|신탁|합유|공유(?!자)|유증|시효취득|설정계약|해제|해지|기부채납|현물출자";
+
+const REGISTRY_DATE_RE = /(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)/g;
+
+/** 접수란 날짜인지 — 날짜 직후(가까운 곳에) 「제N호」가 있으면 접수 */
+function isReceiptDate(text: string, dateIndex: number, dateLen: number) {
+  const after = text.slice(dateIndex + dateLen, dateIndex + dateLen + 24);
+  return /^\s*제\s*\d+\s*호/.test(after);
+}
+
+/**
+ * 등기원인 칸 전체. 예: 「2026년1월27일 매매」
+ * 접수(…일 제N호)와 구분. 「매매」만 단독으로 반환하지 않는다.
+ */
+function captureRegistryCause(chunk: string): string {
+  const kindRe = new RegExp(`(${REGISTRY_CAUSE_KIND})`, "g");
+  for (const km of chunk.matchAll(kindRe)) {
+    const kind = km[1];
+    const kindAt = km.index ?? 0;
+    const before = chunk.slice(0, kindAt);
+    const dates = [...before.matchAll(REGISTRY_DATE_RE)];
+    for (let i = dates.length - 1; i >= 0; i--) {
+      const d = dates[i];
+      const di = d.index ?? 0;
+      if (isReceiptDate(chunk, di, d[0].length)) continue;
+      // 원인 키워드와 날짜 사이가 너무 멀면(다른 칸) 스킵
+      if (kindAt - (di + d[0].length) > 40) continue;
+      return cleanValue(`${d[1]} ${kind}`);
+    }
+  }
+
+  // 날짜와 원인이 붙어 있는 경우 (사이 공백·줄바꿈)
+  const glued = chunk.match(
+    new RegExp(`(\\d{4}\\s*년\\s*\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일)\\s*(${REGISTRY_CAUSE_KIND})`)
+  );
+  if (glued) {
+    const di = glued.index ?? 0;
+    if (!isReceiptDate(chunk, di, glued[1].length)) {
+      return cleanValue(`${glued[1]} ${glued[2]}`);
+    }
+  }
+
+  const alt = chunk.match(
+    new RegExp(`(\\d{4}[.\\-/]\\d{1,2}[.\\-/]\\d{1,2})\\s*(${REGISTRY_CAUSE_KIND})`)
+  );
+  if (alt) return cleanValue(`${alt[1]} ${alt[2]}`);
+
+  return "";
+}
+
+function normalizeHolderText(s: string): string {
+  return s
+    .replace(/\r/g, "\n")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\s+\d{1,3}\s*$/, "")
+    .trim()
+    .slice(0, 600);
+}
+
+const HOLDER_ROLE =
+  "소유자|근저당권자|채권자|전세권자|공유자|임차권자|수탁자|합유자";
+
+/**
+ * 섹션 전체에서 권리자 블록을 모은다.
+ * PDF 표가 칸 단위로 풀려 이름·주소·거래가액 순서가 어긋나도,
+ * n번째 이름 ↔ n번째 거래가액/채권최고액을 짝지어 복원한다.
+ */
+function extractRegistryHolders(section: string): string[] {
+  if (!section) return [];
+
+  const nameRe = new RegExp(
+    `(?:(${HOLDER_ROLE})\\s*)?([가-힣]{2,8})\\s*(\\d{6})([\\d\\-*＊*]*)`,
+    "g"
+  );
+  // PDF에 따라 「거래 가 액」「금 465,000,000 원」처럼 띄어쓰기가 끼기도 함
+  const moneyRe = /(?:거\s*래\s*가\s*액|채\s*권\s*최\s*고\s*액)\s*금?\s*[\d,]+(?:\s*원)?/g;
+  const names = [...section.matchAll(nameRe)].filter((m) => {
+    // 등기목적·원인 키워드에 붙은 오탐 제외
+    const prev = section.slice(Math.max(0, (m.index ?? 0) - 12), m.index ?? 0);
+    if (/소유권|근저당|전세권|임차권|저당권/.test(prev)) return false;
+    return true;
+  });
+  const moneys = [...section.matchAll(moneyRe)];
+
+  const found: string[] = [];
+  const usedMoney = new Set<number>();
+
+  for (const n of names) {
+    const nameAt = n.index ?? 0;
+    // 이 이름 뒤에서 아직 안 쓴 첫 거래가액/채권최고액과 짝
+    const money = moneys.find((m) => {
+      const at = m.index ?? -1;
+      return at > nameAt && at - nameAt < 1200 && !usedMoney.has(at);
+    });
+    if (!money || money.index == null) continue;
+    usedMoney.add(money.index);
+
+    const role = n[1] || "소유자";
+    const person = `${n[2]} ${n[3]}${n[4] ?? ""}`.trim();
+    // 주소는 (이전 거래가액 끝 ~ 이번 거래가액) 구간에 있는 경우가 많음
+    let midStart = nameAt + n[0].length;
+    for (const prev of moneys) {
+      const at = prev.index ?? -1;
+      if (at < 0 || at >= money.index) continue;
+      const end = at + prev[0].length;
+      if (end > midStart) midStart = end;
+    }
+    let mid = section.slice(midStart, money.index);
+    // 사이에 끼어든 다른 행(등기목적·접수·다른 이름) 제거
+    mid = mid
+      .replace(new RegExp(REGISTRY_PURPOSE, "g"), " ")
+      .replace(/\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s*제\s*\d+\s*호/g, " ")
+      .replace(new RegExp(`\\d{4}\\s*년\\s*\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일\\s*(?:${REGISTRY_CAUSE_KIND})`, "g"), " ")
+      .replace(new RegExp(`(?:${HOLDER_ROLE})\\s*[가-힣]{2,8}\\s*\\d{6}[\\d\\-*＊*]*`, "g"), " ")
+      .replace(/[가-힣]{2,8}\s*\d{6}[\d\-＊*]*/g, " ")
+      .replace(/(?:거\s*래\s*가\s*액|채\s*권\s*최\s*고\s*액)\s*금?\s*[\d,]+(?:\s*원)?/g, " ")
+      .replace(/(?:^|\s)\d{1,3}(?=\s)/g, " ");
+
+    const block = normalizeHolderText(`${role} ${person} ${mid} ${money[0]}`);
+    if (block.length >= 15) found.push(block);
+  }
+
+  if (found.length) return found.slice(0, 20);
+
+  // 거래가액 텍스트가 없을 때: 역할+이름+주소 형태
+  for (const m of section.matchAll(
+    new RegExp(
+      `(?:${HOLDER_ROLE})\\s*[가-힣]{2,20}\\s*\\d{6}[\\d\\-*＊*]*[\\s\\S]{0,280}?(?:시|도)\\s*[가-힣]+(?:시|군|구)[\\s\\S]{0,160}?\\d+\\s*호`,
+      "g"
+    )
+  )) {
+    const v = normalizeHolderText(m[0]);
+    if (v.length >= 15) found.push(v);
+  }
+
+  // 최후: 이름+주민번호만이라도 (주소는 PDF 텍스트에 없는 경우)
+  if (!found.length) {
+    for (const n of names.slice(0, 5)) {
+      const role = n[1] || "소유자";
+      const v = normalizeHolderText(`${role} ${n[2]} ${n[3]}${n[4] ?? ""}`);
+      if (v.length >= 8) found.push(v);
+    }
+  }
+
+  return found.slice(0, 20);
+}
+
+/**
+ * 권리자 및 기타사항 칸 전체.
+ * 예: 소유자 차상현 921216-******* 경기도 … 910동 1403호 … 거래가액 금465,000,000원
+ */
+function captureRegistryHolder(chunk: string, section: string): string {
+  // 1) chunk 안 이름·주민번호로 섹션에서 거래가액까지 확장
+  const nameHit = chunk.match(
+    new RegExp(`(?:${HOLDER_ROLE})\\s*([가-힣]{2,20})\\s*(\\d{6})|([가-힣]{2,8})\\s*(\\d{6})`)
+  );
+  if (nameHit) {
+    const name = nameHit[1] || nameHit[3];
+    const id6 = nameHit[2] || nameHit[4];
+    if (name && id6) {
+      const re = new RegExp(
+        `(?:${HOLDER_ROLE}\\s*)?${name}\\s*${id6}[\\d\\-*＊*]*([\\s\\S]{0,500}?)((?:거\\s*래\\s*가\\s*액|채\\s*권\\s*최\\s*고\\s*액)\\s*금?\\s*[\\d,]+(?:\\s*원)?)`
+      );
+      const full = section.match(re);
+      if (full) {
+        const prefix = full[0].startsWith("소유자") || /근저당|채권|전세|공유|임차|수탁|합유/.test(full[0])
+          ? ""
+          : "소유자 ";
+        return normalizeHolderText(prefix + full[0]);
+      }
+
+      // 거래가액 없이 주소만 있는 경우
+      const addrRe = new RegExp(
+        `(?:${HOLDER_ROLE}\\s*)?${name}\\s*${id6}[\\d\\-*＊*]*([\\s\\S]{0,280}?(?:시|도)\\s*[가-힣]+(?:시|군|구)[\\s\\S]{0,160}?\\d+\\s*호)`
+      );
+      const addr = section.match(addrRe);
+      if (addr) return normalizeHolderText(addr[0]);
+    }
+  }
+
+  // 2) chunk 안에서만이라도 역할+이름부터 끝까지
+  let searchFrom = 0;
+  const kinds = [...chunk.matchAll(new RegExp(`(${REGISTRY_CAUSE_KIND})`, "g"))];
+  if (kinds.length) {
+    const last = kinds[kinds.length - 1];
+    searchFrom = (last.index ?? 0) + last[0].length;
+  } else {
+    const receipt = chunk.match(/\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일\s*제\s*\d+\s*호/);
+    if (receipt && receipt.index != null) searchFrom = receipt.index + receipt[0].length;
+  }
+
+  const rest = chunk.slice(searchFrom);
+  const start = rest.search(new RegExp(`${HOLDER_ROLE}|[가-힣]{2,8}\\s*\\d{6}`));
+  if (start < 0) return "";
+
+  let body = rest.slice(start);
+  // chunk 한정 폴백에서는 다음 등기목적으로 자름
+  const next = body.slice(4).search(new RegExp(REGISTRY_PURPOSE));
+  if (next >= 0) body = body.slice(0, 4 + next);
+  return normalizeHolderText(body);
+}
+
 function joinRegistryColumn(rows: RegistryRow[], key: keyof RegistryRow): string {
+  // 순위번호(예: 28)는 붙이지 않음 — 등기목적·원인·권리자 내용만
   return rows
-    .map((r) => {
-      const v = r[key]?.trim();
-      if (!v) return "";
-      return r.rank ? `${r.rank}. ${v}` : v;
-    })
+    .map((r) => r[key]?.trim() ?? "")
     .filter(Boolean)
     .join("\n");
+}
+
+/** 표 헤더·칸 제목이 주소로 잡히지 않게 걸러낸다 */
+function looksLikeRegistryHeaderJunk(v: string) {
+  return /건물명칭|건물내역|등기원인|권리자\s*및|기타사항|표\s*제\s*부|갑\s*구|을\s*구|순위번호|등기목적/.test(v);
+}
+
+/**
+ * 등기사항증명서 소재지.
+ * 실제 주소는 `[집합건물] 경기도 …`처럼 괄호 유형 바로 옆에 온다.
+ * 「소재지」 칸 제목 뒤는 표 헤더가 이어져 잘못 잡히기 쉬워 후순위로만 쓴다.
+ */
+function captureRegistryLocation(text: string): string | null {
+  const bracket = text.match(
+    /\[\s*(집합건물|토지|건물)\s*\]\s*([^\n【\[]{10,160})/
+  );
+  if (bracket?.[2]) {
+    let v = cleanValue(bracket[2]);
+    // 같은 줄에 표제부가 붙으면 자른다
+    v = v.split(/【|\s*표\s*제\s*부/)[0]?.trim() ?? v;
+    v = v.replace(/\s+/g, " ").trim();
+    if (v.length >= 10 && !looksLikeRegistryHeaderJunk(v)) return v;
+  }
+
+  // 폴백: 시·도/시·군·구가 보이는 경우만 「소재지」 라벨 뒤를 허용
+  const labeled = capture(text, [
+    /소재지\s*[:：]?\s*((?:서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)[^\n【]{6,120})/,
+  ]);
+  if (labeled && !looksLikeRegistryHeaderJunk(labeled)) return labeled;
+
+  return null;
+}
+
+/** 갑구/을구 권리자 문자열. 섹션이 짧으면 본문에서 한 번 더 찾는다. */
+function pickRegistryHolders(text: string, section: string, kind: "갑구" | "을구"): string {
+  const fromSection = extractRegistryHolders(section);
+  const hasMoney = (h: string) => /거래\s*가\s*액|채권\s*최고\s*액|금\s*[\d,]+/.test(h);
+  if (fromSection.some(hasMoney)) return fromSection.join("\n");
+
+  const wide = extractRegistryHolders(text);
+  const filtered =
+    kind === "갑구"
+      ? wide.filter((h) => /소유자|거래\s*가\s*액/.test(h) && !/근저당권자|채권\s*최고/.test(h))
+      : wide.filter((h) => /근저당권자|채권자|전세권자|임차권자|채권\s*최고/.test(h));
+  if (filtered.some(hasMoney)) return filtered.join("\n");
+  if (fromSection.length) return fromSection.join("\n");
+  if (filtered.length) return filtered.join("\n");
+  return wide.join("\n");
 }
 
 function parseRegistry(text: string): ParseResult {
@@ -306,92 +545,32 @@ function parseRegistry(text: string): ParseResult {
       ? fromEulSection
       : fromWhole.filter((r) => /근저당|저당|전세|임차|가압류|압류|경매|지상|지역/.test(r.purpose));
 
-  const gapSummary = gapOnly.map(formatRegistryRow).filter(Boolean).join("\n");
-  const eulSummary = eulOnly.map(formatRegistryRow).filter(Boolean).join("\n");
-
-  if (gapSummary) pushField(fields, "갑구", gapSummary.slice(0, 2000), gapSummary.slice(0, 200));
-  if (eulSummary) pushField(fields, "을구", eulSummary.slice(0, 2000), eulSummary.slice(0, 200));
-
-  const gapPurpose = joinRegistryColumn(gapOnly, "purpose");
-  const gapReceipt = joinRegistryColumn(gapOnly, "receipt");
-  const gapCause = joinRegistryColumn(gapOnly, "cause");
-  const gapHolder = joinRegistryColumn(gapOnly, "holder");
-  if (gapPurpose) pushField(fields, "갑구 등기목적", gapPurpose.slice(0, 1000));
-  if (gapReceipt) pushField(fields, "갑구 접수", gapReceipt.slice(0, 1000));
-  if (gapCause) pushField(fields, "갑구 등기원인", gapCause.slice(0, 1000));
-  if (gapHolder) pushField(fields, "갑구 권리자 및 기타사항", gapHolder.slice(0, 1500));
-
-  const eulPurpose = joinRegistryColumn(eulOnly, "purpose");
-  const eulReceipt = joinRegistryColumn(eulOnly, "receipt");
-  const eulCause = joinRegistryColumn(eulOnly, "cause");
-  const eulHolder = joinRegistryColumn(eulOnly, "holder");
-  if (eulPurpose) pushField(fields, "을구 등기목적", eulPurpose.slice(0, 1000));
-  if (eulReceipt) pushField(fields, "을구 접수", eulReceipt.slice(0, 1000));
-  if (eulCause) pushField(fields, "을구 등기원인", eulCause.slice(0, 1000));
-  if (eulHolder) pushField(fields, "을구 권리자 및 기타사항", eulHolder.slice(0, 1500));
-
+  // 등기사항증명서 추출 항목(이 8개만): 소유자, 소재지, 갑구·을구 등기목적/등기원인/권리자
   const ownerFromGap =
     gapOnly
-      .map((r) => r.holder)
-      .find((h) => h && /[가-힣]{2,}/.test(h) && !/채권최고|금\s*[\d,]/.test(h)) ?? null;
+      .map((r) => r.holder.match(/소유자\s*([가-힣]{2,20})/)?.[1] ?? r.holder.match(/^([가-힣]{2,8})\s*\d{6}/)?.[1])
+      .find(Boolean) ?? null;
   const owner = capture(text, [
     /소유자\s*[:：]?\s*([가-힣]{2,20})/,
     /명의인\s*[:：]?\s*([가-힣]{2,20})/,
   ]);
-  pushField(fields, "소유자", owner || (ownerFromGap ? cleanValue(ownerFromGap).slice(0, 40) : null));
+  pushField(fields, "소유자", owner || (ownerFromGap ? cleanValue(ownerFromGap) : null));
+  pushField(fields, "소재지", captureRegistryLocation(text));
 
-  const loc = capture(text, [
-    /\[?\s*소재지\s*\]?\s*[:：]?\s*([^\n]{8,80})/,
-    /부동산의\s*표시[^\n]*\n\s*([^\n]{8,80})/,
-  ]);
-  pushField(fields, "소재지", loc);
+  const gapPurpose = joinRegistryColumn(gapOnly, "purpose");
+  const gapCause = joinRegistryColumn(gapOnly, "cause");
+  // 권리자: 표 칸 순서가 깨져도 이름↔거래가액 짝으로 복원. 섹션이 짧게 잘리면 본문 전체에서 보강
+  const gapHolder = pickRegistryHolders(text, gapSection, "갑구") || joinRegistryColumn(gapOnly, "holder");
+  if (gapPurpose) pushField(fields, "갑구 등기목적", gapPurpose.slice(0, 1000));
+  if (gapCause) pushField(fields, "갑구 등기원인", gapCause.slice(0, 1000));
+  if (gapHolder) pushField(fields, "갑구 권리자 및 기타사항", gapHolder.slice(0, 1500));
 
-  const mortgageAmount = capture(text, [
-    /채권최고액\s*[:：]?\s*(금?\s*[\d,]+원?)/,
-    /최고액\s*[:：]?\s*(금?\s*[\d,]+원?)/,
-  ]);
-  pushField(fields, "근저당권 채권최고액", mortgageAmount);
-
-  const mortgagee = capture(text, [/근저당권자\s*[:：]?\s*([^\n]{2,40})/, /채권자\s*[:：]?\s*([^\n]{2,40})/]);
-  pushField(fields, "근저당권자", mortgagee);
-
-  if (/압류|가압류/.test(text) || eulOnly.some((r) => /압류|가압류/.test(r.purpose))) {
-    const hit = text.match(/.{0,20}(압류|가압류).{0,40}/)?.[0];
-    pushField(fields, "압류·가압류", "기재 있음");
-    signals.push({
-      level: "전문가 검토",
-      title: "압류·가압류 기재",
-      description: "등기부에 압류 또는 가압류 관련 문구가 있어요.",
-      evidence_text: hit?.slice(0, 200),
-      next_action: "등기 원문을 확인하고 필요 시 전문가 검토를 받으세요.",
-    });
-  }
-
-  if (/전세권|임차권/.test(text) || eulOnly.some((r) => /전세|임차/.test(r.purpose))) {
-    pushField(fields, "전세권·임차권", "기재 있음");
-  }
-
-  const issued = capture(text, [/발급[^\n]{0,6}([\d.\-\/년월일\s]{6,20})/, /열람일시\s*[:：]?\s*([\d.\-\/\s:]{8,30})/]);
-  pushField(fields, "발급일", issued ? issued.replace(/\s+/g, " ").trim() : null);
-
-  if (mortgageAmount || mortgagee || eulOnly.some((r) => /근저당|저당/.test(r.purpose))) {
-    signals.push({
-      level: "확인 필요",
-      title: "근저당권·을구 확인",
-      description: "을구(근저당 등) 등기목적·접수·원인·권리자를 원문과 대조하세요.",
-      next_action: "잔금·인수 조건에 반영할지 확인하세요.",
-    });
-  }
-
-  if (gapSummary || eulSummary) {
-    signals.push({
-      level: "참고",
-      title: "갑구·을구 추출",
-      description:
-        "갑구·을구의 등기목적·접수·등기원인·권리자 및 기타사항을 읽었어요. 누락이 없는지 원문과 맞춰 주세요.",
-      next_action: "확인설명서 권리관계에 반영하기 전 검토하세요.",
-    });
-  }
+  const eulPurpose = joinRegistryColumn(eulOnly, "purpose");
+  const eulCause = joinRegistryColumn(eulOnly, "cause");
+  const eulHolder = pickRegistryHolders(text, eulSection, "을구") || joinRegistryColumn(eulOnly, "holder");
+  if (eulPurpose) pushField(fields, "을구 등기목적", eulPurpose.slice(0, 1000));
+  if (eulCause) pushField(fields, "을구 등기원인", eulCause.slice(0, 1000));
+  if (eulHolder) pushField(fields, "을구 권리자 및 기타사항", eulHolder.slice(0, 1500));
 
   return { fields, signals };
 }
