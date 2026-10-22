@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
+import { hasAiAccess } from "@/lib/ai/access";
 import { getSession } from "@/lib/auth";
 import { getOfficeGate } from "@/lib/office-gate";
 import { getOfficeMembers } from "@/lib/queries";
@@ -19,7 +20,12 @@ export default async function NewCustomerPage() {
           <OfficeRequiredNotice kind="customer" isOwner={gate.isOwner} next="/customers/new" />
         </Card>
       ) : (
-        <NewCustomerClient officeId={office.id} members={members} currentUserId={profile.id} />
+        <NewCustomerClient
+          officeId={office.id}
+          members={members}
+          currentUserId={profile.id}
+          aiAvailable={hasAiAccess(office)}
+        />
       )}
     </div>
   );

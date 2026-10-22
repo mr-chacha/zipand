@@ -86,6 +86,9 @@ export async function createProperty(_prev: ActionState | null, fd: FormData): P
     if (photoPaths.length > MEDIA_LIMITS.photo.maxCount) {
       throw new FormError(`사진은 매물당 최대 ${MEDIA_LIMITS.photo.maxCount}장까지 등록할 수 있어요.`);
     }
+    if (videoPaths.length > MEDIA_LIMITS.video.maxCount) {
+      throw new FormError(`동영상은 매물당 최대 ${MEDIA_LIMITS.video.maxCount}개까지 등록할 수 있어요.`);
+    }
     const values = readPropertyForm(fd);
     const { error } = await supabase
       .from("properties")
@@ -248,8 +251,12 @@ export async function addPropertyVideos(
     .from("property_videos")
     .select("id", { count: "exact", head: true })
     .eq("property_id", propertyId);
+  if ((count ?? 0) + valid.length > MEDIA_LIMITS.video.maxCount) {
+    await supabase.storage.from("property-videos").remove(valid.map((v) => v.path));
+    return { error: `동영상은 매물당 최대 ${MEDIA_LIMITS.video.maxCount}개까지 등록할 수 있어요.` };
+  }
   const { error } = await supabase.from("property_videos").insert(
-    valid.map((v, i) => ({
+    valid.slice(0, MEDIA_LIMITS.video.maxCount - (count ?? 0)).map((v, i) => ({
       property_id: propertyId,
       storage_path: v.path,
       file_name: v.name,
@@ -261,9 +268,9 @@ export async function addPropertyVideos(
     await supabase.storage.from("property-videos").remove(valid.map((v) => v.path));
     return { error: toErrorMessage(error) };
   }
-  await logPropertyEvent(propertyId, `동영상 ${valid.length}개 추가`);
+  await logPropertyEvent(propertyId, "동영상 추가");
   revalidatePath(`/properties/${propertyId}`);
-  return { message: `동영상 ${valid.length}개를 추가했어요.` };
+  return { message: "동영상을 추가했어요." };
 }
 
 export async function deletePropertyVideo(videoId: string): Promise<ActionState> {

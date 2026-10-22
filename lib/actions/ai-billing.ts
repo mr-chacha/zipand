@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { hasAiAccess } from "@/lib/ai/access";
 import { getSession } from "@/lib/auth";
 import {
   AI_PROVIDERS,
@@ -13,6 +14,12 @@ import {
 } from "@/lib/constants";
 import { FormError, toErrorMessage } from "@/lib/form";
 import type { ActionState } from "@/types";
+
+/** 클라이언트에서 AI 사용 가능 뱃지용 */
+export async function getAiAccessState(): Promise<{ available: boolean }> {
+  const { office } = await getSession();
+  return { available: hasAiAccess(office) };
+}
 
 const OWNER_ONLY = "대표만 변경할 수 있어요.";
 

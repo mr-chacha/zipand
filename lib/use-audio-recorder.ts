@@ -21,14 +21,12 @@ const noopSubscribe = () => () => {};
 /**
  * 녹음 공용 훅.
  * - 안드로이드 앱: 네이티브 녹음(포그라운드 서비스) — 화면이 꺼지거나 다른 앱을 써도 계속 녹음
- * - 브라우저: MediaRecorder — 화면이 켜져 있는 동안만 녹음
+ * - 웹: 바로 녹음 불가 — 파일 업로드만 (AudioAttach에서 안내)
  */
 export function useAudioRecorder({ filePrefix, onRecorded }: { filePrefix: string; onRecorded: (recording: Recording) => void }) {
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const native = useSyncExternalStore(noopSubscribe, hasNativeRecorder, () => false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
   const onRecordedRef = useRef(onRecorded);
   useEffect(() => {
     onRecordedRef.current = onRecorded;
@@ -57,52 +55,25 @@ export function useAudioRecorder({ filePrefix, onRecorded }: { filePrefix: strin
   };
 
   const start = async () => {
-    if (native) {
-      try {
-        const { startedAt } = await ZipandRecorder.start();
-        setNow(Date.now());
-        setStartedAt(startedAt);
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "녹음을 시작하지 못했어요.");
-      }
-      return;
-    }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      toast.error("이 브라우저에서는 녹음을 지원하지 않아요. 음성 파일을 업로드해 주세요.");
+    if (!native) {
+      toast.error("바로 녹음은 앱에서만 가능해요. 음성 파일을 업로드해 주세요.");
       return;
     }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      const began = Date.now();
-      chunksRef.current = [];
-      recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
-      recorder.onstop = () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const type = recorder.mimeType.split(";")[0] || "audio/webm";
-        const ext = type.includes("mp4") ? "m4a" : type.includes("ogg") ? "ogg" : "webm";
-        const blob = new Blob(chunksRef.current, { type });
-        onRecordedRef.current({
-          file: new File([blob], `${filePrefix}-${stamp()}.${ext}`, { type }),
-          durationSec: Math.round((Date.now() - began) / 1000),
-        });
-      };
-      recorder.start();
-      recorderRef.current = recorder;
-      setNow(began);
-      setStartedAt(began);
-    } catch {
-      toast.error("마이크 권한이 필요해요. 브라우저 설정에서 마이크를 허용해 주세요.");
+      const { startedAt } = await ZipandRecorder.start();
+      setNow(Date.now());
+      setStartedAt(startedAt);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "녹음을 시작하지 못했어요.");
     }
   };
 
   const stop = async () => {
-    setStartedAt(null);
     if (!native) {
-      recorderRef.current?.stop();
-      recorderRef.current = null;
+      setStartedAt(null);
       return;
     }
+    setStartedAt(null);
     try {
       const result = await ZipandRecorder.stop();
       const file = await readNativeFile(result.path, `${filePrefix}-${stamp()}.m4a`, result.mimeType);

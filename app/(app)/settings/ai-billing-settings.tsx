@@ -94,8 +94,8 @@ export function AiBillingSettings({ isOwner, aiProvider, billingMode, planId, cr
             <ComingSoonBadge />
           </CardTitle>
           <CardDescription>
-            테스트용으로 AI 엔진과 과금 방식(구독 / 토큰·크레딧)을 골라 저장해요. 실제 결제와 AI 호출은 이어서
-            연결할 예정이에요.
+            AI 엔진과 과금 방식(구독 / 토큰·크레딧)을 골라 저장해요. 실제 결제는 준비중이며, 테스트 크레딧·플랜
+            선택으로 AI 기능을 바로 써 볼 수 있어요. Free이거나 크레딧 0이면 AI가 잠겨요.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 text-sm">

@@ -10,8 +10,19 @@ import { DocumentReview } from "./document-review";
 
 export const metadata: Metadata = { title: "문서 검토" };
 
-export default async function DocumentDetailPage({ params }: PageProps<"/documents/[id]">) {
+/** 상대 경로만 허용 (오픈 리다이렉트 방지) */
+function safeReturnPath(raw: string | string[] | undefined): string | null {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  if (!v || !v.startsWith("/") || v.startsWith("//") || v.includes("://")) return null;
+  return v;
+}
+
+export default async function DocumentDetailPage({
+  params,
+  searchParams,
+}: PageProps<"/documents/[id]">) {
   const { id } = await params;
+  const sp = await searchParams;
   const { supabase } = await getSession();
 
   const { data: doc } = await supabase
@@ -26,21 +37,35 @@ export default async function DocumentDetailPage({ params }: PageProps<"/documen
   const [fields, signals, urls] = await Promise.all([
     supabase.from("document_fields").select("*").eq("document_id", id).order("created_at"),
     supabase.from("document_signals").select("*").eq("document_id", id).order("created_at"),
-    signedUrls(supabase, "documents", [doc.storage_path]),
+    // 문서 원문은 캐시된 만료 토큰(InvalidJWT exp)이 남지 않게 항상 새로 발급
+    signedUrls(supabase, "documents", [doc.storage_path], 60 * 60, { fresh: true }),
   ]);
   const fileUrl = urls[doc.storage_path] ?? null;
   const isPdf = doc.file_name.toLowerCase().endsWith(".pdf");
   const property = Array.isArray(doc.property) ? doc.property[0] : doc.property;
   const uploader = Array.isArray(doc.uploader) ? doc.uploader[0] : doc.uploader;
   const reviewer = Array.isArray(doc.reviewer) ? doc.reviewer[0] : doc.reviewer;
+  const presets = DOC_FIELD_PRESETS[doc.doc_type as DocType] ?? [];
+  const presetRank = new Map(presets.map((label, i) => [label, i]));
+  const orderedFields = [...(fields.data ?? [])].sort((a, b) => {
+    const ai = presetRank.get(a.label) ?? 1000;
+    const bi = presetRank.get(b.label) ?? 1000;
+    if (ai !== bi) return ai - bi;
+    return a.created_at.localeCompare(b.created_at);
+  });
+
+  const returnTo = safeReturnPath(sp.return);
+  const backHref =
+    returnTo ?? (property ? `/properties/${property.id}?tab=docs` : "/documents");
+  const backLabel = property || returnTo?.includes("/properties/") ? "매물 문서" : "문서 관리";
 
   return (
     <div className="space-y-6">
       <PageHeader
         title={doc.doc_type}
         description={`${property?.title ?? ""} · ${doc.file_name}`}
-        backHref="/documents"
-        backLabel="문서 관리"
+        backHref={backHref}
+        backLabel={backLabel}
         actions={<DocStatusBadge status={doc.status} />}
       />
 
@@ -61,8 +86,8 @@ export default async function DocumentDetailPage({ params }: PageProps<"/documen
           documentId={id}
           status={doc.status}
           issuedAt={doc.issued_at}
-          presets={DOC_FIELD_PRESETS[doc.doc_type as DocType] ?? []}
-          fields={fields.data ?? []}
+          presets={presets}
+          fields={orderedFields}
           signals={signals.data ?? []}
         />
       </div>

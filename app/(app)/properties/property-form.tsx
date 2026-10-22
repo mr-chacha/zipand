@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Mic } from "lucide-react";
 import { toast } from "sonner";
 import { AdCopyButton } from "@/components/ai/ad-copy-button";
-import { ComingSoonPanel } from "@/components/coming-soon";
+import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { FormMessage } from "@/components/form/form-message";
 import { FormActions } from "@/components/form/form-actions";
 import { AreaInput, MoneyInput } from "@/components/form/number-input";
@@ -76,6 +77,7 @@ interface PropertyFormProps {
   hideAutoFill?: boolean;
   /** 있으면 새 매물 등록 시 사진·동영상을 함께 올린다 */
   officeId?: string;
+  aiAvailable?: boolean;
 }
 
 export function PropertyForm({
@@ -89,6 +91,7 @@ export function PropertyForm({
   redirectTo,
   hideAutoFill,
   officeId,
+  aiAvailable = false,
 }: PropertyFormProps) {
   const [photos, setPhotos] = useState<PickedMedia[]>([]);
   const [videos, setVideos] = useState<PickedMedia[]>([]);
@@ -157,10 +160,24 @@ export function PropertyForm({
     <form onSubmit={onSubmit} className="space-y-6">
       {redirectTo && <input type="hidden" name="redirect_to" value={redirectTo} />}
       {!d && !hideAutoFill && (
-        <ComingSoonPanel
-          title="사진·음성으로 자동 입력"
-          description="현장 음성 메모를 AI가 방향·채광·수리 필요 항목으로 정리해 채워주는 기능은 서비스 준비중이에요. 매물 저장 후 임장 기록에서 직접 입력할 수 있어요."
-        />
+        <Card className="border-dashed bg-muted/20">
+          <CardContent className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Mic className="size-4" />
+            </span>
+            <div className="space-y-1">
+              <p className="flex flex-wrap items-center gap-2 text-sm font-medium">
+                음성으로 임장 항목 자동 정리
+                <AiAccessBadge available={aiAvailable} compact />
+              </p>
+              <p className="text-xs text-muted-foreground">
+                매물을 저장한 뒤{" "}
+                <span className="text-foreground">임장 기록</span>에서 음성을 올리면 받아쓰기·방향·채광·수리 항목을 AI가
+                채워 줘요.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       <Card>
@@ -403,7 +420,7 @@ export function PropertyForm({
           <div className="space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <Label htmlFor="description">매물 설명 (고객 공개)</Label>
-              <AdCopyButton />
+              <AdCopyButton aiAvailable={aiAvailable} />
             </div>
             <Textarea id="description" name="description" rows={3} defaultValue={d?.description ?? ""} placeholder="예) 한강 조망, 초등학교 도보 5분" />
             <p className="text-xs text-muted-foreground">주소·유형·가격을 바탕으로 AI 초안을 채운 뒤 수정해 저장하세요.</p>

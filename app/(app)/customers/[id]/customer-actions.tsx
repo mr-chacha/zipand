@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { FileAudio, Link2, Link2Off, ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { ConsultResultDialog } from "@/components/ai/consult-result-dialog";
 import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
 import { ConfirmAction } from "@/components/form/confirm-action";
@@ -77,11 +78,13 @@ export function ConsultationPanel({
   customerId,
   consultations,
   gate,
+  aiAvailable,
 }: {
   officeId: string;
   customerId: string;
   consultations: ConsultationItem[];
   gate: GateInfo;
+  aiAvailable: boolean;
 }) {
   const [audio, setAudio] = useState<AttachedAudio | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
@@ -101,6 +104,10 @@ export function ConsultationPanel({
   });
 
   const runAi = (consultationId: string) => {
+    if (!aiAvailable) {
+      toast.error("구독 후 혹은 크레딧 결제 후 사용할 수 있어요. 설정 → AI·요금에서 확인해 주세요.");
+      return;
+    }
     startAi(async () => {
       const r = await analyzeConsultation(consultationId);
       if (!r.ok) {
@@ -205,21 +212,23 @@ export function ConsultationPanel({
                   ) : (
                     <p className="text-xs text-muted-foreground">녹음 파일을 불러오지 못했어요.</p>
                   )}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    className="mt-1"
-                    disabled={aiPending}
-                    onClick={() => runAi(c.id)}
-                  >
-                    {aiPending ? (
-                      <Loader2 className="animate-spin" data-icon="inline-start" />
-                    ) : (
-                      <Sparkles data-icon="inline-start" />
-                    )}
-                    AI 요약·고객 반영
-                  </Button>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      disabled={aiPending}
+                      onClick={() => runAi(c.id)}
+                    >
+                      {aiPending ? (
+                        <Loader2 className="animate-spin" data-icon="inline-start" />
+                      ) : (
+                        <Sparkles data-icon="inline-start" />
+                      )}
+                      AI 요약·고객 반영
+                    </Button>
+                    <AiAccessBadge available={aiAvailable} compact />
+                  </div>
                 </div>
               )}
             </li>

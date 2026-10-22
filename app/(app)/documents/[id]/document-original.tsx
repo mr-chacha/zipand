@@ -46,7 +46,13 @@ export function DocumentOriginal({
     setBusy("download");
     try {
       const res = await fetch(fileUrl);
-      if (!res.ok) throw new Error("파일을 받지 못했어요.");
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        if (/InvalidJWT|exp/.test(body)) {
+          throw new Error("파일 링크가 만료됐어요. 페이지를 새로고침해 주세요.");
+        }
+        throw new Error("파일을 받지 못했어요.");
+      }
       const blob = await res.blob();
       const href = URL.createObjectURL(blob);
       const a = document.createElement("a");

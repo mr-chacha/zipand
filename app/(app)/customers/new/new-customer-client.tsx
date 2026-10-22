@@ -10,10 +10,12 @@ export function NewCustomerClient({
   officeId,
   members,
   currentUserId,
+  aiAvailable,
 }: {
   officeId: string;
   members: { id: string; name: string }[];
   currentUserId: string;
+  aiAvailable: boolean;
 }) {
   const draftFolderId = useId().replace(/:/g, "");
   const [defaults, setDefaults] = useState<Partial<Customer>>({});
@@ -24,6 +26,7 @@ export function NewCustomerClient({
       <CallDraftPanel
         officeId={officeId}
         draftFolderId={`draft-${draftFolderId}`}
+        aiAvailable={aiAvailable}
         onDraft={(partial, consult) => {
           const memoParts = [partial.memo, consult.summary ? `[상담 요약]\n${consult.summary}` : null].filter(Boolean);
           setDefaults({ ...partial, memo: memoParts.join("\n\n") || null });

@@ -49,3 +49,35 @@ export type LocationDraft = {
   school_high_mode: string;
   note: string;
 };
+
+export type VisitFieldDraft = { label: string; value: string };
+
+export type VisitDraft = {
+  transcript: string;
+  fields: VisitFieldDraft[];
+  checklist_ok: string[];
+  follow_ups: string[];
+  memo: string;
+  provider: string;
+};
+
+export type ClauseSuggestion = {
+  title: string;
+  body: string;
+  reason: string;
+  expert_review: boolean;
+};
+
+export type DocumentAiField = {
+  label: string;
+  value: string;
+  evidence_text: string | null;
+};
+
+export type DocumentAiSignal = {
+  level: "전문가 검토" | "확인 필요" | "참고";
+  title: string;
+  description: string | null;
+  evidence_text: string | null;
+  next_action: string | null;
+};

@@ -23,9 +23,19 @@ interface DocumentUploaderProps {
   officeId: string;
   properties: { value: string; label: string }[];
   defaultPropertyId?: string;
+  /** true면 매물 선택을 숨기고 defaultPropertyId만 사용 */
+  lockProperty?: boolean;
+  /** false면 문서 상세로 이동하지 않고 현재 페이지에 머묾 (기본 true) */
+  goToDetail?: boolean;
 }
 
-export function DocumentUploader({ officeId, properties, defaultPropertyId }: DocumentUploaderProps) {
+export function DocumentUploader({
+  officeId,
+  properties,
+  defaultPropertyId,
+  lockProperty = false,
+  goToDetail = true,
+}: DocumentUploaderProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -74,7 +84,9 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
           return;
         }
         toast.success(result.message ?? "업로드했어요.");
-        router.push(`/documents/${result.id}`);
+        setFile(null);
+        if (goToDetail) router.push(`/documents/${result.id}`);
+        else router.refresh();
       } catch (e) {
         toast.error(toErrorMessage(e));
       }
@@ -128,10 +140,12 @@ export function DocumentUploader({ officeId, properties, defaultPropertyId }: Do
       />
 
       <div className="space-y-3">
-        <div className="space-y-1.5">
-          <Label htmlFor="doc-property">연결할 매물</Label>
-          <NativeSelect id="doc-property" value={propertyId} onChange={(e) => setPropertyId(e.target.value)} options={properties} />
-        </div>
+        {!lockProperty && (
+          <div className="space-y-1.5">
+            <Label htmlFor="doc-property">연결할 매물</Label>
+            <NativeSelect id="doc-property" value={propertyId} onChange={(e) => setPropertyId(e.target.value)} options={properties} />
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label htmlFor="doc-type">문서 종류</Label>
           <NativeSelect id="doc-type" value={docType} onChange={(e) => setDocType(e.target.value as DocType)} options={DOC_TYPES} />

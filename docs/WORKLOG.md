@@ -4,15 +4,13 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: AI 1차 기능 연결 (브랜치 `feat/ai-assist`) — 선택 엔진(GPT/Gemini)으로 실제 호출
-  - **설정**: AI 엔진·구독/크레딧 선택 UI (`offices.ai_provider` 등)
-  - **통화 녹음 AI**: 고객 등록·상담 녹음 → STT·요약 → 고객 필드·문자 초안·추천 매물 (전화는 **파일명만**). 검토 후 반영
-  - **매물**: 「AI 광고 문구」로 `description`·highlights 초안
-  - **확인설명서**: 「AI 입지 채우기」로 ⑤ 입지 필드 초안 (추정·확인 필요)
-  - **크레딧 과금**이면 호출당 1 차감. 구독은 한도 미적용(추후)
-  - **원칙**: AI는 초안만. 법률 확정 표현 금지. 결제는 준비중
-- **다음 작업 시작 지점**: `npm run db:push`(`20261021120000`) → `.env.local`에 `OPENAI_API_KEY` 또는 `GEMINI_API_KEY` → 설정에서 엔진 선택 → 녹음/광고/입지 스모크
-- **환경**: 원격 Supabase + AI 키. 마이그레이션 **`20261021120000` 필요**
+- **단계**: AI·매물 UX·공부서류 추출 보강 (브랜치 `feat/ai-assist`)
+  - AI ComingSoon → 실제 호출 + `hasAiAccess`(구독/크레딧) 뱃지. 임장 STT·항목 정리, 특약·브리핑·문서 AI 러너 분리
+  - 매물: 사진 옆 동영상 최대 1개, 하위 탭(상세·임장·서류·연결 고객·브리핑), 선택 탭 primary 강조
+  - 등기 자동 추출: 8항목·소재지 `[집합건물]`·등기목적/원인/권리자(칸 전체·거래가액) 파싱 개선. 문서 AI 추출 UI는 일시 비활성
+  - 문서 검토: 전체 확인·카드 클릭 토글, 뒤로가기=매물 `?tab=docs`, 서명 URL 만료 캐시 수정, 목록 업로드 버튼 제거
+- **다음 작업 시작 지점**: 등기 PDF로 갑구 권리자(주소·거래가액) 재추출 확인 → 임장 AI·구독/크레딧 스모크 → lint/build 후 `develop` PR
+- **환경**: 원격 Supabase + AI 키. 마이그레이션 **`20261021120000` 필요**(이전과 동일)
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -63,6 +61,21 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-22 — AI 실사용·매물 서브내비·등기 추출·문서 UX
+**작업 요약**
+- AI: ComingSoon 해제, 접근 뱃지, 임장·특약·브리핑·문서 러너, 방문 폼 페이월 안내
+- 매물: 미디어(사진+영상1), `PropertySubnav`, 연결 고객 탭
+- 등기 파싱: 8필드, 권리자 전체(이름·주소·거래가액), 서명 URL `fresh`·JWT exp 캐시
+- 문서 검토: 전체/카드 체크, 매물 문서로 뒤로가기, 목록 업로드 버튼 제거, 버튼 `cursor-pointer`
+
+**변경 파일**
+- `lib/ai/*`, `lib/actions/ai-*`, `lib/doc-extract/parse.ts`, `lib/storage.ts`, `lib/actions/documents.ts`
+- `components/property-subnav.tsx`, `components/ai/*`, `components/ui/button.tsx`
+- `properties/**`, `documents/**`, `visit-form.tsx`, `docs/WORKLOG.md`
+
+**남은 TODO**
+- 실 PDF로 권리자·서명 URL 재확인. AI 결제·구독 한도. 문서 AI 추출 UI 복구 여부
 
 ### 2026-10-21 — AI 엔진 선택 UI + 통화·광고·입지 기능
 **작업 요약**

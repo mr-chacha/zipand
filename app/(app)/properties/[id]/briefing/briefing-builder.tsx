@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, ExternalLink, EyeOff, Link2, Loader2, Printer, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, EyeOff, Link2, Loader2, Printer, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { BriefingView, DEFAULT_SECTIONS, type BriefingData } from "@/components/briefing-view";
-import { ComingSoonButton } from "@/components/coming-soon";
+import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { CompleteProfileDialog } from "@/components/complete-profile-dialog";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { NativeSelect } from "@/components/form/native-select";
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
 import { createBriefing, deleteBriefing } from "@/lib/actions/briefings";
+import { suggestBriefingComment } from "@/lib/actions/ai-assist";
 import { formatDate, formatDateTime } from "@/lib/format";
 import type { BriefingSections, ProfileNeed } from "@/types";
 
@@ -46,15 +47,25 @@ interface BriefingBuilderProps {
   links: BriefingLink[];
   siteUrl: string;
   gate: GateInfo;
+  aiAvailable: boolean;
 }
 
-export function BriefingBuilder({ propertyId, data, defaultComment, links, siteUrl, gate }: BriefingBuilderProps) {
+export function BriefingBuilder({
+  propertyId,
+  data,
+  defaultComment,
+  links,
+  siteUrl,
+  gate,
+  aiAvailable,
+}: BriefingBuilderProps) {
   const officeGuard = useOfficeGuard("briefing", gate);
   const [sections, setSections] = useState<BriefingSections>(DEFAULT_SECTIONS);
   const [comment, setComment] = useState(defaultComment);
   const [days, setDays] = useState("14");
   const [pending, startTransition] = useTransition();
-  useBusy(pending);
+  const [aiPending, startAi] = useTransition();
+  useBusy(pending || aiPending);
   const [needs, setNeeds] = useState<ProfileNeed[]>([]);
 
   const linkUrl = (token: string) => `${typeof window !== "undefined" ? window.location.origin : siteUrl}/b/${token}`;
@@ -114,7 +125,37 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
           </CardHeader>
           <CardContent className="space-y-3">
             <Textarea rows={5} value={comment} onChange={(e) => setComment(e.target.value)} />
-            <ComingSoonButton size="sm">AI로 설명 작성</ComingSoonButton>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={aiPending}
+                onClick={() => {
+                  if (!aiAvailable) {
+                    toast.error("구독 후 혹은 크레딧 결제 후 사용할 수 있어요. 설정 → AI·요금에서 확인해 주세요.");
+                    return;
+                  }
+                  startAi(async () => {
+                    const r = await suggestBriefingComment(propertyId);
+                    if (!r.ok) {
+                      toast.error(r.error);
+                      return;
+                    }
+                    setComment(r.comment);
+                    toast.success("AI 설명 초안을 채웠어요. 확인하고 링크를 만드세요.");
+                  });
+                }}
+              >
+                {aiPending ? (
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
+                ) : (
+                  <Sparkles data-icon="inline-start" />
+                )}
+                AI로 설명 작성
+              </Button>
+              <AiAccessBadge available={aiAvailable} compact />
+            </div>
           </CardContent>
         </Card>
 
@@ -205,9 +246,6 @@ export function BriefingBuilder({ propertyId, data, defaultComment, links, siteU
                 })}
               </div>
             )}
-            <p className="text-xs text-muted-foreground">
-              PDF가 필요하면 링크의 인쇄 버튼을 눌러 &lsquo;PDF로 저장&rsquo;을 선택하세요.
-            </p>
           </CardContent>
         </Card>
       </div>

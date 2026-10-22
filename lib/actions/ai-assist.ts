@@ -5,9 +5,18 @@ import { consumeAiCredit } from "@/lib/ai/credits";
 import { matchPropertiesForDraft } from "@/lib/ai/match-properties";
 import { phoneFromFilename } from "@/lib/ai/phone";
 import { resolveAiProvider } from "@/lib/ai/provider";
+import { runBriefingComment } from "@/lib/ai/run-briefing";
+import { runClauseSuggestions } from "@/lib/ai/run-clauses";
 import { runConsultationFromAudio } from "@/lib/ai/run-consult";
 import { runAdCopy, runLocationDraft } from "@/lib/ai/run-text";
-import type { ConsultationDraft, LocationDraft, PropertyMatch } from "@/lib/ai/types";
+import { runVisitOrganize, runVisitTranscribe } from "@/lib/ai/run-visit";
+import type {
+  ClauseSuggestion,
+  ConsultationDraft,
+  LocationDraft,
+  PropertyMatch,
+  VisitDraft,
+} from "@/lib/ai/types";
 import { getSession } from "@/lib/auth";
 import { DEAL_TYPES } from "@/lib/constants";
 import { FormError } from "@/lib/errors";
@@ -16,9 +25,19 @@ import { isPropertyPath } from "@/lib/storage";
 
 const AUDIO_MAX = 25 * 1024 * 1024;
 
+function audioMime(fileName: string) {
+  const n = fileName.toLowerCase();
+  if (n.endsWith(".m4a") || n.endsWith(".mp4")) return "audio/mp4";
+  if (n.endsWith(".wav")) return "audio/wav";
+  if (n.endsWith(".webm")) return "audio/webm";
+  if (n.endsWith(".amr")) return "audio/amr";
+  if (n.endsWith(".ogg")) return "audio/ogg";
+  return "audio/mpeg";
+}
+
 async function loadAudioBytes(
   supabase: Awaited<ReturnType<typeof getSession>>["supabase"],
-  bucket: "consultation-audio",
+  bucket: "consultation-audio" | "visit-audio",
   path: string
 ) {
   const { data, error } = await supabase.storage.from(bucket).download(path);
@@ -42,7 +61,7 @@ export async function analyzeCallAudio(audioPath: string, audioName: string): Pr
     const ai = resolveAiProvider(office.ai_provider);
     await consumeAiCredit(supabase, office, 1);
     const bytes = await loadAudioBytes(supabase, "consultation-audio", audioPath);
-    const mime = audioName.toLowerCase().endsWith(".m4a") ? "audio/mp4" : "audio/mpeg";
+    const mime = audioMime(audioName);
     const draft = await runConsultationFromAudio(ai, bytes, audioName || "call.m4a", mime);
     const phoneFromFile = phoneFromFilename(audioName);
 
@@ -169,6 +188,131 @@ export async function suggestDisclosureLocation(address: string): Promise<Locati
     await consumeAiCredit(supabase, office, 1);
     const fields = await runLocationDraft(ai, trimmed);
     return { ok: true, fields };
+  } catch (e) {
+    return { ok: false, error: toErrorMessage(e) };
+  }
+}
+
+export type VisitTranscribeResult = { ok: true; transcript: string } | { ok: false; error: string };
+export type VisitOrganizeResult = { ok: true; draft: VisitDraft } | { ok: false; error: string };
+
+/** 임장 음성 → 받아쓰기만 */
+export async function transcribeVisitAudio(
+  propertyId: string,
+  audioPath: string,
+  audioName: string
+): Promise<VisitTranscribeResult> {
+  try {
+    const { supabase, office } = await getSession();
+    if (!isPropertyPath(audioPath, office.id, propertyId)) {
+      throw new FormError("녹음 파일 경로가 올바르지 않아요.");
+    }
+    const ai = resolveAiProvider(office.ai_provider);
+    await consumeAiCredit(supabase, office, 1);
+    const bytes = await loadAudioBytes(supabase, "visit-audio", audioPath);
+    const { transcript } = await runVisitTranscribe(ai, bytes, audioName || "visit.m4a", audioMime(audioName));
+    if (!transcript) throw new FormError("받아쓴 내용이 없어요. 녹음 품질을 확인해 주세요.");
+    return { ok: true, transcript };
+  } catch (e) {
+    return { ok: false, error: toErrorMessage(e) };
+  }
+}
+
+/** 임장 음성 → 항목·체크리스트·메모 초안 */
+export async function organizeVisitAudio(
+  propertyId: string,
+  audioPath: string,
+  audioName: string
+): Promise<VisitOrganizeResult> {
+  try {
+    const { supabase, office } = await getSession();
+    if (!isPropertyPath(audioPath, office.id, propertyId)) {
+      throw new FormError("녹음 파일 경로가 올바르지 않아요.");
+    }
+    const ai = resolveAiProvider(office.ai_provider);
+    await consumeAiCredit(supabase, office, 1);
+    const bytes = await loadAudioBytes(supabase, "visit-audio", audioPath);
+    const draft = await runVisitOrganize(ai, bytes, audioName || "visit.m4a", audioMime(audioName));
+    return { ok: true, draft };
+  } catch (e) {
+    return { ok: false, error: toErrorMessage(e) };
+  }
+}
+
+export type BriefingCommentResult = { ok: true; comment: string } | { ok: false; error: string };
+
+export async function suggestBriefingComment(propertyId: string): Promise<BriefingCommentResult> {
+  try {
+    const { supabase, office } = await getSession();
+    const ai = resolveAiProvider(office.ai_provider);
+    await consumeAiCredit(supabase, office, 1);
+
+    const { data: property, error } = await supabase
+      .from("properties")
+      .select("title, deal_type, property_type, region, price, monthly_rent, area_m2, direction, description, highlights")
+      .eq("id", propertyId)
+      .single();
+    if (error || !property) throw new FormError("매물을 찾을 수 없어요.");
+
+    const { data: visit } = await supabase
+      .from("property_visits")
+      .select("follow_ups")
+      .eq("property_id", propertyId)
+      .order("visited_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const price =
+      property.deal_type === "월세"
+        ? `보증 ${property.price ?? "-"} / 월 ${property.monthly_rent ?? "-"}`
+        : String(property.price ?? "-");
+
+    const comment = await runBriefingComment(ai, {
+      title: property.title,
+      dealType: property.deal_type,
+      propertyType: property.property_type,
+      region: property.region ?? "",
+      price,
+      area: property.area_m2 != null ? String(property.area_m2) : "",
+      direction: property.direction ?? "",
+      description: property.description ?? "",
+      highlights: (property.highlights ?? []).join(", "),
+      followUps: (visit?.follow_ups ?? []).join("\n"),
+    });
+    if (!comment) throw new FormError("설명을 만들지 못했어요. 매물 정보를 조금 더 채운 뒤 다시 시도해 주세요.");
+    return { ok: true, comment };
+  } catch (e) {
+    return { ok: false, error: toErrorMessage(e) };
+  }
+}
+
+export type ClauseSuggestResult = { ok: true; suggestions: ClauseSuggestion[] } | { ok: false; error: string };
+
+export async function suggestDealClauses(dealId: string): Promise<ClauseSuggestResult> {
+  try {
+    const { supabase, office } = await getSession();
+    const ai = resolveAiProvider(office.ai_provider);
+    await consumeAiCredit(supabase, office, 1);
+
+    const { data: deal, error } = await supabase
+      .from("deals")
+      .select("id, stage, memo, prep_note, terms_note, loan_note, property:properties(title, deal_type)")
+      .eq("id", dealId)
+      .single();
+    if (error || !deal) throw new FormError("거래를 찾을 수 없어요.");
+
+    const { data: clauses } = await supabase.from("deal_clauses").select("body").eq("deal_id", dealId);
+    const property = Array.isArray(deal.property) ? deal.property[0] : deal.property;
+
+    const suggestions = await runClauseSuggestions(ai, {
+      dealType: property?.deal_type ?? "",
+      stage: deal.stage,
+      propertyTitle: property?.title ?? "",
+      notes: [deal.memo, deal.prep_note, deal.terms_note, deal.loan_note].filter(Boolean).join("\n"),
+      existingClauses: (clauses ?? []).map((c) => c.body),
+    });
+    if (!suggestions.length) throw new FormError("추천할 특약을 찾지 못했어요. 거래 메모를 보강한 뒤 다시 시도해 주세요.");
+    return { ok: true, suggestions };
   } catch (e) {
     return { ok: false, error: toErrorMessage(e) };
   }

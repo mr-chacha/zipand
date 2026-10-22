@@ -16,6 +16,11 @@ function mimeFor(fileName: string, fallback: string) {
     amr: "audio/amr",
     ogg: "audio/ogg",
     aac: "audio/aac",
+    pdf: "application/pdf",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
   };
   return (ext && map[ext]) || fallback || "audio/mp4";
 }
@@ -71,5 +76,40 @@ export async function geminiJsonFromAudio<T>(
     if (e instanceof FormError) throw e;
     const msg = e instanceof Error ? e.message : String(e);
     throw new FormError(`Gemini 오디오 요청 실패: ${msg}`);
+  }
+}
+
+/** PDF·이미지 등 파일을 첨부해 JSON 추출 */
+export async function geminiJsonFromFile<T>(
+  apiKey: string,
+  system: string,
+  user: string,
+  bytes: Buffer,
+  fileName: string,
+  mime: string
+): Promise<T> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: FLASH,
+    generationConfig: { responseMimeType: "application/json", temperature: 0.1 },
+    systemInstruction: system,
+  });
+  try {
+    const result = await model.generateContent([
+      { text: user },
+      {
+        inlineData: {
+          mimeType: mimeFor(fileName, mime),
+          data: bytes.toString("base64"),
+        },
+      },
+    ]);
+    const raw = result.response.text();
+    if (!raw.trim()) throw new FormError("문서에서 항목을 찾지 못했어요.");
+    return JSON.parse(raw) as T;
+  } catch (e) {
+    if (e instanceof FormError) throw e;
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new FormError(`Gemini 문서 요청 실패: ${msg}`);
   }
 }

@@ -118,7 +118,15 @@ export async function setFieldReviewed(fieldId: string, documentId: string, revi
   const { error } = await supabase.from("document_fields").update({ reviewed }).eq("id", fieldId);
   if (error) return { error: toErrorMessage(error) };
   if (!reviewed) await markNeedsReview(documentId);
-  revalidatePath(`/documents/${documentId}`);
+  // 체크는 클라이언트에서 낙관적 반영 — 전체 페이지 revalidate는 생략(체감 지연 방지)
+  return {};
+}
+
+export async function setAllFieldsReviewed(documentId: string, reviewed: boolean): Promise<ActionState> {
+  const { supabase } = await getSession();
+  const { error } = await supabase.from("document_fields").update({ reviewed }).eq("document_id", documentId);
+  if (error) return { error: toErrorMessage(error) };
+  if (!reviewed) await markNeedsReview(documentId);
   return {};
 }
 

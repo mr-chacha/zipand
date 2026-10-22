@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
+import { hasAiAccess } from "@/lib/ai/access";
 import { createProperty } from "@/lib/actions/properties";
 import { getSession } from "@/lib/auth";
 import { getOfficeGate } from "@/lib/office-gate";
@@ -32,6 +33,7 @@ export default async function NewPropertyPage() {
           currentUserId={profile.id}
           officeId={office.id}
           cancelHref="/properties"
+          aiAvailable={hasAiAccess(office)}
         />
       )}
     </div>

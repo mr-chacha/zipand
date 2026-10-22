@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DOC_TYPES, type DocType } from "@/lib/constants";
 import { formatDate } from "@/lib/format";
-import { cn } from "@/lib/utils";
 
 export type PropertyDocumentRow = {
   id: string;
@@ -57,7 +56,7 @@ function DocCell({
       <Link
         href={`/documents?property=${propertyId}`}
         className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-        title={`${docType} 업로드`}
+        title={`${docType} 없음`}
       >
         —
       </Link>
@@ -128,16 +127,8 @@ export function PropertyDocumentsTable({
                     <DocCell doc={latestByType(p.documents, t)} propertyId={p.id} docType={t} />
                   </TableCell>
                 ))}
-                <TableCell className="pr-4 text-right">
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="tabular-nums text-sm font-medium">{p.documents.length}</span>
-                    <Link
-                      href={`/documents?property=${p.id}`}
-                      className={cn(buttonVariants({ size: "sm", variant: "outline" }), "h-7 text-xs")}
-                    >
-                      업로드
-                    </Link>
-                  </div>
+                <TableCell className="pr-4 text-right tabular-nums text-sm font-medium">
+                  {p.documents.length}
                 </TableCell>
               </TableRow>
             ))}
@@ -151,19 +142,11 @@ export function PropertyDocumentsTable({
           const filled = DOC_TYPES.filter((t) => latestByType(p.documents, t));
           return (
             <Card key={p.id} className="gap-3 p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <Link href={`/properties/${p.id}`} className="font-medium hover:underline">
-                    {p.title}
-                  </Link>
-                  <p className="truncate text-xs text-muted-foreground">{p.address}</p>
-                </div>
-                <Link
-                  href={`/documents?property=${p.id}`}
-                  className={cn(buttonVariants({ size: "sm", variant: "outline" }), "shrink-0")}
-                >
-                  업로드
+              <div className="min-w-0">
+                <Link href={`/properties/${p.id}`} className="font-medium hover:underline">
+                  {p.title}
                 </Link>
+                <p className="truncate text-xs text-muted-foreground">{p.address}</p>
               </div>
               {p.documents.length === 0 ? (
                 <p className="text-xs text-muted-foreground">등록된 서류 없음</p>

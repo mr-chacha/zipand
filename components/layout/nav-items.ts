@@ -24,7 +24,7 @@ export const navItems: NavItem[] = [
   { title: "고객 및 상담", href: "/customers", icon: Users },
   { title: "문서 관리", href: "/documents", icon: FileSearch },
   { title: "계약관리", href: "/contracts", icon: FileSignature },
-  { title: "AI 실무 도우미", href: "/assistant", icon: Bot, comingSoon: true },
+  { title: "AI 실무 도우미", href: "/assistant", icon: Bot },
 ];
 
 export const bottomNavItems: NavItem[] = [{ title: "설정", href: "/settings", icon: Settings }];

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { FileSearch, ShieldCheck } from "lucide-react";
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
+import { PropertySubnav } from "@/components/property-subnav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession } from "@/lib/auth";
 import { getOfficeGate } from "@/lib/office-gate";
@@ -65,8 +66,15 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
     <div className="space-y-6">
       <PageHeader
         title="문서 관리"
-        description="등록한 매물별로 등기·건축물대장·지적도 등 보관 서류를 보고, 업로드·검토할 수 있어요. 문서 상세에서 PDF 자동 추출로 면적·구조를 채울 수 있어요."
+        description={
+          selectedTitle
+            ? `「${selectedTitle}」 서류 · 등기·건축물대장 등을 업로드·검토할 수 있어요.`
+            : "등록한 매물별로 등기·건축물대장·지적도 등 보관 서류를 보고, 업로드·검토할 수 있어요. 문서 상세에서 PDF 자동 추출로 면적·구조를 채울 수 있어요."
+        }
+        backHref={selectedPropertyId ? `/properties/${selectedPropertyId}` : undefined}
+        backLabel={selectedPropertyId ? "매물 상세" : undefined}
       />
+      {selectedPropertyId ? <PropertySubnav propertyId={selectedPropertyId} active="docs" /> : null}
 
       <div className="grid gap-6 lg:grid-cols-5">
         <Card className="lg:col-span-3">

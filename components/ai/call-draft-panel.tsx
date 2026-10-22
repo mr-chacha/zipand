@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,10 +17,12 @@ export function CallDraftPanel({
   officeId,
   draftFolderId,
   onDraft,
+  aiAvailable = true,
 }: {
   officeId: string;
   draftFolderId: string;
   onDraft: (partial: Partial<Customer>, consult: ConsultationDraft) => void;
+  aiAvailable?: boolean;
 }) {
   const [audio, setAudio] = useState<AttachedAudio | null>(null);
   const [busy, setBusy] = useState(false);
@@ -31,6 +34,10 @@ export function CallDraftPanel({
   const run = () => {
     if (!audio) {
       toast.error("통화 녹음 파일을 먼저 올려 주세요.");
+      return;
+    }
+    if (!aiAvailable) {
+      toast.error("구독 후 혹은 크레딧 결제 후 사용할 수 있어요. 설정 → AI·요금에서 확인해 주세요.");
       return;
     }
     start(async () => {
@@ -65,9 +72,10 @@ export function CallDraftPanel({
     <>
       <Card className="border-primary/30">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
             <Sparkles className="size-4 text-primary" />
             통화 녹음으로 AI 작성
+            <AiAccessBadge available={aiAvailable} compact />
           </CardTitle>
           <CardDescription>
             녹음만 올리면 요약·희망조건을 채워요. 전화번호는 파일명에 있을 때만 자동 입력돼요.
