@@ -4,6 +4,7 @@ import { Building2, Compass, FileText, Layers, Lock, Maximize, Phone, Users } fr
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { PropertySubnav } from "@/components/property-subnav";
+import { RegistryInquiryButton } from "@/components/deal-forms/registry-inquiry-dialog";
 import { DocStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -67,6 +68,7 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
     signedUrls(supabase, "property-videos", videoRows.map((v) => v.storage_path)),
   ]);
   const linkedCustomers = (links.data ?? []).map((l) => l.customer).filter((c) => c !== null);
+  const hasRegistryDocument = (docs.data ?? []).some((doc) => doc.doc_type === "등기사항증명서");
 
   const dongHo =
     formatPropertyAddress({ address: "", building: property.building, unit: property.unit }) || "-";
@@ -107,13 +109,36 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
               {gate.blocked.document ? (
                 <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
               ) : (
-                <DocumentUploader
-                  officeId={office.id}
-                  properties={[{ value: id, label: property.title }]}
-                  defaultPropertyId={id}
-                  lockProperty
-                  goToDetail={false}
-                />
+                <div className="space-y-3">
+                  {!hasRegistryDocument && (
+                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium">등기사항증명서가 아직 없어요</p>
+                        <p className="text-xs text-muted-foreground">
+                          주소로 등기를 열람하면 원문 PDF가 이 매물 서류함에 자동 저장됩니다.
+                        </p>
+                      </div>
+                      <RegistryInquiryButton
+                        properties={[
+                          {
+                            value: id,
+                            label: [property.title, property.address].filter(Boolean).join(" · "),
+                            address: property.address ?? "",
+                            building: property.building ?? "",
+                            unit: property.unit ?? "",
+                          },
+                        ]}
+                      />
+                    </div>
+                  )}
+                  <DocumentUploader
+                    officeId={office.id}
+                    properties={[{ value: id, label: property.title }]}
+                    defaultPropertyId={id}
+                    lockProperty
+                    goToDetail={false}
+                  />
+                </div>
               )}
             </CardContent>
           </Card>

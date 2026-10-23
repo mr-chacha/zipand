@@ -242,6 +242,8 @@ export default async function ContractsPage() {
             value: p.id,
             label: [p.title, p.address].filter(Boolean).join(" · ") || p.id.slice(0, 8),
             address: p.address ?? "",
+            building: p.building ?? "",
+            unit: p.unit ?? "",
           }))}
           writeProperties={writePropertyOptions}
         />
