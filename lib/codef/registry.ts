@@ -4,8 +4,9 @@ import { codefEncrypt } from "@/lib/codef/crypto";
 
 const PRODUCT_PATH = "/v1/kr/public/ck/real-estate-register/status";
 
-export type RegistryRealtyType = "0" | "1"; // 0 토지+건물, 1 집합건물
+export type RegistryRealtyType = "0" | "1" | "2" | "3"; // 0 토지+건물, 1 집합건물, 2 토지, 3 건물
 export type RegistryIssueType = "0" | "1"; // 0 발급, 1 열람
+export type RegistryRecordState = "0" | "1"; // 0 말소사항 포함, 1 현재 유효사항
 
 export type RegistryAddressInput = {
   /** 시도 — CODEF addr_sido (예: 경기도) */
@@ -16,6 +17,7 @@ export type RegistryAddressInput = {
   dong?: string;
   ho?: string;
   realtyType: RegistryRealtyType;
+  recordState: RegistryRecordState;
 };
 
 export type RegistryAddrCandidate = {
@@ -38,41 +40,13 @@ export type RegistryTwoWayState = {
 
 export type RegistrySuccess = {
   continue2Way?: false;
-  /** pdf: CODEF resOriGinalData / summary: PDF 비어 있을 때 등기 요약 JSON */
-  fileKind: "pdf" | "summary";
-  /** 파일 바이트의 base64 (PDF 또는 UTF-8 JSON) */
+  fileKind: "pdf";
+  /** CODEF resOriGinalData의 PDF 바이트 Base64 */
   fileBase64: string;
   contentType: string;
   fileName: string;
   raw: Record<string, unknown>;
 };
-
-/** PDF가 비었을 때 열람 요약이라도 저장·다운로드할 수 있게 만든다 */
-function buildSummaryFallback(
-  data: Record<string, unknown>,
-  fileNameBase: string
-): RegistrySuccess | null {
-  const list = data.resRegisterEntriesList;
-  if (!Array.isArray(list) || list.length === 0) return null;
-  const payload = {
-    commUniqueNo: data.commUniqueNo ?? null,
-    resIssueYN: data.resIssueYN ?? null,
-    resWarningMessage: data.resWarningMessage ?? null,
-    resTotalPageCount: data.resTotalPageCount ?? null,
-    resRegisterEntriesList: list,
-    note:
-      "CODEF 응답에 PDF(resOriGinalData)가 비어 있어 등기 요약 JSON으로 저장했습니다. 데모(development.codef.io)에서는 PDF가 비는 경우가 있습니다. 정식 API(CODEF_USE_SANDBOX=false)에서 다시 열람하면 PDF를 받을 수 있습니다.",
-  };
-  // documents 버킷은 기본이 PDF·이미지만 — text/plain 은 마이그레이션으로 허용
-  const json = `${JSON.stringify(payload, null, 2)}\n`;
-  return {
-    fileKind: "summary",
-    fileBase64: Buffer.from(json, "utf8").toString("base64"),
-    contentType: "text/plain",
-    fileName: `${fileNameBase}.txt`,
-    raw: data,
-  };
-}
 
 function finishRegistrySuccess(
   data: Record<string, unknown>,
@@ -80,7 +54,7 @@ function finishRegistrySuccess(
   msg: string,
   fileNameBase: string
 ): RegistrySuccess {
-  if (code && code !== "CF-00000" && !pickPdfBase64(data)) {
+  if (code && code !== "CF-00000") {
     throw new Error(msg && msg !== "성공" ? msg : `CODEF 오류 (${code})`);
   }
 
@@ -94,6 +68,14 @@ function finishRegistrySuccess(
     resTotalPageCount: data.resTotalPageCount,
   });
 
+  if (data.resIssueYN != null && String(data.resIssueYN) !== "1" && !pdfBase64) {
+    throw new Error(
+      `등기 열람에 실패했어요 (발행여부: ${String(data.resIssueYN)}). ${
+        String(data.resWarningMessage ?? "").trim() || "주소와 열람 조건을 확인해 주세요."
+      }`
+    );
+  }
+
   if (pdfBase64) {
     return {
       fileKind: "pdf",
@@ -104,19 +86,14 @@ function finishRegistrySuccess(
     };
   }
 
-  const summary = buildSummaryFallback(data, fileNameBase);
-  if (summary) {
-    console.warn("[codef-registry] PDF empty — saving register summary JSON instead");
-    return summary;
-  }
-
   throw new Error(
-    "등기 열람은 성공(CF-00000)했지만 PDF(resOriGinalData)와 요약 데이터가 모두 비어 있어요. 데모 API이거나 주소·동·호를 확인해 주세요. (전자민원캐시는 이미 차감됐을 수 있습니다)"
+    "등기 열람은 성공했지만 원문 PDF(resOriGinalData)가 비어 있어요. CODEF 응답의 resIssueYN과 원문 포함 옵션을 확인해 주세요. (전자민원캐시는 이미 차감됐을 수 있습니다)"
   );
 }
 
 function decodeCodefData(data: unknown): Record<string, unknown> {
   if (data == null) return {};
+  if (Array.isArray(data)) return { items: data };
   if (typeof data === "object" && !Array.isArray(data)) return data as Record<string, unknown>;
   if (typeof data !== "string") return {};
   try {
@@ -146,9 +123,7 @@ function normalizePdfBase64Candidate(raw: string): string {
 
 /** %PDF- → base64 헤더 JVBERi0 */
 function isPdfBase64(s: string): boolean {
-  if (s.length < 200) return false;
-  if (s.startsWith("JVBERi0")) return true;
-  return /^[A-Za-z0-9+/]+=*$/.test(s.slice(0, 120)) && s.length > 1000;
+  return s.length >= 200 && s.startsWith("JVBERi0");
 }
 
 function findPdfInUnknown(value: unknown, depth: number): string {
@@ -247,18 +222,6 @@ function parseCodefResponseText(text: string): {
   }
 }
 
-function debugSecret(label: string, plain: string, encrypted: string) {
-  const codes = [...plain].map((c) => c.charCodeAt(0));
-  console.info(`[codef-registry] ${label}`, {
-    plain,
-    plainLen: plain.length,
-    plainCharCodes: codes,
-    encLen: encrypted.length,
-    encHead: encrypted.slice(0, 24),
-    encTail: encrypted.slice(-12),
-  });
-}
-
 async function postRegistry(body: Record<string, unknown>) {
   const { apiBase, sandbox } = getCodefConfig();
   const token = await getCodefAccessToken();
@@ -273,7 +236,7 @@ async function postRegistry(body: Record<string, unknown>) {
     url: `${apiBase}${PRODUCT_PATH}`,
     sandbox,
     organization: body.organization,
-    phoneNo: body.phoneNo,
+    phoneNoLen: String(body.phoneNo ?? "").length,
     inquiryType: body.inquiryType,
     realtyType: body.realtyType,
     issueType: body.issueType,
@@ -283,17 +246,16 @@ async function postRegistry(body: Record<string, unknown>) {
     addr_buildingNumber: body.addr_buildingNumber,
     dong: body.dong ?? "",
     ho: body.ho ?? "",
-    ePrepayNo: body.ePrepayNo,
     ePrepayNoLen: String(body.ePrepayNo ?? "").length,
     passwordEncLen: String(body.password ?? "").length,
-    ePrepayPassEncLen: String(body.ePrepayPass ?? "").length,
+    ePrepayPassLen: String(body.ePrepayPass ?? "").length,
     registerSummaryYN: body.registerSummaryYN,
+    originDataYN: body.originDataYN,
     jsonBodyLen: jsonBody.length,
     encodedBodyLen: encodedBody.length,
-    ePrepayPassMode: "plain (A/B: 암호문 344자 전달 의심 시 평문 전송)",
     specHint: {
       ePrepayNo: "12자리 전자민원캐시 번호 (평문)",
-      ePrepayPass: "결제 비밀번호 4~8자 — 현재 평문 전송 실험",
+      ePrepayPass: "전자민원캐시 비밀번호 (평문)",
       password: "등기소 비회원 비밀번호 → RSA 암호문",
     },
   });
@@ -309,7 +271,7 @@ async function postRegistry(body: Record<string, unknown>) {
   const text = await res.text();
   console.info("[codef-registry] RESPONSE", {
     httpStatus: res.status,
-    bodyHead: text.slice(0, 400),
+    bodyLength: text.length,
   });
   const json = parseCodefResponseText(text);
   const code = json.result?.code ?? "";
@@ -331,12 +293,15 @@ function baseBody(address: RegistryAddressInput, issueType: RegistryIssueType) {
     throw new Error("전자민원캐시(CODEF_EPREPAY_NO / CODEF_EPREPAY_PASS)를 설정해 주세요.");
   }
   if (!cfg.publicKey) {
-    throw new Error("CODEF_PUBLIC_KEY가 필요합니다. (전자민원캐시 비밀번호 RSA 암호화)");
+    throw new Error("CODEF_PUBLIC_KEY가 필요합니다. (인터넷등기소 비밀번호 RSA 암호화)");
   }
   const phoneNo = process.env.CODEF_PHONE_NO?.trim() ?? "";
   const password = process.env.CODEF_PASSWORD?.trim() ?? "";
   if (!phoneNo || !password) {
     throw new Error("등기소 비회원 로그인용 CODEF_PHONE_NO / CODEF_PASSWORD를 설정해 주세요.");
+  }
+  if (!/^\d{4}$/.test(password)) {
+    throw new Error("CODEF_PASSWORD는 재열람에 사용할 임의의 숫자 4자리여야 합니다.");
   }
 
   if (!address.addrSido.trim()) {
@@ -360,14 +325,6 @@ function baseBody(address: RegistryAddressInput, issueType: RegistryIssueType) {
   }
 
   const passwordEnc = codefEncrypt(cfg.publicKey, password);
-  debugSecret("등기소 password (CODEF_PASSWORD)", password, passwordEnc);
-  // 데모에서 암호문(344자)이 캐시에 그대로 넘어가는 증상 → ePrepayPass는 평문 전송 A/B
-  console.info("[codef-registry] 캐시 ePrepayPass PLAIN", {
-    plain: ePass,
-    plainLen: ePass.length,
-    plainCharCodes: [...ePass].map((c) => c.charCodeAt(0)),
-    mode: "plain",
-  });
   console.info("[codef-registry] publicKey", {
     len: cfg.publicKey.length,
     hasPemHeader: cfg.publicKey.includes("BEGIN PUBLIC KEY"),
@@ -387,7 +344,10 @@ function baseBody(address: RegistryAddressInput, issueType: RegistryIssueType) {
     issueType,
     ePrepayNo: cfg.ePrepayNo.replace(/\s/g, ""),
     ePrepayPass: ePass,
+    // CODEF 공식 명세: 원문 PDF(resOriGinalData)는 명시적으로 포함 요청해야 한다.
+    originDataYN: "1",
     registerSummaryYN: "1",
+    state: address.recordState,
   };
   if (address.dong?.trim()) body.dong = address.dong.trim();
   if (address.ho?.trim()) body.ho = address.ho.trim();
@@ -443,7 +403,6 @@ export async function inquireRegistrySelectAddress(
   const body = {
     ...baseBody(address, issueType),
     is2Way: true,
-    simpleAuth: "1",
     uniqueNo: twoWay.uniqueNo,
     jobIndex: String(twoWay.jobIndex),
     threadIndex: String(twoWay.threadIndex),

@@ -7,6 +7,7 @@ export {
   type RegistryAddressInput,
   type RegistryAddrCandidate,
   type RegistryIssueType,
+  type RegistryRecordState,
   type RegistryRealtyType,
   type RegistrySuccess,
   type RegistryTwoWayState,

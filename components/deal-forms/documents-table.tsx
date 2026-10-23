@@ -532,7 +532,7 @@ export function DocumentsTable({
             <FormDownloadLink key={f.href} href={f.href} filename={f.filename} label={f.label} />
           ))}
           <PrivacyConsentWriteButton deals={deals} />
-          <RegistryInquiryButton properties={properties} />
+          <RegistryInquiryButton properties={properties} allowUnlinked />
         </DocumentsWriteControls>
       )}
 

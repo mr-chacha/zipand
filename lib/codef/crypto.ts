@@ -1,6 +1,6 @@
 import { constants, publicEncrypt } from "node:crypto";
 
-/** CODEF publicKey로 RSA PKCS1 암호화 (비밀번호·전자민원캐시 비번) */
+/** CODEF publicKey로 인터넷등기소 비회원 비밀번호를 RSA PKCS1 암호화 */
 export function codefEncrypt(publicKeyPemOrBody: string, plain: string): string {
   const body = publicKeyPemOrBody
     .replace(/-----BEGIN PUBLIC KEY-----/g, "")
