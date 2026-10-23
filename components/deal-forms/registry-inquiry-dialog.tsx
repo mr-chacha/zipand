@@ -38,6 +38,14 @@ type RegistryFileResult = Extract<RegistryInquiryResult, { ok: true; kind: "file
   label: string;
 };
 
+type UnitInputMode = "both" | "dong" | "ho";
+
+function unitModeFor(dong?: string, ho?: string): UnitInputMode {
+  if (dong && !ho) return "dong";
+  if (!dong && ho) return "ho";
+  return "both";
+}
+
 function candidateLabel(candidate: Record<string, unknown>) {
   return String(
     candidate.resAddr ??
@@ -73,6 +81,9 @@ export function RegistryInquiryDialog({
   const [includeLand, setIncludeLand] = useState("0");
   const [dong, setDong] = useState(allowUnlinked ? "" : (properties[0]?.building ?? ""));
   const [ho, setHo] = useState(allowUnlinked ? "" : (properties[0]?.unit ?? ""));
+  const [unitMode, setUnitMode] = useState<UnitInputMode>(
+    allowUnlinked ? "both" : unitModeFor(properties[0]?.building, properties[0]?.unit)
+  );
   const [result, setResult] = useState<RegistryInquiryResult | null>(null);
   const [files, setFiles] = useState<RegistryFileResult[]>([]);
   const requestKind = useRef<"main" | "land">("main");
@@ -108,6 +119,7 @@ export function RegistryInquiryDialog({
     setPropertyId(nextId);
     setDong(property?.building ?? "");
     setHo(property?.unit ?? "");
+    setUnitMode(unitModeFor(property?.building, property?.unit));
     setAddress(null);
     setResult(null);
     setFiles([]);
@@ -230,6 +242,9 @@ export function RegistryInquiryDialog({
       setPropertyId(allowUnlinked ? "" : (properties[0]?.value ?? ""));
       setDong(allowUnlinked ? "" : (properties[0]?.building ?? ""));
       setHo(allowUnlinked ? "" : (properties[0]?.unit ?? ""));
+      setUnitMode(
+        allowUnlinked ? "both" : unitModeFor(properties[0]?.building, properties[0]?.unit)
+      );
       setRecordState("1");
       setIncludeLand("0");
       requestKind.current = "main";
@@ -240,6 +255,11 @@ export function RegistryInquiryDialog({
 
   const showCompletedFiles =
     files.length > 0 && result !== null && (!result.ok || result.kind === "file");
+  const unitInputMissing =
+    realtyType === "1" &&
+    ((unitMode === "both" && (!dong.trim() || !ho.trim())) ||
+      (unitMode === "dong" && !dong.trim()) ||
+      (unitMode === "ho" && !ho.trim()));
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
@@ -288,6 +308,37 @@ export function RegistryInquiryDialog({
             </div>
 
             <div className="space-y-1.5">
+              <Label>부동산 구분</Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {[
+                  { value: "0", label: "토지 + 건물" },
+                  { value: "1", label: "집합건물" },
+                  { value: "2", label: "토지" },
+                  { value: "3", label: "건물" },
+                ].map((option) => (
+                  <label key={option.value} className="cursor-pointer">
+                    <input
+                      type="radio"
+                      name="realty_type"
+                      value={option.value}
+                      checked={realtyType === option.value}
+                      onChange={() => {
+                        setRealtyType(option.value);
+                        if (option.value === "2") setIncludeLand("0");
+                        setResult(null);
+                        setFiles([]);
+                      }}
+                      className="peer sr-only"
+                    />
+                    <span className="flex h-9 items-center justify-center rounded-lg border px-2 text-sm transition-colors peer-checked:border-primary peer-checked:bg-primary/10 peer-checked:text-primary peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50 hover:bg-muted">
+                      {option.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
               <Label>등기 검색 주소</Label>
               <div className="flex gap-2">
                 <Input
@@ -309,60 +360,74 @@ export function RegistryInquiryDialog({
               )}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-realty-type">부동산 구분</Label>
-                <NativeSelect
-                  id="reg-realty-type"
-                  name="realty_type"
-                  value={realtyType}
-                  onChange={(event) => {
-                    const nextType = event.target.value;
-                    setRealtyType(nextType);
-                    if (nextType === "2") setIncludeLand("0");
-                    setResult(null);
-                    setFiles([]);
-                  }}
-                  options={[
-                    { value: "1", label: "집합건물" },
-                    { value: "0", label: "토지+건물" },
-                    { value: "2", label: "토지" },
-                    { value: "3", label: "건물" },
-                  ]}
-                  className="w-full"
-                />
+            {realtyType === "1" && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <Label>동·호 선택</Label>
+                  {[
+                    { value: "both", label: "동+호" },
+                    { value: "dong", label: "동" },
+                    { value: "ho", label: "호" },
+                  ].map((option) => (
+                    <label key={option.value} className="flex cursor-pointer items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="unit_mode"
+                        value={option.value}
+                        checked={unitMode === option.value}
+                        onChange={() => {
+                          const nextMode = option.value as UnitInputMode;
+                          setUnitMode(nextMode);
+                          if (nextMode === "dong") setHo("");
+                          if (nextMode === "ho") setDong("");
+                          setResult(null);
+                          setFiles([]);
+                        }}
+                        className="size-4 accent-primary"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-dong">동</Label>
+                    <Input
+                      id="reg-dong"
+                      name="dong"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required={unitMode !== "ho"}
+                      disabled={unitMode === "ho"}
+                      value={dong}
+                      onChange={(event) => {
+                        setDong(event.target.value.replace(/\D/g, ""));
+                        setResult(null);
+                      }}
+                      placeholder="예) 101"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reg-ho">호</Label>
+                    <Input
+                      id="reg-ho"
+                      name="ho"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      required={unitMode !== "dong"}
+                      disabled={unitMode === "dong"}
+                      value={ho}
+                      onChange={(event) => {
+                        setHo(event.target.value.replace(/\D/g, ""));
+                        setResult(null);
+                      }}
+                      placeholder="예) 1203"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-dong">동</Label>
-                <Input
-                  id="reg-dong"
-                  name="dong"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={dong}
-                  onChange={(event) => {
-                    setDong(event.target.value.replace(/\D/g, ""));
-                    setResult(null);
-                  }}
-                  placeholder="예) 101"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="reg-ho">호</Label>
-                <Input
-                  id="reg-ho"
-                  name="ho"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={ho}
-                  onChange={(event) => {
-                    setHo(event.target.value.replace(/\D/g, ""));
-                    setResult(null);
-                  }}
-                  placeholder="예) 1203"
-                />
-              </div>
-            </div>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -403,10 +468,6 @@ export function RegistryInquiryDialog({
               </div>
             </div>
 
-            {realtyType === "1" && (
-              <p className="text-xs text-muted-foreground">집합건물은 동 또는 호 중 하나 이상 입력해야 합니다.</p>
-            )}
-
             <p className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-foreground">
               열람을 실행하면 등기 열람수수료가 차감됩니다.
               {includeLand === "1" && realtyType !== "2" && " 토지등기를 함께 열람하면 2건의 수수료가 발생할 수 있습니다."}
@@ -445,7 +506,7 @@ export function RegistryInquiryDialog({
                 <DialogFooter className="mt-1">
                   <Button
                     type="submit"
-                    disabled={pending || !address || (realtyType === "1" && !dong.trim() && !ho.trim())}
+                    disabled={pending || !address || unitInputMissing}
                   >
                     {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Landmark data-icon="inline-start" />}
                     {pending ? "인터넷등기소 열람 중…" : "등기 열람"}

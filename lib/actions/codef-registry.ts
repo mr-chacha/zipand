@@ -69,8 +69,16 @@ function parseInput(fd: FormData): RegistryAddressInput & { propertyId: string; 
   if ((dong && !/^\d+$/.test(dong)) || (ho && !/^\d+$/.test(ho))) {
     throw new Error("동·호는 숫자만 입력해 주세요.");
   }
-  if (realtyType === "1" && !dong && !ho) {
-    throw new Error("집합건물은 동 또는 호 중 하나 이상 입력해 주세요.");
+  const unitMode = String(fd.get("unit_mode") ?? "both");
+  if (realtyType === "1") {
+    if (!["both", "dong", "ho"].includes(unitMode)) {
+      throw new Error("동·호 선택 방식이 올바르지 않습니다.");
+    }
+    if (unitMode === "both" && (!dong || !ho)) {
+      throw new Error("동과 호를 모두 입력해 주세요.");
+    }
+    if (unitMode === "dong" && !dong) throw new Error("동을 입력해 주세요.");
+    if (unitMode === "ho" && !ho) throw new Error("호를 입력해 주세요.");
   }
   const registryLabel = String(fd.get("registry_label") ?? "").trim();
   return {
