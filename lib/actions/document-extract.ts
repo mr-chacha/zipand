@@ -189,11 +189,7 @@ export async function extractDocumentFields(documentId: string): Promise<ActionS
 
 /**
  * AI로 공부서류 항목·확인 사항을 추출한다.
- * 텍스트 PDF는 규칙 추출이 약한 경우에도 LLM으로 보강하고, 스캔본은 Gemini 파일 첨부로 시도한다.
- *
- * TODO(문서 AI 추출): 당분간 UI에서 비활성(규칙 기반 「자동 추출」만 노출).
- * 다시 켤 때 document-review의 AI 추출 버튼·AiAccessBadge를 복구하고 이 액션을 연결한다.
- * 구현 본체는 lib/ai/run-document.ts 에 유지.
+ * 등기는 전체 원문을 바탕으로 현재 유효한 권리와 확인 사항을 요약한다.
  */
 export async function extractDocumentFieldsAi(documentId: string): Promise<ActionState & { count?: number }> {
   const { supabase, office } = await getSession();
@@ -245,6 +241,20 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       return { error: "AI가 항목을 찾지 못했어요. 원문을 대조해 직접 입력해 주세요." };
     }
 
+    // AI 재요약은 직전 AI 결과만 교체하고 사용자가 직접 입력한 항목은 보존한다.
+    const { error: deleteFieldError } = await supabase
+      .from("document_fields")
+      .delete()
+      .eq("document_id", id)
+      .eq("ai_generated", true);
+    if (deleteFieldError) throw deleteFieldError;
+    const { error: deleteSignalError } = await supabase
+      .from("document_signals")
+      .delete()
+      .eq("document_id", id)
+      .eq("ai_generated", true);
+    if (deleteSignalError) throw deleteSignalError;
+
     const { data: existing } = await supabase.from("document_fields").select("label").eq("document_id", id);
     const have = new Set((existing ?? []).map((f) => f.label));
 
@@ -255,7 +265,9 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
         label: f.label,
         value: f.value,
         evidence_text: f.evidence_text,
-        page: null as number | null,
+        page: f.page,
+        confidence: f.confidence,
+        ai_generated: true,
         reviewed: false,
       }));
 
@@ -264,16 +276,27 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       if (insErr) throw insErr;
     }
 
-    for (const f of parsed.fields.filter((x) => have.has(x.label))) {
-      await supabase
+    for (const f of parsed.fields.filter((field) => have.has(field.label))) {
+      const { error: updateError } = await supabase
         .from("document_fields")
-        .update({ value: f.value, evidence_text: f.evidence_text, reviewed: false })
+        .update({
+          value: f.value,
+          evidence_text: f.evidence_text,
+          page: f.page,
+          confidence: f.confidence,
+          ai_generated: true,
+          reviewed: false,
+        })
         .eq("document_id", id)
         .eq("label", f.label);
+      if (updateError) throw updateError;
     }
 
     if (parsed.signals.length) {
-      const { data: sigExist } = await supabase.from("document_signals").select("title").eq("document_id", id);
+      const { data: sigExist } = await supabase
+        .from("document_signals")
+        .select("title")
+        .eq("document_id", id);
       const sigHave = new Set((sigExist ?? []).map((s) => s.title));
       const sigRows = parsed.signals
         .filter((s) => !sigHave.has(s.title))
@@ -284,7 +307,10 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
           description: s.description,
           evidence_text: s.evidence_text,
           next_action: s.next_action,
-          page: null as number | null,
+          page: s.page,
+          confidence: s.confidence,
+          ai_generated: true,
+          reviewed: false,
         }));
       if (sigRows.length) {
         const { error: sigErr } = await supabase.from("document_signals").insert(sigRows);
@@ -298,8 +324,8 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
     revalidatePath("/documents");
 
     return {
-      message: `AI로 ${toInsert.length || parsed.fields.length}개 항목을 채웠어요. 원문과 대조한 뒤 검토 완료해 주세요.`,
-      count: toInsert.length || parsed.fields.length,
+      message: `AI로 ${parsed.fields.length}개 항목과 ${parsed.signals.length}개 확인 사항을 정리했어요. 원문과 대조한 뒤 검토 완료해 주세요.`,
+      count: parsed.fields.length + parsed.signals.length,
     };
   } catch (e) {
     return { error: toErrorMessage(e) };

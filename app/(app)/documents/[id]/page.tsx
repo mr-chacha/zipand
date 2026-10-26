@@ -53,6 +53,11 @@ export default async function DocumentDetailPage({
     if (ai !== bi) return ai - bi;
     return a.created_at.localeCompare(b.created_at);
   });
+  const reviewKey = [
+    doc.status,
+    ...orderedFields.map((field) => `${field.id}:${field.reviewed}`),
+    ...(signals.data ?? []).map((signal) => `${signal.id}:${signal.reviewed}`),
+  ].join("|");
 
   const returnTo = safeReturnPath(sp.return);
   const backHref =
@@ -83,7 +88,9 @@ export default async function DocumentDetailPage({
         />
 
         <DocumentReview
+          key={reviewKey}
           documentId={id}
+          docType={doc.doc_type}
           status={doc.status}
           issuedAt={doc.issued_at}
           presets={presets}

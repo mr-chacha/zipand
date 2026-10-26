@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { AlertTriangle, CheckCircle2, Loader2, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -17,9 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
-import { extractDocumentFields } from "@/lib/actions/document-extract";
-// TODO(문서 AI 추출): UI에서 당분간 비활성. 다시 켤 때 extractDocumentFieldsAi + AiAccessBadge 복구.
-// import { extractDocumentFieldsAi } from "@/lib/actions/document-extract";
+import { extractDocumentFields, extractDocumentFieldsAi } from "@/lib/actions/document-extract";
 import {
   addDocumentField,
   addDocumentSignal,
@@ -30,6 +28,7 @@ import {
   reopenReview,
   setAllFieldsReviewed,
   setFieldReviewed,
+  setSignalReviewed,
   updateDocumentIssuedAt,
 } from "@/lib/actions/documents";
 import { SIGNAL_LEVELS } from "@/lib/constants";
@@ -39,6 +38,7 @@ import type { DocumentField, DocumentSignal } from "@/types";
 
 interface DocumentReviewProps {
   documentId: string;
+  docType: string;
   status: string;
   issuedAt: string | null;
   presets: string[];
@@ -48,6 +48,7 @@ interface DocumentReviewProps {
 
 export function DocumentReview({
   documentId,
+  docType,
   status,
   issuedAt,
   presets,
@@ -55,17 +56,16 @@ export function DocumentReview({
   signals,
 }: DocumentReviewProps) {
   const [pending, startTransition] = useTransition();
-  const [, startReviewToggle] = useTransition();
+  const [reviewPending, startReviewToggle] = useTransition();
   const [extracting, setExtracting] = useState(false);
   const [localFields, setLocalFields] = useState(fields);
-  useBusy(pending || extracting);
+  const [localSignals, setLocalSignals] = useState(signals);
+  useBusy(pending || extracting || reviewPending);
   const reviewedCount = localFields.filter((f) => f.reviewed).length;
+  const reviewedSignalCount = localSignals.filter((signal) => signal.reviewed).length;
   const allReviewed = localFields.length > 0 && reviewedCount === localFields.length;
+  const hasAiResult = localFields.some((field) => field.ai_generated);
   const done = status === "검토 완료";
-
-  useEffect(() => {
-    setLocalFields(fields);
-  }, [fields]);
 
   const run = (fn: () => Promise<{ error?: string; message?: string }>) =>
     startTransition(async () => {
@@ -99,11 +99,26 @@ export function DocumentReview({
     });
   };
 
+  const toggleSignalReviewed = (signalId: string, reviewed: boolean) => {
+    const prev = localSignals;
+    setLocalSignals((rows) => rows.map((signal) => (signal.id === signalId ? { ...signal, reviewed } : signal)));
+    startReviewToggle(async () => {
+      const result = await setSignalReviewed(signalId, documentId, reviewed);
+      if (result.error) {
+        setLocalSignals(prev);
+        toast.error(result.error);
+      }
+    });
+  };
+
   const runExtract = () => {
     setExtracting(true);
     startTransition(async () => {
       try {
-        const result = await extractDocumentFields(documentId);
+        const result =
+          docType === "등기사항증명서"
+            ? await extractDocumentFieldsAi(documentId)
+            : await extractDocumentFields(documentId);
         if (result.error) toast.error(result.error);
         else if (result.message) toast.success(result.message);
       } finally {
@@ -119,12 +134,24 @@ export function DocumentReview({
           <div className="space-y-1">
             <CardTitle>핵심 항목 정리</CardTitle>
             <CardDescription>
-              체크는 「원문과 대조했다」는 표시예요. 전부 체크해야 검토 완료할 수 있어요.
+              {docType === "등기사항증명서"
+                ? "AI가 원문을 정리한 결과예요. 항목과 확인 사항을 모두 원문과 대조해 주세요."
+                : "체크는 「원문과 대조했다」는 표시예요. 전부 체크해야 검토 완료할 수 있어요."}
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={pending || extracting || done} onClick={runExtract}>
-            {extracting ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
-            {extracting ? "추출 중…" : "자동 추출"}
+            {extracting ? (
+              <Loader2 className="animate-spin" data-icon="inline-start" />
+            ) : docType === "등기사항증명서" ? (
+              <Sparkles data-icon="inline-start" />
+            ) : null}
+            {extracting
+              ? "정리 중…"
+              : docType === "등기사항증명서"
+                ? hasAiResult
+                  ? "AI 다시 요약"
+                  : "AI 요약"
+                : "자동 추출"}
           </Button>
         </div>
         <div className="flex flex-wrap items-end gap-2">
@@ -148,7 +175,9 @@ export function DocumentReview({
             <TabsTrigger value="fields">
               추출 항목 {fields.length > 0 && `(${reviewedCount}/${fields.length})`}
             </TabsTrigger>
-            <TabsTrigger value="signals">확인 사항 {signals.length > 0 && `(${signals.length})`}</TabsTrigger>
+            <TabsTrigger value="signals">
+              확인 사항 {localSignals.length > 0 && `(${reviewedSignalCount}/${localSignals.length})`}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="fields" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
@@ -210,6 +239,11 @@ export function DocumentReview({
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="text-xs text-muted-foreground">{field.label}</span>
+                      {field.ai_generated && (
+                        <span className="text-[10px] font-medium text-primary">
+                          AI · 신뢰도 {field.confidence ?? 50}%
+                        </span>
+                      )}
                       <span className="whitespace-pre-wrap text-sm font-medium">{field.value}</span>
                     </div>
                     {(field.evidence_text || field.page) && (
@@ -243,14 +277,31 @@ export function DocumentReview({
 
           <TabsContent value="signals" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
             <div className="space-y-3 pb-1">
-              {signals.length === 0 && (
+              {localSignals.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">기록된 확인 사항이 없어요.</p>
               )}
-              {signals.map((signal) => (
-                <div key={signal.id} className="space-y-1.5 rounded-lg border p-3">
+              {localSignals.map((signal) => (
+                <div
+                  key={signal.id}
+                  className={cn(
+                    "space-y-1.5 rounded-lg border p-3 transition-colors",
+                    signal.reviewed && "border-primary/30 bg-primary/5"
+                  )}
+                >
                   <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={signal.reviewed}
+                      disabled={done}
+                      onCheckedChange={(value) => toggleSignalReviewed(signal.id, Boolean(value))}
+                      aria-label={`${signal.title} 원문 대조 확인`}
+                    />
                     <SignalBadge level={signal.level} />
                     <p className="flex-1 text-sm font-medium">{signal.title}</p>
+                    {signal.ai_generated && (
+                      <span className="text-[10px] font-medium text-primary">
+                        AI · 신뢰도 {signal.confidence ?? 50}%
+                      </span>
+                    )}
                     <ConfirmAction
                       appOnly
                       action={() => deleteDocumentSignal(signal.id, documentId)}
@@ -280,7 +331,11 @@ export function DocumentReview({
 
         <div className="flex shrink-0 items-start gap-2 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-          정리 결과는 업무 참고용입니다.<br/>정리 결과를 확인후 계약서를 작성해주세요.
+          <span>
+            {docType === "등기사항증명서"
+              ? "AI 요약은 법률 판단이 아닌 업무 참고용입니다. 신뢰도와 원문 근거를 확인하고, 복잡한 권리관계는 전문가에게 검토받으세요."
+              : "정리 결과는 업무 참고용입니다. 정리 결과를 확인한 후 계약서를 작성해 주세요."}
+          </span>
         </div>
       </CardContent>
       <CardFooter className="shrink-0 flex flex-wrap justify-between gap-2 border-t bg-card">
@@ -302,11 +357,19 @@ export function DocumentReview({
           </Button>
         ) : (
           <Button
-            disabled={pending || localFields.length === 0 || reviewedCount < localFields.length}
+            disabled={
+              pending ||
+              reviewPending ||
+              localFields.length === 0 ||
+              reviewedCount < localFields.length ||
+              reviewedSignalCount < localSignals.length
+            }
             onClick={() => run(() => completeReview(documentId))}
             title={
               localFields.length > 0 && reviewedCount < localFields.length
                 ? `확인하지 않은 항목이 ${localFields.length - reviewedCount}개 있어요`
+                : reviewedSignalCount < localSignals.length
+                  ? `확인하지 않은 확인 사항이 ${localSignals.length - reviewedSignalCount}개 있어요`
                 : undefined
             }
           >

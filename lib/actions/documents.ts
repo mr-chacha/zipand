@@ -6,7 +6,7 @@ import { getSession } from "@/lib/auth";
 import { DOC_TYPES, SIGNAL_LEVELS, type DocType } from "@/lib/constants";
 import { int, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
 import type { ActionState } from "@/types";
-import { extractDocumentFields } from "./document-extract";
+import { extractDocumentFields, extractDocumentFieldsAi } from "./document-extract";
 import { logPropertyEvent } from "./properties";
 
 interface NewDocument {
@@ -47,17 +47,23 @@ export async function createDocument(input: NewDocument): Promise<ActionState & 
 
   const isPdf = input.fileName.toLowerCase().endsWith(".pdf");
   if (!input.skipExtract && isPdf) {
-    const extracted = await extractDocumentFields(data.id);
+    const usesAi = input.docType === "등기사항증명서";
+    const extracted = usesAi
+      ? await extractDocumentFieldsAi(data.id)
+      : await extractDocumentFields(data.id);
     if (extracted.count && extracted.count > 0) {
       return {
-        message: `업로드했어요. ${extracted.count}개 항목을 자동으로 채웠어요. 값을 검토해 주세요.`,
+        message: usesAi
+          ? `업로드하고 AI로 ${extracted.count}개 항목·확인 사항을 정리했어요. 원문과 대조해 주세요.`
+          : `업로드했어요. ${extracted.count}개 항목을 자동으로 채웠어요. 값을 검토해 주세요.`,
         id: data.id,
       };
     }
-    // 스캔 PDF 등 — 업로드 자체는 성공
     return {
       message: extracted.error
-        ? "업로드했어요. 자동 추출은 못 했어요(스캔본일 수 있어요). 문서 상세에서 다시 시도하거나 직접 입력해 주세요."
+        ? usesAi
+          ? `업로드했지만 AI 요약은 완료하지 못했어요: ${extracted.error}`
+          : "업로드했어요. 자동 추출은 못 했어요(스캔본일 수 있어요). 문서 상세에서 다시 시도하거나 직접 입력해 주세요."
         : "업로드했어요. 핵심 항목을 정리해 주세요.",
       id: data.id,
     };
@@ -166,6 +172,18 @@ export async function deleteDocumentSignal(signalId: string, documentId: string)
   return { message: "확인 사항을 삭제했어요." };
 }
 
+export async function setSignalReviewed(
+  signalId: string,
+  documentId: string,
+  reviewed: boolean
+): Promise<ActionState> {
+  const { supabase } = await getSession();
+  const { error } = await supabase.from("document_signals").update({ reviewed }).eq("id", signalId);
+  if (error) return { error: toErrorMessage(error) };
+  if (!reviewed) await markNeedsReview(documentId);
+  return {};
+}
+
 export async function completeReview(documentId: string): Promise<ActionState> {
   const { supabase, profile } = await getSession();
   const { count } = await supabase
@@ -174,6 +192,13 @@ export async function completeReview(documentId: string): Promise<ActionState> {
     .eq("document_id", documentId)
     .eq("reviewed", false);
   if (count) return { error: `확인하지 않은 항목이 ${count}개 있어요.` };
+
+  const { count: signalCount } = await supabase
+    .from("document_signals")
+    .select("id", { count: "exact", head: true })
+    .eq("document_id", documentId)
+    .eq("reviewed", false);
+  if (signalCount) return { error: `확인하지 않은 확인 사항이 ${signalCount}개 있어요.` };
 
   const { data: doc, error } = await supabase
     .from("documents")

@@ -78,6 +78,7 @@ export const DEFAULT_VISIT_CHECKLIST = [
 /** 공부서류 주요 추출 항목 프리셋 (기획서 7.4) — AI 없이 문서 상세에서 수동 입력 */
 export const DOC_FIELD_PRESETS: Record<DocType, string[]> = {
   등기사항증명서: [
+    "AI 요약",
     "소유자",
     "소재지",
     "갑구 등기목적",

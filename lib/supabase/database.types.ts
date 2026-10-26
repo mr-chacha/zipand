@@ -699,6 +699,8 @@ export type Database = {
       }
       document_fields: {
         Row: {
+          ai_generated: boolean
+          confidence: number | null
           created_at: string
           document_id: string
           evidence_text: string | null
@@ -710,6 +712,8 @@ export type Database = {
           value: string
         }
         Insert: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           document_id: string
           evidence_text?: string | null
@@ -721,6 +725,8 @@ export type Database = {
           value: string
         }
         Update: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           document_id?: string
           evidence_text?: string | null
@@ -750,6 +756,8 @@ export type Database = {
       }
       document_signals: {
         Row: {
+          ai_generated: boolean
+          confidence: number | null
           created_at: string
           description: string | null
           document_id: string
@@ -759,9 +767,12 @@ export type Database = {
           next_action: string | null
           office_id: string
           page: number | null
+          reviewed: boolean
           title: string
         }
         Insert: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           description?: string | null
           document_id: string
@@ -771,9 +782,12 @@ export type Database = {
           next_action?: string | null
           office_id?: string
           page?: number | null
+          reviewed?: boolean
           title: string
         }
         Update: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           description?: string | null
           document_id?: string
@@ -783,6 +797,7 @@ export type Database = {
           next_action?: string | null
           office_id?: string
           page?: number | null
+          reviewed?: boolean
           title?: string
         }
         Relationships: [
