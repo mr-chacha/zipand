@@ -3,8 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { DEAL_TYPES, MAINTENANCE_STATUSES, PROPERTY_STATUSES, PROPERTY_TYPES, type PropertyStatus } from "@/lib/constants";
+import {
+  DEAL_TYPES,
+  DEFAULT_NEARBY_KEYWORDS,
+  MAINTENANCE_STATUSES,
+  PROPERTY_STATUSES,
+  PROPERTY_TYPES,
+  type PropertyStatus,
+} from "@/lib/constants";
 import { FormError, int, lines, num, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
+import { normalizeNearbyKeywords } from "@/lib/kakao-local";
 import { isPropertyPath, MEDIA_LIMITS } from "@/lib/storage";
 import type { ActionState } from "@/types";
 
@@ -21,6 +29,7 @@ function readPropertyForm(fd: FormData) {
           ]),
         ].filter(Boolean)
       : [];
+  const nearbyKeywords = normalizeNearbyKeywords(str(fd, "nearby_keywords"));
   return {
     title: requiredStr(fd, "title", "매물명"),
     address: requiredStr(fd, "address", "주소"),
@@ -49,6 +58,7 @@ function readPropertyForm(fd: FormData) {
     description: str(fd, "description"),
     highlights: lines(str(fd, "highlights")),
     internal_memo: str(fd, "internal_memo"),
+    nearby_keywords: nearbyKeywords.length ? nearbyKeywords : [...DEFAULT_NEARBY_KEYWORDS],
     landlord_phone: str(fd, "landlord_phone"),
     caretaker_phone: str(fd, "caretaker_phone"),
     tenant_phone: str(fd, "tenant_phone"),

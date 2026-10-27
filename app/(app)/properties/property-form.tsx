@@ -17,7 +17,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { DEAL_TYPES, DIRECTIONS, PROPERTY_STATUSES, PROPERTY_TYPES } from "@/lib/constants";
+import {
+  DEAL_TYPES,
+  DEFAULT_NEARBY_KEYWORDS,
+  DIRECTIONS,
+  PROPERTY_STATUSES,
+  PROPERTY_TYPES,
+} from "@/lib/constants";
 import { pickKakaoPostcode, toPropertyAddressFields } from "@/lib/kakao-postcode";
 import { useFormAction } from "@/lib/use-form-action";
 import { removeFromStorage, uploadToStorage } from "@/lib/upload-client";
@@ -231,6 +237,19 @@ export function PropertyForm({
                 placeholder="예) 마포구"
               />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="nearby_keywords">주변 검색 키워드</Label>
+            <Input
+              id="nearby_keywords"
+              name="nearby_keywords"
+              defaultValue={(d?.nearby_keywords ?? [...DEFAULT_NEARBY_KEYWORDS]).join(", ")}
+              placeholder="예) 지하철역, 병원, 대형마트, 편의점, 공원"
+            />
+            <p className="text-xs text-muted-foreground">
+              주소를 기준으로 카카오에서 검색할 시설을 쉼표로 구분해 입력하세요. 추천 광고 문구에 실제 검색 결과가
+              반영됩니다.
+            </p>
           </div>
           <div className="grid gap-5 sm:grid-cols-2">
             <div className="space-y-2">

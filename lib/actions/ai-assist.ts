@@ -8,7 +8,7 @@ import { resolveAiProvider } from "@/lib/ai/provider";
 import { runBriefingComment } from "@/lib/ai/run-briefing";
 import { runClauseSuggestions } from "@/lib/ai/run-clauses";
 import { runConsultationFromAudio } from "@/lib/ai/run-consult";
-import { runAdCopy, runLocationDraft } from "@/lib/ai/run-text";
+import { runAdCopy } from "@/lib/ai/run-text";
 import { runVisitOrganize, runVisitTranscribe } from "@/lib/ai/run-visit";
 import type {
   ClauseSuggestion,
@@ -18,9 +18,15 @@ import type {
   VisitDraft,
 } from "@/lib/ai/types";
 import { getSession } from "@/lib/auth";
-import { DEAL_TYPES } from "@/lib/constants";
+import { DEAL_TYPES, DEFAULT_NEARBY_KEYWORDS } from "@/lib/constants";
 import { FormError } from "@/lib/errors";
 import { str, toErrorMessage } from "@/lib/form";
+import {
+  lookupKakaoNearby,
+  nearbyFactsText,
+  normalizeNearbyKeywords,
+  type KakaoNearbyPlace,
+} from "@/lib/kakao-local";
 import { isPropertyPath } from "@/lib/storage";
 
 const AUDIO_MAX = 25 * 1024 * 1024;
@@ -150,27 +156,48 @@ export async function applyConsultationDraft(
   }
 }
 
-export type AdCopyResult = { ok: true; description: string; highlights: string } | { ok: false; error: string };
+export type AdCopyResult =
+  | { ok: true; naver: string; zigbangDabang: string; highlights: string; nearbyCount: number }
+  | { ok: false; error: string };
 
 export async function suggestPropertyAdCopy(fd: FormData): Promise<AdCopyResult> {
   try {
     const { supabase, office } = await getSession();
     const ai = resolveAiProvider(office.ai_provider);
+    const address = str(fd, "address") ?? "";
+    const inputKeywords = normalizeNearbyKeywords(str(fd, "nearby_keywords"));
+    const nearby = await lookupKakaoNearby(
+      address,
+      inputKeywords.length ? inputKeywords : [...DEFAULT_NEARBY_KEYWORDS],
+      { radius: 3_000, sizePerKeyword: 2 }
+    );
     await consumeAiCredit(supabase, office, 1);
     const result = await runAdCopy(ai, {
       title: str(fd, "title") ?? "",
-      address: str(fd, "address") ?? "",
+      address,
       dealType: str(fd, "deal_type") ?? "",
       propertyType: str(fd, "property_type") ?? "",
       price: str(fd, "price") ?? "",
       monthlyRent: str(fd, "monthly_rent") ?? "",
       area: str(fd, "area_m2") ?? "",
+      floor: str(fd, "floor") ?? "",
+      totalFloors: str(fd, "total_floors") ?? "",
+      direction: str(fd, "direction") ?? "",
+      available:
+        str(fd, "available_mode") === "negotiable"
+          ? "협의 가능"
+          : str(fd, "available_mode") === "date"
+            ? (str(fd, "available_from") ?? "")
+            : "",
       highlights: str(fd, "highlights") ?? "",
+      nearbyFacts: nearbyFactsText(nearby.places),
     });
     return {
       ok: true,
-      description: result.description?.trim() || "",
+      naver: result.naver?.trim() || "",
+      zigbangDabang: result.zigbang_dabang?.trim() || "",
       highlights: result.highlights?.trim() || "",
+      nearbyCount: nearby.places.length,
     };
   } catch (e) {
     return { ok: false, error: toErrorMessage(e) };
@@ -179,14 +206,66 @@ export async function suggestPropertyAdCopy(fd: FormData): Promise<AdCopyResult>
 
 export type LocationResult = { ok: true; fields: LocationDraft } | { ok: false; error: string };
 
+function firstPlace(places: KakaoNearbyPlace[], keyword: string) {
+  return places.find((place) => place.keyword === keyword);
+}
+
+function placeFields(place: KakaoNearbyPlace | undefined) {
+  return place
+    ? { name: place.name, minutes: String(place.estimatedWalkMinutes) }
+    : { name: "", minutes: "" };
+}
+
 export async function suggestDisclosureLocation(address: string): Promise<LocationResult> {
   try {
-    const { supabase, office } = await getSession();
+    await getSession();
     const trimmed = address.trim();
     if (!trimmed) throw new FormError("입지를 채우려면 주소가 필요해요.");
-    const ai = resolveAiProvider(office.ai_provider);
-    await consumeAiCredit(supabase, office, 1);
-    const fields = await runLocationDraft(ai, trimmed);
+    const dislikedKeywords = ["장례식장", "화장장", "소각장", "폐기물처리시설", "하수처리장"];
+    const keywords = [
+      "버스정류장",
+      "지하철역",
+      "초등학교",
+      "중학교",
+      "고등학교",
+      ...dislikedKeywords,
+    ];
+    const nearby = await lookupKakaoNearby(trimmed, keywords, { radius: 3_000, sizePerKeyword: 1 });
+    const bus = placeFields(firstPlace(nearby.places, "버스정류장"));
+    const subway = placeFields(firstPlace(nearby.places, "지하철역"));
+    const elementary = placeFields(firstPlace(nearby.places, "초등학교"));
+    const middle = placeFields(firstPlace(nearby.places, "중학교"));
+    const high = placeFields(firstPlace(nearby.places, "고등학교"));
+    const disliked = nearby.places.filter(
+      (place) => dislikedKeywords.includes(place.keyword) && place.distanceM <= 1_000
+    );
+    const fields: LocationDraft = {
+      road_width: "",
+      road_paved: "",
+      road_access: "",
+      bus_stop: bus.name,
+      bus_minutes: bus.minutes,
+      bus_mode: "도보",
+      subway_station: subway.name,
+      subway_minutes: subway.minutes,
+      subway_mode: "도보",
+      parking: "",
+      school_elem: elementary.name,
+      school_elem_min: elementary.minutes,
+      school_elem_mode: "도보",
+      school_mid: middle.name,
+      school_mid_min: middle.minutes,
+      school_mid_mode: "도보",
+      school_high: high.name,
+      school_high_min: high.minutes,
+      school_high_mode: "도보",
+      disliked_facility: disliked.length ? "있음" : "",
+      disliked_facility_detail: disliked
+        .map((place) => `${place.name} 약 ${(place.distanceM / 1_000).toFixed(1)}km`)
+        .join(", "),
+      note:
+        "카카오 장소의 직선거리로 도보 시간을 추정했어요. 실제 보행시간과 비선호시설 누락 여부를 현장·공적 자료로 확인해 주세요.",
+    };
     return { ok: true, fields };
   } catch (e) {
     return { ok: false, error: toErrorMessage(e) };

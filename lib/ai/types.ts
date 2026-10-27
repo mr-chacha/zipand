@@ -47,6 +47,8 @@ export type LocationDraft = {
   school_high: string;
   school_high_min: string;
   school_high_mode: string;
+  disliked_facility: string;
+  disliked_facility_detail: string;
   note: string;
 };
 

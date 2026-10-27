@@ -2,7 +2,7 @@ import "server-only";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { FormError } from "@/lib/errors";
 
-const FLASH = "gemini-2.5-flash-lite";
+const FLASH = process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash-lite";
 
 function mimeFor(fileName: string, fallback: string) {
   const ext = fileName.split(".").pop()?.toLowerCase();

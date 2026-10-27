@@ -129,6 +129,18 @@ export const DOC_TYPE_TO_DISCLOSURE_CHECK: Partial<Record<DocType, string>> = {
   부동산종합공부: "doc_other",
 };
 
+export const DEFAULT_NEARBY_KEYWORDS = [
+  "지하철역",
+  "버스정류장",
+  "초등학교",
+  "중학교",
+  "고등학교",
+  "병원",
+  "대형마트",
+  "편의점",
+  "공원",
+] as const;
+
 export type DealChecklistStage = (typeof DEAL_CHECKLIST_STAGES)[number];
 export type DealStep = (typeof DEAL_STEPS)[number];
 

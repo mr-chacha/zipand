@@ -4,14 +4,14 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: CODEF 등기 원문 PDF 자동 열람 (브랜치 `feat/codef-registry-pdf`)
-  - 계약관리·매물 서류 탭에서 주소 검색 → 인터넷등기소 원문 PDF 열람·자동 다운로드·매물 서류함 저장
-  - 현재 유효사항/말소사항 포함, 같은 지번 토지등기 추가 열람 선택. 기본값은 현재 유효사항·토지 미열람
-  - 계약관리 매물 미선택 시 PDF 임시 저장 → 검색 주소·동·호로 매물 생성 → 등기 PDF 연결
-  - 입력 순서: 매물 선택 → 부동산 구분 라디오 → 주소 검색 → 동+호/동/호 선택·숫자 입력 → 등기 옵션
-  - 원문 포함 `originDataYN=1`, PDF 검증, 2Way 주소 선택, 민감 로그 제거
-- **다음 작업 시작 지점**: `feat/codef-registry-pdf` → `develop` PR 리뷰·머지 후 전자민원캐시 실열람 스모크(현재 유효사항·말소사항·토지·매물 미선택 등록)
-- **환경**: 원격 Supabase + AI 키. 마이그레이션 **`20261021120000` 필요**(이전과 동일)
+- **단계**: AI 등기 요약·카카오 주변 입지·플랫폼별 광고 문구 (브랜치 `feat/ai-registry-summary`)
+  - 등기 PDF 저장 후 선택 AI 엔진으로 현재 유효 권리 중심 요약, 원문 근거·쪽수·신뢰도·사용자 검토 상태 표시
+  - 매물 서류에 등기가 있으면 `등기 재열람`로 노출하고 기존 문서를 유지한 채 새 PDF 추가
+  - 카카오 Local로 주소 좌표·주변 키워드를 조회해 네이버용/직방·다방용 광고 문구를 동시에 생성
+  - 확인설명서 역·정류장·초중고·비선호시설을 카카오 조회 결과로 채움(도보 시간은 직선거리 기반 추정)
+  - Gemini 기본 모델 `gemini-3.5-flash-lite`, 환경변수 `GEMINI_MODEL`로 교체 가능
+- **다음 작업 시작 지점**: 마이그레이션·환경변수 적용 후 AI 등기 요약, 카카오 주변 조회, 플랫폼별 광고 문구 실 API 스모크
+- **환경**: `KAKAO_REST_API_KEY`, 선택 AI 키 필요. 마이그레이션 **`20261021120000`, `20261023160000`, `20261027100000` 적용 필요**
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -62,6 +62,32 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-27 — AI 등기 요약·카카오 입지·플랫폼별 광고 문구
+**작업 요약**
+- 등기 규칙 파싱을 AI 우선 요약으로 전환하고 AI 결과에 원문 근거·쪽수·신뢰도·검토 상태 추가
+- 등기 재열람 UI, 매물 미선택→신규 매물 연결 이후 AI 요약까지 연결
+- 매물별 주변 검색 키워드를 저장하고 카카오 Local 검색 결과를 광고 문구·확인설명서 입지에 반영
+- 네이버 부동산용과 직방·다방용 문구를 동시에 생성해 각각 복사하거나 매물 설명에 적용하는 모달 추가
+- Gemini 종료 모델을 `gemini-3.5-flash-lite`로 교체하고 계약 서식 상세의 화면 미리보기 제거(인쇄용 DOM 유지)
+
+**변경 파일**
+- `lib/ai/{gemini,run-document,run-text,types}.ts`, `lib/actions/{document-extract,documents,ai-assist,properties,codef-registry}.ts`
+- `lib/kakao-local.ts`, `lib/constants.ts`, `lib/supabase/database.types.ts`, `.env.example`
+- `components/ai/ad-copy-button.tsx`, `components/deal-forms/{registry-inquiry-dialog,disclosure-write-dialog}.tsx`
+- `app/(app)/properties/**`, `app/(app)/documents/[id]/**`, `app/(app)/contracts/**`, `app/(app)/assistant/page.tsx`, `app/(app)/settings/ai-billing-settings.tsx`
+- `supabase/migrations/20261023160000_document_ai_review.sql`, `20261027100000_property_nearby_keywords.sql`
+
+**결정 사항**
+- AI는 등기 법률 판단을 확정하지 않고 원문 대조 전까지 미검토 상태로 둔다
+- 광고 주변 시설은 카카오 조회 결과만 사용하며 입력하지 않은 층·방향·입주일은 생성하지 않는다
+- 카카오 Local은 보행 경로를 제공하지 않으므로 현재 도보 시간은 직선거리÷분당 67m의 참고 추정치다
+- 확인설명서 비선호시설은 검색 결과가 있을 때만 `있음`으로 채우고 결과가 없다고 `없음`으로 확정하지 않는다
+
+**남은 TODO**
+- `npm run db:push`, 배포 환경 `KAKAO_REST_API_KEY`·`GEMINI_MODEL` 반영
+- 실제 Gemini/OpenAI 등기 PDF와 카카오 Local 주소·주변 키워드 조회 스모크
+- 정확한 도보 경로 시간이 필요하면 TMAP 보행 경로 API 연동
 
 ### 2026-10-23 — CODEF 등기 원문 PDF 자동 열람
 **작업 요약**

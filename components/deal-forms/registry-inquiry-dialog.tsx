@@ -548,16 +548,18 @@ export function RegistryInquiryDialog({
 export function RegistryInquiryButton({
   properties,
   allowUnlinked = false,
+  label = "등기 열람",
 }: {
   properties: RegistryPropertyOption[];
   allowUnlinked?: boolean;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
       <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
         <Landmark data-icon="inline-start" />
-        등기 열람
+        {label}
       </Button>
       <RegistryInquiryDialog
         open={open}

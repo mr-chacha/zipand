@@ -110,27 +110,30 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
                 <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
               ) : (
                 <div className="space-y-3">
-                  {!hasRegistryDocument && (
-                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium">등기사항증명서가 아직 없어요</p>
-                        <p className="text-xs text-muted-foreground">
-                          주소로 등기를 열람하면 원문 PDF가 이 매물 서류함에 자동 저장됩니다.
-                        </p>
-                      </div>
-                      <RegistryInquiryButton
-                        properties={[
-                          {
-                            value: id,
-                            label: [property.title, property.address].filter(Boolean).join(" · "),
-                            address: property.address ?? "",
-                            building: property.building ?? "",
-                            unit: property.unit ?? "",
-                          },
-                        ]}
-                      />
+                  <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {hasRegistryDocument ? "최신 등기가 필요하신가요?" : "등기사항증명서가 아직 없어요"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {hasRegistryDocument
+                          ? "등기를 재열람하면 기존 문서는 유지되고 새 원문 PDF가 이 매물 서류함에 추가됩니다."
+                          : "주소로 등기를 열람하면 원문 PDF가 이 매물 서류함에 자동 저장됩니다."}
+                      </p>
                     </div>
-                  )}
+                    <RegistryInquiryButton
+                      label={hasRegistryDocument ? "등기 재열람" : "등기 열람"}
+                      properties={[
+                        {
+                          value: id,
+                          label: [property.title, property.address].filter(Boolean).join(" · "),
+                          address: property.address ?? "",
+                          building: property.building ?? "",
+                          unit: property.unit ?? "",
+                        },
+                      ]}
+                    />
+                  </div>
                   <DocumentUploader
                     officeId={office.id}
                     properties={[{ value: id, label: property.title }]}

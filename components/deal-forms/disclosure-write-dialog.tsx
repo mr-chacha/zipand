@@ -16,9 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { suggestDisclosureLocation } from "@/lib/actions/ai-assist";
-import { getAiAccessState } from "@/lib/actions/ai-billing";
 import { lookupBuildingHubForDisclosure } from "@/lib/actions/building-hub";
 import { createDealFormForDeal, updateDealForm } from "@/lib/actions/deal-forms";
 import { loadDisclosureFromDealProperty, loadDisclosureFromProperty } from "@/lib/actions/disclosure-docs";
@@ -135,12 +133,7 @@ function DisclosureWriteBody({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [aiAvailable, setAiAvailable] = useState(false);
   useBusy(pending);
-
-  useEffect(() => {
-    void getAiAccessState().then((r) => setAiAvailable(r.available));
-  }, []);
 
   const [pickProperty, setPickProperty] = useState<ContractPropertyType>(seed?.propertyType ?? "아파트");
   const [pickDeal, setPickDeal] = useState<ContractDealType>(seed?.dealType ?? "매매");
@@ -462,10 +455,6 @@ function DisclosureWriteBody({
             disabled={!active || locPending}
             onClick={() => {
               if (!active) return;
-              if (!aiAvailable) {
-                toast.error("구독 후 혹은 크레딧 결제 후 사용할 수 있어요. 설정 → AI·요금에서 확인해 주세요.");
-                return;
-              }
               const addr =
                 active.data.property_address?.trim() ||
                 deals.find((d) => d.value === dealId)?.prefill?.propertyAddress?.trim() ||
@@ -482,13 +471,16 @@ function DisclosureWriteBody({
                     return;
                   }
                   const { note, ...fields } = res.fields;
-                  setLiveContractData((prev) => ({ ...(prev ?? {}), ...fields }));
+                  const filledFields = Object.fromEntries(
+                    Object.entries(fields).filter(([, value]) => value !== "")
+                  );
+                  setLiveContractData((prev) => ({ ...(prev ?? {}), ...filledFields }));
                   setFormEpoch((n) => n + 1);
                   setPage(2);
                   toast.success(
                     note
-                      ? `입지 초안을 채웠어요. ${note}`
-                      : "입지 초안을 채웠어요. 추정값이니 현장·지도로 확인하세요."
+                      ? `카카오 주변 입지를 채웠어요. ${note}`
+                      : "카카오 주변 입지를 채웠어요. 거리와 시설을 확인하세요."
                   );
                 })
                 .finally(() => setLocPending(false));
@@ -499,9 +491,8 @@ function DisclosureWriteBody({
             ) : (
               <MapPin data-icon="inline-start" />
             )}
-            AI 입지 채우기
+            카카오 입지 조회
           </Button>
-          <AiAccessBadge available={aiAvailable} compact />
           <Button type="button" size="sm" variant="ghost" onClick={onClose}>
             닫기
           </Button>

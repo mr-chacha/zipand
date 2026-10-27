@@ -1185,6 +1185,7 @@ export type Database = {
           main_use: string | null
           manager_id: string | null
           monthly_rent: number | null
+          nearby_keywords: string[]
           office_id: string
           price: number
           property_type: string
@@ -1222,6 +1223,7 @@ export type Database = {
           main_use?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
+          nearby_keywords?: string[]
           office_id?: string
           price?: number
           property_type: string
@@ -1259,6 +1261,7 @@ export type Database = {
           main_use?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
+          nearby_keywords?: string[]
           office_id?: string
           price?: number
           property_type?: string
