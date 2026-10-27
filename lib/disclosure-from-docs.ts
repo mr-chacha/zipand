@@ -125,7 +125,15 @@ export function mapPropertyDocsToDisclosure(
         if (!out.ownership_building) out.ownership_building = value;
         continue;
       }
+      if (label === "갑구(소유권에 관한 사항)") {
+        if (!out.ownership_building) out.ownership_building = value;
+        continue;
+      }
       if (label === "을구") {
+        if (!out.rights_building) out.rights_building = value;
+        continue;
+      }
+      if (label === "을구(소유권 외의 권리에 관한 사항)") {
         if (!out.rights_building) out.rights_building = value;
         continue;
       }

@@ -22,6 +22,7 @@ async function loadDocsForPropertyId(propertyId: string) {
     .from("documents")
     .select("id, doc_type, file_name, issued_at, document_fields(label, value)")
     .eq("property_id", propertyId)
+    .eq("status", "검토 완료")
     .order("created_at", { ascending: false });
   if (docsErr) throw docsErr;
 
@@ -29,7 +30,7 @@ async function loadDocsForPropertyId(propertyId: string) {
     return {
       ok: false as const,
       error:
-        "이 매물에 업로드된 서류가 없어요. 인터넷등기소 등에서 발급받아 문서 관리에 올린 뒤, 문서 상세에서 소유자·면적 등을 입력해 주세요.",
+        "검토 완료된 서류가 없어요. 문서 관리에서 AI 추출한 값을 원문과 대조하고 검토 완료해 주세요.",
     };
   }
 

@@ -335,7 +335,6 @@ export async function registerPropertyFromRegistry(
     "등기 열람 매물";
   const names = fd.getAll("pending_file_name").map(String);
   const uploadedPaths: string[] = [];
-  let summarizedCount = 0;
 
   try {
     const { error: propertyError } = await supabase.from("properties").insert({
@@ -384,7 +383,6 @@ export async function registerPropertyFromRegistry(
       if (created.error || !created.id) {
         throw new Error(created.error ?? "등기 문서 저장에 실패했어요.");
       }
-      if (created.message?.includes("AI로")) summarizedCount += 1;
     }
 
     await supabase.storage.from("documents").remove(paths);
@@ -405,10 +403,7 @@ export async function registerPropertyFromRegistry(
   return {
     ok: true,
     propertyId,
-    message:
-      summarizedCount > 0
-        ? `매물을 등록하고 등기 PDF ${paths.length}건을 연결했어요. AI 요약 ${summarizedCount}건도 완료했어요.`
-        : "매물을 등록하고 등기 PDF를 서류함에 연결했어요. AI 요약은 문서 상세에서 다시 시도해 주세요.",
+    message: `매물을 등록하고 등기 PDF ${paths.length}건을 연결했어요. 서류 목록에서 선택해 AI 추출할 수 있어요.`,
   };
 }
 

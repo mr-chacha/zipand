@@ -25,7 +25,7 @@ interface DocumentUploaderProps {
   defaultPropertyId?: string;
   /** true면 매물 선택을 숨기고 defaultPropertyId만 사용 */
   lockProperty?: boolean;
-  /** false면 문서 상세로 이동하지 않고 현재 페이지에 머묾 (기본 true) */
+  /** true면 업로드 후 문서 상세로 이동 (기본 false) */
   goToDetail?: boolean;
 }
 
@@ -34,7 +34,7 @@ export function DocumentUploader({
   properties,
   defaultPropertyId,
   lockProperty = false,
-  goToDetail = true,
+  goToDetail = false,
 }: DocumentUploaderProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);

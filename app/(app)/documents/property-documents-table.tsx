@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FileText, Plus } from "lucide-react";
-import { DocStatusBadge } from "@/components/status-badge";
+import { DocumentExtractionBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,8 @@ export type PropertyDocumentRow = {
   doc_type: string;
   file_name: string;
   status: string;
+  extraction_status: string;
+  extraction_error: string | null;
   issued_at: string | null;
   created_at: string;
 };
@@ -66,7 +68,7 @@ function DocCell({
     <Link href={`/documents/${doc.id}`} className="group flex min-w-0 flex-col gap-0.5">
       <span className="flex items-center gap-1">
         <FileText className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
-        <DocStatusBadge status={doc.status} />
+        <DocumentExtractionBadge status={doc.extraction_status} />
       </span>
       <span className="truncate text-[11px] text-muted-foreground group-hover:underline">
         {doc.issued_at ? formatDate(doc.issued_at) : formatDate(doc.created_at)}
@@ -165,7 +167,7 @@ export function PropertyDocumentsTable({
                             {d.doc_type}
                             <span className="ml-1 text-xs text-muted-foreground">{d.file_name}</span>
                           </span>
-                          <DocStatusBadge status={d.status} />
+                          <DocumentExtractionBadge status={d.extraction_status} />
                         </Link>
                       </li>
                     ))}

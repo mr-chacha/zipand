@@ -205,6 +205,13 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
     if (error) throw error;
     if (!doc) return { error: "문서를 찾을 수 없어요." };
 
+    await supabase
+      .from("documents")
+      .update({ extraction_status: "추출 중", extraction_error: null })
+      .eq("id", id);
+    revalidatePath("/documents");
+    revalidatePath(`/documents/${id}`);
+
     const ai = resolveAiProvider(office.ai_provider);
     await consumeAiCredit(supabase, office, 1);
 
@@ -238,7 +245,7 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
     });
 
     if (!parsed.fields.length && !parsed.signals.length) {
-      return { error: "AI가 항목을 찾지 못했어요. 원문을 대조해 직접 입력해 주세요." };
+      throw new FormError("AI가 항목을 찾지 못했어요. 원문을 대조해 직접 입력해 주세요.");
     }
 
     // AI 재요약은 직전 AI 결과만 교체하고 사용자가 직접 입력한 항목은 보존한다.
@@ -318,7 +325,17 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       }
     }
 
-    await supabase.from("documents").update({ status: "검토 필요", reviewed_at: null, reviewed_by: null }).eq("id", id);
+    await supabase
+      .from("documents")
+      .update({
+        status: "검토 필요",
+        extraction_status: "검토 필요",
+        extraction_error: null,
+        extracted_at: new Date().toISOString(),
+        reviewed_at: null,
+        reviewed_by: null,
+      })
+      .eq("id", id);
     await logPropertyEvent(doc.property_id, `${doc.doc_type} AI 추출 (${toInsert.length}항목)`);
     revalidatePath(`/documents/${id}`);
     revalidatePath("/documents");
@@ -328,6 +345,45 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       count: parsed.fields.length + parsed.signals.length,
     };
   } catch (e) {
-    return { error: toErrorMessage(e) };
+    const message = toErrorMessage(e);
+    await supabase
+      .from("documents")
+      .update({ extraction_status: "추출 실패", extraction_error: message })
+      .eq("id", id);
+    revalidatePath(`/documents/${id}`);
+    revalidatePath("/documents");
+    return { error: message };
   }
+}
+
+export type BatchDocumentAiResult = ActionState & {
+  succeeded?: number;
+  failed?: number;
+};
+
+/** 서류 목록에서 선택한 문서를 순서대로 AI 추출한다. 문서마다 AI 사용량 1회가 차감된다. */
+export async function extractDocumentsAi(documentIds: string[]): Promise<BatchDocumentAiResult> {
+  const ids = [...new Set(documentIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) return { error: "AI 추출할 서류를 선택해 주세요." };
+  if (ids.length > 10) return { error: "AI 추출은 한 번에 최대 10건까지 선택할 수 있어요." };
+
+  let succeeded = 0;
+  const errors: string[] = [];
+  for (const id of ids) {
+    const result = await extractDocumentFieldsAi(id);
+    if (result.error) errors.push(result.error);
+    else succeeded += 1;
+  }
+  revalidatePath("/documents");
+  revalidatePath("/properties/[id]", "page");
+  const failed = ids.length - succeeded;
+  return {
+    message:
+      failed > 0
+        ? `${succeeded}건 추출 완료, ${failed}건 실패했어요. 실패한 서류의 상태를 확인해 주세요.`
+        : `${succeeded}건을 AI로 추출했어요. 각 서류의 원문과 대조해 주세요.`,
+    succeeded,
+    failed,
+    ...(succeeded === 0 && errors[0] ? { error: errors[0] } : {}),
+  };
 }

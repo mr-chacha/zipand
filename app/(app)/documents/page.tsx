@@ -27,7 +27,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
     supabase
       .from("properties")
       .select(
-        "id, title, address, property_type, deal_type, updated_at, documents(id, doc_type, file_name, status, issued_at, created_at)"
+        "id, title, address, property_type, deal_type, updated_at, documents(id, doc_type, file_name, status, extraction_status, extraction_error, issued_at, created_at)"
       )
       .order("updated_at", { ascending: false }),
     getPropertyOptions(),
@@ -69,7 +69,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
         description={
           selectedTitle
             ? `「${selectedTitle}」 서류 · 등기·건축물대장 등을 업로드·검토할 수 있어요.`
-            : "등록한 매물별로 등기·건축물대장·지적도 등 보관 서류를 보고, 업로드·검토할 수 있어요. 문서 상세에서 PDF 자동 추출로 면적·구조를 채울 수 있어요."
+            : "등록한 매물별 보관 서류와 AI 추출·검토 상태를 확인할 수 있어요."
         }
         backHref={selectedPropertyId ? `/properties/${selectedPropertyId}` : undefined}
         backLabel={selectedPropertyId ? "매물 상세" : undefined}
@@ -99,11 +99,11 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <FileSearch className="size-4 text-primary" />
-                PDF 자동 추출
+                AI 추출 안내
               </CardTitle>
               <CardDescription>
-                PDF를 올리면 전용면적·구조·소유자 등을 자동으로 읽어요. 문서 상세에서 값을 검토하면 확인설명서·계약서에 반영됩니다.
-                스캔(사진) PDF는 인식이 어려울 수 있어요 — 그때는 「자동 추출」을 다시 누르거나 직접 입력하세요.
+                업로드만으로는 분석하지 않아요. 매물 목록에서 매물의 「서류」 탭을 열고 분석할 문서를 선택해 AI
+                추출하세요. 검토 완료한 서류만 확인설명서에 반영됩니다.
               </CardDescription>
             </CardHeader>
           </Card>

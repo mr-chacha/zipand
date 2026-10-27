@@ -64,21 +64,36 @@ function normalize(raw: RawDoc, docType: DocType): { fields: DocumentAiField[]; 
 }
 
 function system(docType: string) {
-  const registryRules =
+  const documentRules =
     docType === "등기사항증명서"
       ? `
 등기사항증명서는 표제부·갑구·을구를 끝까지 읽고 순위번호, 접수번호, 말소 표시를 함께 대조하세요.
 현재 유효한 소유권 및 소유권 외 권리를 중심으로 정리하되, 가압류·압류·가처분·경매개시·근저당권·전세권 등 계약 전에 확인할 권리는 signals에 빠뜨리지 마세요.
 말소되었거나 말소사항 포함본에만 남은 권리를 현재 유효한 권리처럼 적지 마세요.
 "AI 요약"은 소유자, 현재 유효한 제한물권·처분제한, 채권최고액 등 핵심을 5문장 이내로 요약하세요.
+"갑구(소유권에 관한 사항)"에는 현재 소유자와 갑구의 유효한 소유권·처분제한 사항을 원문 순서대로 정리하세요.
+"을구(소유권 외의 권리에 관한 사항)"에는 현재 유효한 근저당권·전세권 등 소유권 외 권리를 채권최고액·권리자와 함께 정리하세요.
 권리의 우선순위나 법적 효력을 추정하지 말고 불명확하면 반드시 "확인 필요"로 표시하세요.`
-      : "";
+      : docType === "건축물대장"
+        ? `
+확인설명서 작성에 필요한 주용도, 구조, 전용면적·건축면적·연면적, 위반건축물 여부, 허가일, 사용승인일을 원문 그대로 추출하세요.
+총괄표제부와 전유부가 함께 있으면 대상 동·호의 전유부 값을 우선하고 서로 다른 값은 signals에 확인 필요로 남기세요.
+용도지역·용도지구·용도구역은 건축물대장에서 추정하지 마세요.`
+        : docType === "토지이용계획확인서"
+          ? `
+용도지역, 용도지구, 용도구역과 문서에 명시된 행위제한·도시계획 관련 확인 사항을 원문 기준으로 추출하세요.
+건축물의 구조·주용도나 등기 권리관계를 추정하지 마세요.`
+          : docType === "토지대장"
+            ? `
+지목, 면적, 소유자, 발급일을 원문 그대로 추출하고 변동 이력과 현재 값이 섞이지 않게 구분하세요.`
+            : `
+확인설명서에 옮길 수 있는 프리셋 항목만 원문 그대로 추출하고 다른 서류의 내용을 추정하지 마세요.`;
 
   return `당신은 한국 부동산 공부서류(${docType}) 정리 도우미입니다.
 원문에 있는 사실만 추출하고, 없으면 넣지 마세요. 법률 확정 판단을 하지 마세요.
 evidence_text에는 결과를 직접 뒷받침하는 짧고 정확한 원문 구절을 넣으세요.
 confidence는 원문이 해당 결과를 얼마나 명확하게 뒷받침하는지 0~100 정수로 표시하세요.
-page는 근거가 있는 PDF 쪽 번호이며 알 수 없으면 null로 표시하세요.${registryRules}
+page는 근거가 있는 PDF 쪽 번호이며 알 수 없으면 null로 표시하세요.${documentRules}
 JSON만 출력하세요.`;
 }
 
@@ -104,15 +119,30 @@ export async function runDocumentAiExtract(
 
   // Gemini는 복잡한 등기의 전체 페이지·말소 표시를 직접 대조하게 원본 PDF를 우선 전달한다.
   if (docType === "등기사항증명서" && ai.provider === "gemini") {
-    const raw = await geminiJsonFromFile<RawDoc>(
-      ai.geminiKey!,
-      system(docType),
-      userPrompt(docType, `문서 유형: ${docType}\n파일: ${fileName}\n첨부 원문의 모든 페이지를 읽고 현재 유효한 권리를 중심으로 정리하세요.`),
-      bytes,
-      fileName,
-      mime || "application/pdf"
-    );
-    return normalize(raw, docType);
+    try {
+      const raw = await geminiJsonFromFile<RawDoc>(
+        ai.geminiKey!,
+        system(docType),
+        userPrompt(docType, `문서 유형: ${docType}\n파일: ${fileName}\n첨부 원문의 모든 페이지를 읽고 현재 유효한 권리를 중심으로 정리하세요.`),
+        bytes,
+        fileName,
+        mime || "application/pdf"
+      );
+      return normalize(raw, docType);
+    } catch (fileError) {
+      // 인터넷등기소의 보호·특수 인코딩 PDF는 Gemini 문서 입력이 400으로 거부될 수 있다.
+      // PDF 텍스트를 읽을 수 있으면 같은 기준으로 텍스트 분석을 자동 재시도한다.
+      if (textHint.trim().length < 80) throw fileError;
+      const raw = await geminiJsonFromText<RawDoc>(
+        ai.geminiKey!,
+        system(docType),
+        userPrompt(
+          docType,
+          `문서 유형: ${docType}\n파일: ${fileName}\nPDF 원문 첨부를 읽지 못해 추출 텍스트로 분석합니다.\n\n원문 텍스트:\n${textHint.slice(0, 60_000)}`
+        )
+      );
+      return normalize(raw, docType);
+    }
   }
 
   if (textHint.trim().length >= 80) {

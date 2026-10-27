@@ -4,14 +4,18 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: AI 등기 요약·카카오 주변 입지·플랫폼별 광고 문구 (브랜치 `feat/ai-registry-summary`)
-  - 등기 PDF 저장 후 선택 AI 엔진으로 현재 유효 권리 중심 요약, 원문 근거·쪽수·신뢰도·사용자 검토 상태 표시
+- **단계**: 매물 서류 선택형 AI 추출·AI 등기 요약·카카오 주변 입지 (브랜치 `feat/ai-registry-summary`)
+  - 서류 업로드 시 자동 추출하지 않고, 매물 상세 서류 탭에서 전체/개별 선택 후 일괄 AI 추출
+  - 추출 상태(미추출·추출 중·검토 필요·완료·실패)를 표시하고 상세 화면에서 결과 수정·검토 완료
+  - 검토 완료된 추출 결과만 확인설명서에 반영
+  - 등기 PDF는 현재 유효 권리 중심으로 분석하고 원문 근거·쪽수·신뢰도 표시
+  - Gemini 문서 입력이 거부되는 보호·특수 PDF는 추출 텍스트로 자동 재시도
   - 매물 서류에 등기가 있으면 `등기 재열람`로 노출하고 기존 문서를 유지한 채 새 PDF 추가
   - 카카오 Local로 주소 좌표·주변 키워드를 조회해 네이버용/직방·다방용 광고 문구를 동시에 생성
   - 확인설명서 역·정류장·초중고·비선호시설을 카카오 조회 결과로 채움(도보 시간은 직선거리 기반 추정)
   - Gemini 기본 모델 `gemini-3.5-flash-lite`, 환경변수 `GEMINI_MODEL`로 교체 가능
-- **다음 작업 시작 지점**: 마이그레이션·환경변수 적용 후 AI 등기 요약, 카카오 주변 조회, 플랫폼별 광고 문구 실 API 스모크
-- **환경**: `KAKAO_REST_API_KEY`, 선택 AI 키 필요. 마이그레이션 **`20261021120000`, `20261023160000`, `20261027100000` 적용 필요**
+- **다음 작업 시작 지점**: `npm run db:push` 후 매물 서류에서 실 PDF 선택→AI 추출→상세 수정·검토 완료→확인설명서 반영 스모크
+- **환경**: `KAKAO_REST_API_KEY`, 선택 AI 키 필요. 마이그레이션 **`20261021120000`, `20261023160000`, `20261027100000`, `20261027170000` 적용 필요**
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -62,6 +66,30 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-27 — 매물 서류 선택형 AI 추출·검토 흐름
+**작업 요약**
+- 업로드 즉시 자동 추출을 제거하고 매물 상세 서류 탭에서 전체/개별 선택한 문서를 일괄 AI 추출하도록 변경
+- 문서별 추출 상태 뱃지와 실패 사유를 표시하고 문서 상세에서 추출값 수정·검토 완료 처리
+- 검토 완료 문서만 확인설명서에 반영해 미검증 AI 결과의 자동 사용 방지
+- Gemini SDK를 Interactions API 기반 `@google/genai`로 교체하고, 원본 PDF 요청이 거부되면 추출 텍스트로 자동 재시도
+
+**변경 파일**
+- `app/(app)/properties/[id]/{page,property-documents-list}.tsx`
+- `app/(app)/documents/**`, `components/status-badge.tsx`
+- `lib/actions/{document-extract,documents,disclosure-docs,codef-registry}.ts`
+- `lib/ai/{gemini,run-document}.ts`, `lib/disclosure-from-docs.ts`, `lib/constants.ts`
+- `lib/supabase/database.types.ts`, `supabase/migrations/20261027170000_document_ai_extraction_status.sql`
+- `package.json`, `package-lock.json`
+
+**결정 사항**
+- 서류 업로드와 AI 추출을 분리하고 AI 추출 시작 위치는 문서관리 목록이 아닌 매물 상세 서류 탭으로 한정
+- AI 결과는 사용자가 문서 상세에서 원문과 대조해 검토 완료하기 전까지 확인설명서에 사용하지 않음
+- 인터넷등기소 보호·특수 인코딩 PDF는 원본 분석을 우선하되 Gemini 400 응답 시 읽을 수 있는 원문 텍스트로 재시도
+
+**남은 TODO**
+- `npm run db:push` 후 실제 등기·건축물대장·토지이용계획확인서로 선택 추출 및 검토 흐름 스모크
+- 텍스트 추출도 불가능한 보호·스캔 PDF의 Gemini Files API 또는 OCR 보완 검토
 
 ### 2026-10-27 — AI 등기 요약·카카오 입지·플랫폼별 광고 문구
 **작업 요약**

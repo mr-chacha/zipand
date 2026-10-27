@@ -23,7 +23,7 @@
     "@capacitor/android": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/local-notifications": "^8.3.1",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.31.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.3",
     "class-variance-authority": "^0.7.1",

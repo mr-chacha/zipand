@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
-import { extractDocumentFields, extractDocumentFieldsAi } from "@/lib/actions/document-extract";
+import { extractDocumentFieldsAi } from "@/lib/actions/document-extract";
 import {
   addDocumentField,
   addDocumentSignal,
@@ -29,6 +29,7 @@ import {
   setAllFieldsReviewed,
   setFieldReviewed,
   setSignalReviewed,
+  updateDocumentField,
   updateDocumentIssuedAt,
 } from "@/lib/actions/documents";
 import { SIGNAL_LEVELS } from "@/lib/constants";
@@ -39,6 +40,8 @@ import type { DocumentField, DocumentSignal } from "@/types";
 interface DocumentReviewProps {
   documentId: string;
   docType: string;
+  extractionStatus: string;
+  extractionError: string | null;
   status: string;
   issuedAt: string | null;
   presets: string[];
@@ -49,6 +52,8 @@ interface DocumentReviewProps {
 export function DocumentReview({
   documentId,
   docType,
+  extractionStatus,
+  extractionError,
   status,
   issuedAt,
   presets,
@@ -58,6 +63,7 @@ export function DocumentReview({
   const [pending, startTransition] = useTransition();
   const [reviewPending, startReviewToggle] = useTransition();
   const [extracting, setExtracting] = useState(false);
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [localFields, setLocalFields] = useState(fields);
   const [localSignals, setLocalSignals] = useState(signals);
   useBusy(pending || extracting || reviewPending);
@@ -115,10 +121,7 @@ export function DocumentReview({
     setExtracting(true);
     startTransition(async () => {
       try {
-        const result =
-          docType === "등기사항증명서"
-            ? await extractDocumentFieldsAi(documentId)
-            : await extractDocumentFields(documentId);
+        const result = await extractDocumentFieldsAi(documentId);
         if (result.error) toast.error(result.error);
         else if (result.message) toast.success(result.message);
       } finally {
@@ -134,26 +137,26 @@ export function DocumentReview({
           <div className="space-y-1">
             <CardTitle>핵심 항목 정리</CardTitle>
             <CardDescription>
-              {docType === "등기사항증명서"
-                ? "AI가 원문을 정리한 결과예요. 항목과 확인 사항을 모두 원문과 대조해 주세요."
-                : "체크는 「원문과 대조했다」는 표시예요. 전부 체크해야 검토 완료할 수 있어요."}
+              AI 추출 결과의 원문 근거와 값을 대조하세요. 잘못된 값은 수정한 뒤 다시 확인할 수 있어요.
             </CardDescription>
           </div>
-          <Button type="button" size="sm" variant="outline" disabled={pending || extracting || done} onClick={runExtract}>
+          <Button type="button" size="sm" variant="outline" disabled={pending || extracting} onClick={runExtract}>
             {extracting ? (
               <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : docType === "등기사항증명서" ? (
+            ) : (
               <Sparkles data-icon="inline-start" />
-            ) : null}
-            {extracting
-              ? "정리 중…"
-              : docType === "등기사항증명서"
-                ? hasAiResult
-                  ? "AI 다시 요약"
-                  : "AI 요약"
-                : "자동 추출"}
+            )}
+            {extracting ? "AI 추출 중…" : hasAiResult ? "AI 다시 추출" : "AI 추출"}
           </Button>
         </div>
+        {extractionStatus === "미추출" && (
+          <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            아직 AI 추출하지 않은 서류예요. 목록에서 선택하거나 위 버튼으로 추출하세요.
+          </p>
+        )}
+        {extractionStatus === "추출 실패" && extractionError && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{extractionError}</p>
+        )}
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="issued_at">발급일</Label>
@@ -222,7 +225,7 @@ export function DocumentReview({
                     }
                   }}
                   className={cn(
-                    "flex gap-3 rounded-lg border p-3 outline-none transition-colors",
+                    "flex flex-wrap gap-3 rounded-lg border p-3 outline-none transition-colors",
                     done ? "cursor-default" : "cursor-pointer hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50",
                     field.reviewed && "border-primary/30 bg-primary/5"
                   )}
@@ -254,9 +257,20 @@ export function DocumentReview({
                     )}
                   </div>
                   <div
+                    className="flex items-center"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="항목 수정"
+                      disabled={pending}
+                      onClick={() => setEditingFieldId((current) => (current === field.id ? null : field.id))}
+                    >
+                      <Pencil />
+                    </Button>
                     <ConfirmAction
                       appOnly
                       action={() => deleteDocumentField(field.id, documentId)}
@@ -269,6 +283,20 @@ export function DocumentReview({
                       }
                     />
                   </div>
+                  {editingFieldId === field.id && (
+                    <div
+                      className="w-full"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <FieldEditForm
+                        documentId={documentId}
+                        field={field}
+                        presets={presets}
+                        onClose={() => setEditingFieldId(null)}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
               <FieldForm documentId={documentId} presets={presets} />
@@ -379,6 +407,58 @@ export function DocumentReview({
         )}
       </CardFooter>
     </Card>
+  );
+}
+
+function FieldEditForm({
+  documentId,
+  field,
+  presets,
+  onClose,
+}: {
+  documentId: string;
+  field: DocumentField;
+  presets: string[];
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState(field.label);
+  const { state, pending, onSubmit } = useFormAction(
+    updateDocumentField.bind(null, field.id, documentId),
+    { onSuccess: onClose }
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-dashed bg-background p-3">
+      <div className="flex flex-wrap gap-1">
+        {presets.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setLabel(preset)}
+            className="rounded-full bg-muted px-2 py-0.5 text-xs hover:bg-primary/10 hover:text-primary"
+          >
+            {preset}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input name="label" value={label} onChange={(event) => setLabel(event.target.value)} required />
+        <Input name="value" defaultValue={field.value} required />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-[80px_1fr]">
+        <Input name="page" type="number" min={1} defaultValue={field.page ?? ""} placeholder="페이지" />
+        <Input name="evidence_text" defaultValue={field.evidence_text ?? ""} placeholder="원문 근거 문구" />
+      </div>
+      <FormMessage state={state} />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          취소
+        </Button>
+        <SubmitButton size="sm" pending={pending}>
+          수정 저장
+        </SubmitButton>
+      </div>
+    </form>
   );
 }
 

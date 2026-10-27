@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { DocStatusBadge } from "@/components/status-badge";
+import { DocStatusBadge, DocumentExtractionBadge } from "@/components/status-badge";
 import { getSession } from "@/lib/auth";
 import { DOC_FIELD_PRESETS, type DocType } from "@/lib/constants";
 import { signedUrls } from "@/lib/storage";
@@ -55,7 +55,8 @@ export default async function DocumentDetailPage({
   });
   const reviewKey = [
     doc.status,
-    ...orderedFields.map((field) => `${field.id}:${field.reviewed}`),
+    doc.extraction_status,
+    ...orderedFields.map((field) => `${field.id}:${field.reviewed}:${field.label}:${field.value}`),
     ...(signals.data ?? []).map((signal) => `${signal.id}:${signal.reviewed}`),
   ].join("|");
 
@@ -71,7 +72,12 @@ export default async function DocumentDetailPage({
         description={`${property?.title ?? ""} · ${doc.file_name}`}
         backHref={backHref}
         backLabel={backLabel}
-        actions={<DocStatusBadge status={doc.status} />}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <DocumentExtractionBadge status={doc.extraction_status} />
+            <DocStatusBadge status={doc.status} />
+          </div>
+        }
       />
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
@@ -91,6 +97,8 @@ export default async function DocumentDetailPage({
           key={reviewKey}
           documentId={id}
           docType={doc.doc_type}
+          extractionStatus={doc.extraction_status}
+          extractionError={doc.extraction_error}
           status={doc.status}
           issuedAt={doc.issued_at}
           presets={presets}

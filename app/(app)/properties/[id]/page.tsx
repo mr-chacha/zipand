@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, Compass, FileText, Layers, Lock, Maximize, Phone, Users } from "lucide-react";
+import { Building2, Compass, Layers, Lock, Maximize, Phone, Users } from "lucide-react";
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { PropertySubnav } from "@/components/property-subnav";
 import { RegistryInquiryButton } from "@/components/deal-forms/registry-inquiry-dialog";
-import { DocStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +22,7 @@ import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
 import { PhotoManager } from "./photo-manager";
+import { PropertyDocumentsList } from "./property-documents-list";
 import { LinkedCustomers, PropertyHeaderActions, PropertyStatusSelect } from "./property-actions";
 
 export async function generateMetadata({ params }: PageProps<"/properties/[id]">) {
@@ -55,7 +55,11 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
       .eq("property_id", id)
       .order("sort_order")
       .order("created_at"),
-    supabase.from("documents").select("id, doc_type, file_name, status, created_at").eq("property_id", id).order("created_at", { ascending: false }),
+    supabase
+      .from("documents")
+      .select("id, doc_type, file_name, status, extraction_status, created_at")
+      .eq("property_id", id)
+      .order("created_at", { ascending: false }),
     supabase.from("customer_properties").select("customer:customers(id, name, status, phone)").eq("property_id", id),
     getCustomerOptions(),
     getOfficeGate(),
@@ -154,24 +158,8 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
                 </Link>
               </CardAction>
             </CardHeader>
-            <CardContent className="space-y-2">
-              {(docs.data ?? []).length === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">등록된 서류가 없어요.</p>
-              )}
-              {docs.data?.map((doc) => (
-                <Link
-                  key={doc.id}
-                  href={`/documents/${doc.id}?return=${encodeURIComponent(`/properties/${id}?tab=docs`)}`}
-                  className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50"
-                >
-                  <FileText className="size-5 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{doc.doc_type}</p>
-                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
-                  </div>
-                  <DocStatusBadge status={doc.status} />
-                </Link>
-              ))}
+            <CardContent>
+              <PropertyDocumentsList propertyId={id} documents={docs.data ?? []} />
             </CardContent>
           </Card>
         </div>
