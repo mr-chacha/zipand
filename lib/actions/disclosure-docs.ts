@@ -20,7 +20,7 @@ async function loadDocsForPropertyId(propertyId: string) {
 
   const { data: docs, error: docsErr } = await supabase
     .from("documents")
-    .select("id, doc_type, file_name, issued_at, document_fields(label, value)")
+    .select("id, doc_type, file_name, issued_at, created_at, document_fields(label, value)")
     .eq("property_id", propertyId)
     .eq("status", "검토 완료")
     .order("created_at", { ascending: false });
@@ -42,6 +42,7 @@ async function loadDocsForPropertyId(propertyId: string) {
       docType: d.doc_type,
       fileName: d.file_name,
       issuedAt: d.issued_at,
+      createdAt: d.created_at,
       fields: fields.map((f) => ({ label: f.label, value: f.value })),
     };
   });

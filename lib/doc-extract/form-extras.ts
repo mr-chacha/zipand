@@ -32,6 +32,42 @@ function numPart(value: string) {
   return n?.[1] ?? value.trim();
 }
 
+/** 건축물대장 > 부동산종합공부 > 토지대장 > 기타 */
+export function docTypeMergePriority(docType: string) {
+  if (docType === "건축물대장") return 0;
+  if (docType === "부동산종합공부") return 1;
+  if (docType === "토지대장") return 2;
+  return 3;
+}
+
+/** 빈값·확인 필요·0(0%)이면 하위 우선순위 서류 값으로 대체 가능 */
+export function isBlankOrZeroMetric(value: string | null | undefined) {
+  if (value == null) return true;
+  const t = value.trim();
+  if (!t || t === "-" || t === "확인 필요") return true;
+  const n = t.replace(/[^\d.]/g, "");
+  if (!n) return true;
+  return Number(n) === 0;
+}
+
+export function sortDocsByMergePriority<
+  T extends { doc_type?: string; docType?: string; created_at?: string; createdAt?: string },
+>(docs: T[]): T[] {
+  return [...docs].sort((a, b) => {
+    const typeA = a.doc_type ?? a.docType ?? "";
+    const typeB = b.doc_type ?? b.docType ?? "";
+    const d = docTypeMergePriority(typeA) - docTypeMergePriority(typeB);
+    if (d !== 0) return d;
+    const createdA = a.created_at ?? a.createdAt ?? "";
+    const createdB = b.created_at ?? b.createdAt ?? "";
+    return createdB.localeCompare(createdA);
+  });
+}
+
+function takeMetric(current: string | null, next: string) {
+  return isBlankOrZeroMetric(current) ? next : current;
+}
+
 /** 여러 서류 필드를 합친다. 건축물대장·종합공부 값을 우선한다. */
 export function mergeDocFormExtras(
   docs: {
@@ -40,17 +76,7 @@ export function mergeDocFormExtras(
     document_fields: { label: string; value: string }[] | null;
   }[]
 ): DocFormExtras {
-  const priority = (t: string) => {
-    if (t === "건축물대장") return 0;
-    if (t === "부동산종합공부") return 1;
-    if (t === "토지대장") return 2;
-    return 3;
-  };
-  const sorted = [...docs].sort((a, b) => {
-    const d = priority(a.doc_type) - priority(b.doc_type);
-    if (d !== 0) return d;
-    return (b.created_at ?? "").localeCompare(a.created_at ?? "");
-  });
+  const sorted = sortDocsByMergePriority(docs);
 
   const out: DocFormExtras = { ...EMPTY };
   for (const doc of sorted) {
@@ -60,34 +86,42 @@ export function mergeDocFormExtras(
       const value = f.value.trim();
       if (!value) continue;
 
-      if ((label === "전용면적" || (label === "면적" && (doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부"))) && !out.buildingArea) {
+      if (
+        (label === "전용면적" ||
+          (label === "면적" && (doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부"))) &&
+        isBlankOrZeroMetric(out.buildingArea)
+      ) {
         out.buildingArea = numPart(value);
       }
       if (label === "연면적") {
-        if (!out.totalFloorArea) out.totalFloorArea = numPart(value);
+        if (isBlankOrZeroMetric(out.totalFloorArea)) out.totalFloorArea = numPart(value);
         // 전용면적 없을 때 계약서 건물면적 후보
-        if (!out.buildingArea) out.buildingArea = numPart(value);
+        if (isBlankOrZeroMetric(out.buildingArea)) out.buildingArea = numPart(value);
       }
-      if ((label === "건축면적" || label === "건축면적(㎡)") && !out.archArea) {
+      if ((label === "건축면적" || label === "건축면적(㎡)") && isBlankOrZeroMetric(out.archArea)) {
         out.archArea = numPart(value);
       }
       if (
         (label === "대지면적" ||
           label === "토지 면적" ||
           (label === "면적" && doc.doc_type !== "건축물대장" && doc.doc_type !== "부동산종합공부")) &&
-        !out.landArea
+        isBlankOrZeroMetric(out.landArea)
       ) {
         out.landArea = numPart(value);
       }
       if ((label === "주구조" || label === "구조") && !out.buildingStructure) out.buildingStructure = value;
       if (label === "주용도" && !out.buildingUse) out.buildingUse = value;
       if ((label === "지목" || label === "토지 지목") && !out.landCategory) out.landCategory = value;
-      if (label === "개별공시지가" && !out.landPricePerM2) out.landPricePerM2 = numPart(value);
-      if ((label === "건폐율" || label === "건축물 건폐율") && !out.buildingCoverage) {
-        out.buildingCoverage = value.includes("%") ? value : `${numPart(value)}%`;
+      if (label === "개별공시지가" && isBlankOrZeroMetric(out.landPricePerM2)) {
+        out.landPricePerM2 = numPart(value);
       }
-      if ((label === "용적률" || label === "건축물 용적률") && !out.floorAreaRatio) {
-        out.floorAreaRatio = value.includes("%") ? value : `${numPart(value)}%`;
+      if (label === "건폐율" || label === "건축물 건폐율") {
+        const next = value.includes("%") ? value : `${numPart(value)}%`;
+        out.buildingCoverage = takeMetric(out.buildingCoverage, next);
+      }
+      if (label === "용적률" || label === "건축물 용적률") {
+        const next = value.includes("%") ? value : `${numPart(value)}%`;
+        out.floorAreaRatio = takeMetric(out.floorAreaRatio, next);
       }
     }
   }

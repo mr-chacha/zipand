@@ -6,8 +6,11 @@ import { useRouter } from "next/navigation";
 import { Download, Printer, RotateCcw, Search, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentsWriteControls } from "@/components/deal-forms/contract-write-entry";
-import type { WritePropertyOption } from "@/components/deal-forms/contract-write-dialog";
-import type { WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
+import type {
+  ContractWriteEditSeed,
+  WriteDealOption,
+  WritePropertyOption,
+} from "@/components/deal-forms/contract-write-dialog";
 import { PrivacyConsentWriteButton } from "@/components/deal-forms/privacy-consent-dialog";
 import {
   RegistryInquiryButton,
@@ -78,6 +81,8 @@ export type DocumentRow = {
   kind: DealFormKind;
   title: string;
   status: "draft" | "finalized";
+  /** 계약서 작성 창에서 다시 열 때 사용 */
+  data: Record<string, string>;
   contractDate: string;
   expiryDate: string;
   interim1: string;
@@ -87,6 +92,10 @@ export type DocumentRow = {
   monthlyRent: string;
   dealType: string;
   propertyType: string;
+  /** 연결 매물 표시명 */
+  linkedProperty: string;
+  /** 연결 매물 ID — 있으면 매물관리로 이동 */
+  linkedPropertyId: string | null;
   lessorName: string;
   lessorPhone: string;
   lesseeName: string;
@@ -124,6 +133,7 @@ const COLS = [
   "전송상호",
   "수신상호",
   "계약서번호",
+  "연결매물",
 ] as const;
 
 type DateField = "all" | "contractDate" | "expiryDate" | "balanceDate";
@@ -225,6 +235,7 @@ function matchKeyword(row: DocumentRow, field: SearchField, keyword: string) {
                   ? [row.lessorPhone, row.lesseePhone]
                   : [
                       row.title,
+                      row.linkedProperty,
                       row.address,
                       row.lessorName,
                       row.lesseeName,
@@ -289,7 +300,26 @@ export function DocumentsTable({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
+  const [editSeed, setEditSeed] = useState<ContractWriteEditSeed | null>(null);
   useBusy(pending);
+
+  const openContractRow = (row: DocumentRow) => {
+    if (row.kind !== "contract") {
+      router.push(formHref(row));
+      return;
+    }
+    const fromData = row.data.property_id?.trim() ?? "";
+    const fromDeal = row.dealId
+      ? (deals.find((d) => d.value === row.dealId)?.propertyId?.trim() ?? "")
+      : "";
+    setEditSeed({
+      formId: row.id,
+      title: row.title,
+      data: row.data,
+      propertyId: fromData || fromDeal || undefined,
+      status: row.status,
+    });
+  };
 
   const filtered = useMemo(() => filterRows(rows, applied), [rows, applied]);
   const allIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
@@ -349,6 +379,7 @@ export function DocumentsTable({
           r.senderName,
           r.receiverName,
           r.contractNo,
+          r.linkedProperty,
         ]
           .map((v) => `"${String(v).replace(/"/g, '""')}"`)
           .join(",")
@@ -498,12 +529,27 @@ export function DocumentsTable({
       </section>
 
       {!isApp && (
-        <DocumentsWriteControls properties={writeProperties} deals={deals} office={office}>
+        <DocumentsWriteControls
+          properties={writeProperties}
+          deals={deals}
+          office={office}
+          editSeed={editSeed}
+          onEditSeedChange={setEditSeed}
+          trailing={
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="bg-destructive text-white hover:bg-destructive/90"
+              disabled={!selected.length || pending}
+              onClick={() => setConfirmOpen(true)}
+            >
+              <Trash2 data-icon="inline-start" />
+              삭제
+            </Button>
+          }
+        >
           <RelatedFormsWriteButton office={office} />
-          <Button size="sm" variant="outline" disabled={!selected.length || pending} onClick={() => setConfirmOpen(true)}>
-            <Trash2 data-icon="inline-start" />
-            삭제
-          </Button>
           <Button size="sm" variant="outline" onClick={exportExcel}>
             엑셀저장
           </Button>
@@ -566,7 +612,10 @@ export function DocumentsTable({
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={COLS.length + (isApp ? 0 : 1)} className="px-4 py-12 text-center text-sm text-muted-foreground">
+                <td
+                  colSpan={COLS.length + (isApp ? 0 : 1)}
+                  className="px-4 py-12 text-center text-sm text-muted-foreground"
+                >
                   {rows.length === 0
                     ? isApp
                       ? "공유할 확정 계약서가 없어요."
@@ -598,7 +647,9 @@ export function DocumentsTable({
                   row.senderName,
                   row.receiverName,
                   row.contractNo,
+                  row.linkedProperty,
                 ];
+                const linkedCol = COLS.length - 1;
                 return (
                   <tr key={row.id} className="border-t hover:bg-muted/40">
                     {!isApp && (
@@ -616,13 +667,30 @@ export function DocumentsTable({
                         className={cn(
                           "max-w-48 truncate whitespace-nowrap px-2.5 py-2 text-center tabular-nums",
                           i === 0 && value && "font-medium text-red-600",
-                          i === 6 && "max-w-56 text-left"
+                          (i === 6 || i === linkedCol) && "max-w-56 text-left"
                         )}
                       >
-                        {i === 6 || i === 13 ? (
-                          <Link href={href} className="text-primary hover:underline">
-                            {value || "—"}
+                        {i === linkedCol && row.linkedPropertyId && value ? (
+                          <Link
+                            href={`/properties/${row.linkedPropertyId}`}
+                            className="text-primary hover:underline"
+                          >
+                            {value}
                           </Link>
+                        ) : i === 6 || i === 13 ? (
+                          row.kind === "contract" ? (
+                            <button
+                              type="button"
+                              className="text-left text-primary hover:underline"
+                              onClick={() => openContractRow(row)}
+                            >
+                              {value || "—"}
+                            </button>
+                          ) : (
+                            <Link href={href} className="text-primary hover:underline">
+                              {value || "—"}
+                            </Link>
+                          )
                         ) : (
                           value || ""
                         )}
@@ -645,8 +713,8 @@ export function DocumentsTable({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="선택한 서식을 삭제할까요?"
-        description="삭제하면 되돌릴 수 없어요. 공유 링크도 함께 삭제돼요."
+        title="선택한 계약을 삭제할까요?"
+        description="삭제하면 되돌릴 수 없습니다."
         confirmLabel="삭제"
         destructive
         pending={pending}

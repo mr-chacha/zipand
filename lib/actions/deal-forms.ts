@@ -161,6 +161,10 @@ export async function updateDealForm(formId: string, _prev: ActionState | null, 
 
     const title = requiredStr(fd, "title", "제목");
     const data = readFormDataRecord(fd, formFieldKeys(form.kind as DealFormKind));
+    // 연결 매물은 서식 입력 칸이 아니라 별도 선택값 — FormData에 있으면 data에 보존
+    if (fd.has("property_id")) {
+      data.property_id = String(fd.get("property_id") ?? "").trim();
+    }
     const { error } = await supabase
       .from("deal_forms")
       .update({ title, data: data as Json, updated_at: new Date().toISOString() })

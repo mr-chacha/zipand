@@ -306,7 +306,6 @@ export function DocumentReview({
                       <Pencil />
                     </Button>
                     <ConfirmAction
-                      appOnly
                       action={() => deleteDocumentField(field.id, documentId)}
                       title="추출 항목을 삭제할까요?"
                       description="삭제하면 되돌릴 수 없어요."
@@ -365,7 +364,6 @@ export function DocumentReview({
                       </span>
                     )}
                     <ConfirmAction
-                      appOnly
                       action={() => deleteDocumentSignal(signal.id, documentId)}
                       title="확인 사항을 삭제할까요?"
                       description="삭제하면 되돌릴 수 없어요."

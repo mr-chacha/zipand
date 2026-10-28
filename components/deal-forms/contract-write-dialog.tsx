@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Printer, Save } from "lucide-react";
+import { Copy, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
 import { ContractFormSheet } from "@/components/deal-forms/contract-form-sheet";
 import {
@@ -16,6 +16,7 @@ import {
   StandardLeasePageTabs,
   type StandardLeasePageNo,
 } from "@/components/deal-forms/standard-lease-form-sheet";
+import { ConfirmDialog } from "@/components/dialogs";
 import { NativeSelect } from "@/components/form/native-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -36,9 +37,32 @@ import {
   CONTRACT_FORM_STYLE_OPTIONS,
   STANDARD_LEASE_TITLE,
   buildStandardLeaseDefaults,
+  isStandardLeaseForm,
   type ContractFormStyle,
 } from "@/lib/standard-lease";
 import { cn } from "@/lib/utils";
+
+/** 목록에서 제목 클릭 시 기존 계약서를 같은 작성 UI로 연다 */
+export type ContractWriteEditSeed = {
+  formId: string;
+  title: string;
+  data: Record<string, string>;
+  propertyId?: string;
+  status?: "draft" | "finalized";
+};
+
+function inferPropertyType(data: Record<string, string>): ContractPropertyType {
+  const t = data.property_type?.trim() ?? "";
+  if ((CONTRACT_PROPERTY_TYPES as readonly string[]).includes(t)) return t as ContractPropertyType;
+  if (t === "빌라" || t === "원룸") return "다가구";
+  return "아파트";
+}
+
+function inferDealType(data: Record<string, string>): ContractDealType {
+  const t = data.deal_type?.trim() ?? "";
+  if ((CONTRACT_DEAL_TYPES as readonly string[]).includes(t)) return t as ContractDealType;
+  return "매매";
+}
 
 function readFormRecord(formId: string): Record<string, string> {
   const form = document.getElementById(formId);
@@ -135,6 +159,48 @@ function matchProperties(
   return byDeal.length ? byDeal : properties;
 }
 
+/** 2. 계약내용 — 금액·지급일정 (연결 매물과 거래종류가 다를 때 비움) */
+const CONTRACT_CONTENT_KEYS = [
+  "amount",
+  "monthly_rent",
+  "down_payment",
+  "down_payment_date",
+  "loan_amount",
+  "current_deposit",
+  "interim_payment_1",
+  "interim_date_1",
+  "interim_payment_2",
+  "interim_date_2",
+  "balance_amount",
+  "balance_date",
+  "contract_date",
+  "expiry_date",
+  "delivery_date",
+  "move_in_date",
+  "lease_months",
+  "rent_pay_day",
+  "rent_pay_timing",
+] as const;
+
+function clearContractContent(data: Record<string, string>) {
+  const next = { ...data };
+  for (const key of CONTRACT_CONTENT_KEYS) next[key] = "";
+  return next;
+}
+
+function mapPropertyType(raw: string | undefined): ContractPropertyType | null {
+  if (!raw) return null;
+  if ((CONTRACT_PROPERTY_TYPES as readonly string[]).includes(raw)) return raw as ContractPropertyType;
+  if (raw === "빌라" || raw === "원룸") return "다가구";
+  return null;
+}
+
+function mapDealType(raw: string | undefined): ContractDealType | null {
+  if (!raw) return null;
+  if ((CONTRACT_DEAL_TYPES as readonly string[]).includes(raw)) return raw as ContractDealType;
+  return null;
+}
+
 function buildActiveForm(
   propertyType: ContractPropertyType,
   dealType: ContractDealType,
@@ -186,6 +252,7 @@ export function ContractWriteDialog({
   properties,
   deals = [],
   office = null,
+  edit = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -194,6 +261,8 @@ export function ContractWriteDialog({
   deals?: WriteDealOption[];
   /** 설정에 등록된 사무소·담당자 — 개업공인중개사 란에 반영 */
   office?: RelatedFormsOfficeDefaults | null;
+  /** 기존 계약서 열람·수정 */
+  edit?: ContractWriteEditSeed | null;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -205,11 +274,25 @@ export function ContractWriteDialog({
   /** 기본은 연결 안 함 — 선택 시에만 매물 정보 prefill */
   const [propertyId, setPropertyId] = useState("");
   const [formId, setFormId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<Record<string, string> | null>(null);
+  const [editTitle, setEditTitle] = useState<string | null>(null);
+  const [editStatus, setEditStatus] = useState<"draft" | "finalized" | null>(null);
   /** 종류·거래가 바뀔 때 양식을 다시 마운트하기 위한 키 */
   const [formEpoch, setFormEpoch] = useState(0);
   const [leasePage, setLeasePage] = useState<StandardLeasePageNo>(1);
   const [disclosureOpen, setDisclosureOpen] = useState(false);
   const [disclosureSeed, setDisclosureSeed] = useState<DisclosureWriteSeed | null>(null);
+  const [propertyConfirmOpen, setPropertyConfirmOpen] = useState(false);
+  const [pendingPropertyId, setPendingPropertyId] = useState<string | null>(null);
+  const [dealTypeConfirmOpen, setDealTypeConfirmOpen] = useState(false);
+  const [pendingDealType, setPendingDealType] = useState<ContractDealType | null>(null);
+  /** 표준임대차 전환 등으로 거래종류 확인이 필요할 때 함께 적용 */
+  const [pendingFormStyle, setPendingFormStyle] = useState<ContractFormStyle | null>(null);
+  const editing = Boolean(formId && editData);
+  const readOnly = editStatus === "finalized";
+  const prevEditIdRef = useRef<string | null>(null);
+  const linkedProperty = propertyId ? properties.find((p) => p.value === propertyId) : undefined;
+  const linkedPropertyDealType = mapDealType(linkedProperty?.dealType);
 
   /** 연결 매물은 전체 표시, 현재 서식과 맞는 매물을 위로 */
   const propertyOptions = useMemo(() => {
@@ -221,17 +304,26 @@ export function ContractWriteDialog({
     });
   }, [properties, pickProperty, pickDeal]);
 
-  const active = useMemo(
-    () =>
-      open ? buildActiveForm(pickProperty, pickDeal, propertyId, properties, formStyle, office) : null,
-    [open, pickProperty, pickDeal, propertyId, properties, formStyle, office]
-  );
+  const active = useMemo(() => {
+    if (!open) return null;
+    const base = buildActiveForm(pickProperty, pickDeal, propertyId, properties, formStyle, office);
+    if (!base) return null;
+    if (!editData) return base;
+    return {
+      ...base,
+      title: editTitle || base.title,
+      data: { ...base.data, ...editData },
+    };
+  }, [open, pickProperty, pickDeal, propertyId, properties, formStyle, office, editData, editTitle]);
 
   const linkedDealId = (pid: string) =>
     deals.find((d) => d.propertyId === pid)?.value ?? null;
 
   const reset = () => {
     setFormId(null);
+    setEditData(null);
+    setEditTitle(null);
+    setEditStatus(null);
     setPickProperty("아파트");
     setPickDeal("매매");
     setFormStyle("general");
@@ -244,12 +336,47 @@ export function ContractWriteDialog({
 
   const handleOpenChange = (next: boolean) => {
     if (!next) reset();
-    else {
+    else if (!edit) {
       setPropertyId("");
       setFormEpoch((n) => n + 1);
     }
     onOpenChange(next);
   };
+
+  useEffect(() => {
+    if (!open) {
+      prevEditIdRef.current = null;
+      return;
+    }
+    if (edit) {
+      prevEditIdRef.current = edit.formId;
+      setFormId(edit.formId);
+      setEditData(edit.data);
+      setEditTitle(edit.title);
+      setEditStatus(edit.status ?? "draft");
+      setPickProperty(inferPropertyType(edit.data));
+      setPickDeal(inferDealType(edit.data));
+      setFormStyle(isStandardLeaseForm(edit.data) ? "standard_lease" : "general");
+      setPropertyId(edit.propertyId ?? edit.data.property_id ?? "");
+      setLeasePage(1);
+      setFormEpoch((n) => n + 1);
+      return;
+    }
+    // 목록 수정 → 신규 작성으로 전환할 때만 초기화 (저장 직후 formId·연결매물을 지우지 않음)
+    if (prevEditIdRef.current) {
+      prevEditIdRef.current = null;
+      setFormId(null);
+      setEditData(null);
+      setEditTitle(null);
+      setEditStatus(null);
+      setPickProperty("아파트");
+      setPickDeal("매매");
+      setFormStyle("general");
+      setPropertyId("");
+      setLeasePage(1);
+      setFormEpoch((n) => n + 1);
+    }
+  }, [open, edit]);
 
   const openDisclosure = () => {
     const live = readFormRecord("contract-write-form");
@@ -265,59 +392,190 @@ export function ContractWriteDialog({
     setDisclosureOpen(true);
   };
 
-  const keepOrClearProperty = (next: WritePropertyOption[], prev: string) =>
-    prev && next.some((p) => p.value === prev) ? prev : "";
+  /** 서식·종류 변경 시 현재 입력값을 새 양식에 최대한 유지 */
+  const remountWithTypes = ({
+    nextProperty = pickProperty,
+    nextDeal = pickDeal,
+    nextStyle = formStyle,
+    skipContractContent = false,
+  }: {
+    nextProperty?: ContractPropertyType;
+    nextDeal?: ContractDealType;
+    nextStyle?: ContractFormStyle;
+    skipContractContent?: boolean;
+  }) => {
+    const live = typeof document !== "undefined" ? readFormRecord("contract-write-form") : {};
+    const base = buildActiveForm(nextProperty, nextDeal, propertyId, properties, nextStyle, office);
+    if (!base) {
+      setPickProperty(nextProperty);
+      setPickDeal(nextDeal);
+      setFormStyle(nextStyle);
+      setLeasePage(1);
+      setFormEpoch((n) => n + 1);
+      return;
+    }
+
+    let data: Record<string, string> = { ...base.data, ...live };
+    if (editData) data = { ...data, ...editData, ...live };
+    data.template_id = base.data.template_id;
+    data.template_title = base.data.template_title;
+    data.property_type = nextProperty;
+    data.deal_type = nextDeal;
+    data.form_template = base.data.form_template;
+    data.building_use = data.building_use || nextProperty;
+    if (skipContractContent) data = clearContractContent(data);
+
+    setPickProperty(nextProperty);
+    setPickDeal(nextDeal);
+    setFormStyle(nextStyle);
+    setEditData(data);
+    setEditTitle(base.title);
+    setLeasePage(1);
+    setFormEpoch((n) => n + 1);
+  };
 
   const changeProperty = (value: ContractPropertyType) => {
-    setPickProperty(value);
-    setFormId(null);
-    setLeasePage(1);
-    const next = matchProperties(properties, value, pickDeal);
-    setPropertyId((prev) => keepOrClearProperty(next, prev));
-    setFormEpoch((n) => n + 1);
+    if (readOnly || value === pickProperty) return;
+    remountWithTypes({ nextProperty: value });
+  };
+
+  const applyDealType = (value: ContractDealType, skipContractContent: boolean) => {
+    remountWithTypes({ nextDeal: value, skipContractContent });
   };
 
   const changeDealType = (value: ContractDealType) => {
-    setPickDeal(value);
-    setFormId(null);
-    setLeasePage(1);
-    const next = matchProperties(properties, pickProperty, value);
-    setPropertyId((prev) => keepOrClearProperty(next, prev));
-    setFormEpoch((n) => n + 1);
+    if (readOnly || value === pickDeal) return;
+    if (
+      linkedPropertyDealType &&
+      linkedPropertyDealType !== value
+    ) {
+      setPendingDealType(value);
+      setDealTypeConfirmOpen(true);
+      return;
+    }
+    applyDealType(value, false);
+  };
+
+  const confirmDealTypeChange = () => {
+    if (!pendingDealType) return;
+    remountWithTypes({
+      nextDeal: pendingDealType,
+      nextStyle: pendingFormStyle ?? formStyle,
+      skipContractContent: true,
+    });
+    setPendingDealType(null);
+    setPendingFormStyle(null);
+    setDealTypeConfirmOpen(false);
   };
 
   const changeFormStyle = (value: ContractFormStyle) => {
-    setFormStyle(value);
-    setFormId(null);
-    setLeasePage(1);
-    setFormEpoch((n) => n + 1);
+    if (readOnly || value === formStyle) return;
     if (value === "standard_lease" && pickDeal === "매매") {
-      setPickDeal("전세");
-      const next = matchProperties(properties, pickProperty, "전세");
-      setPropertyId((prev) => keepOrClearProperty(next, prev));
+      if (linkedPropertyDealType && linkedPropertyDealType !== "전세") {
+        setPendingFormStyle(value);
+        setPendingDealType("전세");
+        setDealTypeConfirmOpen(true);
+        return;
+      }
+      remountWithTypes({ nextStyle: value, nextDeal: "전세" });
+      return;
     }
+    remountWithTypes({ nextStyle: value });
   };
 
-  const changePropertyId = (value: string) => {
+  const applyPropertyId = (value: string) => {
+    const p = properties.find((x) => x.value === value);
+    const nextProperty = mapPropertyType(p?.propertyType) ?? pickProperty;
+    const nextDeal = mapDealType(p?.dealType) ?? pickDeal;
     setPropertyId(value);
-    setFormId(null);
+    // 매물 변경 확인 후 — 매물 정보로 다시 채움 (연결 매물의 거래종류로 맞춤)
+    const base = buildActiveForm(nextProperty, nextDeal, value, properties, formStyle, office);
+    setPickProperty(nextProperty);
+    setPickDeal(nextDeal);
+    if (base) {
+      setEditData(base.data);
+      setEditTitle(base.title);
+    } else {
+      setEditData(null);
+    }
     setLeasePage(1);
     setFormEpoch((n) => n + 1);
-    // 매물 선택 시 부동산·거래 종류를 매물에 맞춤 (계약서 서식에 있는 종류만)
-    const p = properties.find((x) => x.value === value);
-    if (p?.propertyType && (CONTRACT_PROPERTY_TYPES as readonly string[]).includes(p.propertyType)) {
-      setPickProperty(p.propertyType as ContractPropertyType);
-    } else if (p?.propertyType === "빌라" || p?.propertyType === "원룸") {
-      setPickProperty("다가구");
+  };
+
+  const requestPropertyIdChange = (value: string) => {
+    if (value === propertyId) return;
+    const mayLoseValues = Boolean(propertyId || formId || editData);
+    if (mayLoseValues) {
+      setPendingPropertyId(value);
+      setPropertyConfirmOpen(true);
+      return;
     }
-    if (p?.dealType && (CONTRACT_DEAL_TYPES as readonly string[]).includes(p.dealType)) {
-      setPickDeal(p.dealType as ContractDealType);
+    applyPropertyId(value);
+  };
+
+  const confirmPropertyIdChange = () => {
+    if (pendingPropertyId === null) return;
+    applyPropertyId(pendingPropertyId);
+    setPendingPropertyId(null);
+    setPropertyConfirmOpen(false);
+  };
+
+  const makeCopy = () => {
+    if (!active) {
+      toast.error("계약서 양식을 불러오지 못했어요.");
+      return;
     }
+    startTransition(async () => {
+      const live = readFormRecord("contract-write-form");
+      if (propertyId) live.property_id = propertyId;
+      else delete live.property_id;
+      live.contract_no = newContractNo();
+
+      const baseTitle = (editTitle || active.title).replace(/\s*\(사본\)\s*$/u, "").trim() || active.title;
+      const copyTitle = `${baseTitle} (사본)`;
+      live.template_title = copyTitle;
+
+      const dealId = propertyId ? linkedDealId(propertyId) : null;
+      const created = await createDealFormForDeal(dealId, {
+        templateId: active.templateId,
+        kind: "contract",
+        title: copyTitle,
+      });
+      if (created.error || !created.id) {
+        toast.error(created.error ?? "사본을 만들지 못했어요.");
+        return;
+      }
+
+      const fd = new FormData();
+      fd.set("title", copyTitle);
+      for (const [key, value] of Object.entries(live)) {
+        fd.set(key, value);
+      }
+      if (propertyId) fd.set("property_id", propertyId);
+
+      const updated = await updateDealForm(created.id, null, fd);
+      if (updated.error) {
+        toast.error(updated.error);
+        return;
+      }
+
+      setFormId(created.id);
+      setEditData(live);
+      setEditTitle(copyTitle);
+      setEditStatus("draft");
+      setFormEpoch((n) => n + 1);
+      toast.success("사본을 만들었어요.");
+      router.refresh();
+    });
   };
 
   const save = (fd: FormData) => {
     if (!active) {
       toast.error("계약서 양식을 불러오지 못했어요.");
+      return;
+    }
+    if (readOnly) {
+      toast.error("확정된 계약서는 수정할 수 없어요.");
       return;
     }
     startTransition(async () => {
@@ -327,6 +585,10 @@ export function ContractWriteDialog({
         if (result.error) toast.error(result.error);
         else {
           toast.success(result.message ?? "저장했어요.");
+          const live = readFormRecord("contract-write-form");
+          if (propertyId) live.property_id = propertyId;
+          else delete live.property_id;
+          setEditData(live);
           router.refresh();
         }
         return;
@@ -349,6 +611,11 @@ export function ContractWriteDialog({
         return;
       }
       setFormId(created.id);
+      const live = readFormRecord("contract-write-form");
+      if (propertyId) live.property_id = propertyId;
+      setEditData(live);
+      setEditTitle(active.title);
+      setEditStatus("draft");
       toast.success("계약서를 저장했어요.");
       router.refresh();
     });
@@ -365,7 +632,7 @@ export function ContractWriteDialog({
         )}
       >
         <DialogHeader className="space-y-0 border-b px-4 py-3 print:hidden">
-          <DialogTitle>계약서 작성</DialogTitle>
+          <DialogTitle>{editing ? "계약서 조회·수정" : "계약서 작성"}</DialogTitle>
           <DialogDescription className="sr-only">
             일반 계약서 또는 표준임대차 계약서를 선택하고 부동산·거래 종류를 바꾸면 아래 양식이 바뀝니다.
           </DialogDescription>
@@ -380,6 +647,7 @@ export function ContractWriteDialog({
             <NativeSelect
               id="cw-style"
               value={formStyle}
+              disabled={readOnly}
               onChange={(e) => changeFormStyle(e.target.value as ContractFormStyle)}
               options={[...CONTRACT_FORM_STYLE_OPTIONS]}
               className="w-44 bg-white text-foreground"
@@ -392,6 +660,7 @@ export function ContractWriteDialog({
             <NativeSelect
               id="cw-property"
               value={pickProperty}
+              disabled={readOnly}
               onChange={(e) => changeProperty(e.target.value as ContractPropertyType)}
               options={[...CONTRACT_PROPERTY_TYPES]}
               className="w-36 bg-white text-foreground"
@@ -404,6 +673,7 @@ export function ContractWriteDialog({
             <NativeSelect
               id="cw-deal"
               value={pickDeal}
+              disabled={readOnly}
               onChange={(e) => changeDealType(e.target.value as ContractDealType)}
               options={[...CONTRACT_DEAL_TYPES]}
               className="w-28 bg-white text-foreground"
@@ -424,7 +694,8 @@ export function ContractWriteDialog({
               <NativeSelect
                 id="cw-link-property"
                 value={propertyId}
-                onChange={(e) => changePropertyId(e.target.value)}
+                disabled={readOnly}
+                onChange={(e) => requestPropertyIdChange(e.target.value)}
                 placeholder="선택안함"
                 options={propertyOptions.map((p) => ({
                   value: p.value,
@@ -438,9 +709,24 @@ export function ContractWriteDialog({
 
         <div className="shrink-0 border-b bg-muted/40 print:hidden">
           <div className="flex flex-wrap items-center gap-2 px-4 py-2">
-            <Button type="submit" form="contract-write-form" size="sm" disabled={pending || !active}>
+            <Button
+              type="submit"
+              form="contract-write-form"
+              size="sm"
+              disabled={pending || !active || readOnly}
+            >
               <Save data-icon="inline-start" />
               계약서저장
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={pending || !active}
+              onClick={makeCopy}
+            >
+              <Copy data-icon="inline-start" />
+              사본만들기
             </Button>
             <Button type="button" size="sm" variant="outline" disabled={!active} onClick={openDisclosure}>
               확인설명서 작성
@@ -463,7 +749,8 @@ export function ContractWriteDialog({
             <Button type="button" size="sm" variant="ghost" onClick={() => handleOpenChange(false)}>
               닫기
             </Button>
-            {formId && <span className="text-[14px] text-muted-foreground">저장됨</span>}
+            {readOnly && <span className="text-[14px] text-muted-foreground">확정됨 · 조회만 가능해요</span>}
+            {!readOnly && formId && <span className="text-[14px] text-muted-foreground">저장됨</span>}
             {!formId && active && (
               <span className="text-[14px] text-destructive">신규계약서작성 모드 · 아직 저장되지 않았어요</span>
             )}
@@ -489,29 +776,32 @@ export function ContractWriteDialog({
           ) : (
             <form
               id="contract-write-form"
-              key={`${active.formStyle}-${active.templateId}-${propertyId}-${formEpoch}`}
+              key={`${active.formStyle}-${active.templateId}-${propertyId}-${formEpoch}-${formId ?? "new"}`}
               onSubmit={(e) => {
                 e.preventDefault();
                 save(new FormData(e.currentTarget));
               }}
             >
               <input type="hidden" name="title" value={active.title} />
-              {active.formStyle === "standard_lease" ? (
-                <StandardLeaseFormSheet
-                  title={active.title}
-                  data={active.data}
-                  page={leasePage}
-                  onPageChange={setLeasePage}
-                  showPageTabs={false}
-                />
-              ) : (
-                <ContractFormSheet
-                  propertyType={active.propertyType}
-                  dealType={active.dealType}
-                  title={active.title}
-                  data={active.data}
-                />
-              )}
+              <input type="hidden" name="property_id" value={propertyId} />
+              <fieldset disabled={readOnly} className="min-w-0 border-0 p-0">
+                {active.formStyle === "standard_lease" ? (
+                  <StandardLeaseFormSheet
+                    title={active.title}
+                    data={active.data}
+                    page={leasePage}
+                    onPageChange={setLeasePage}
+                    showPageTabs={false}
+                  />
+                ) : (
+                  <ContractFormSheet
+                    propertyType={active.propertyType}
+                    dealType={active.dealType}
+                    title={active.title}
+                    data={active.data}
+                  />
+                )}
+              </fieldset>
             </form>
           )}
         </div>
@@ -523,6 +813,38 @@ export function ContractWriteDialog({
       onOpenChange={setDisclosureOpen}
       deals={deals}
       seed={disclosureSeed}
+    />
+
+    <ConfirmDialog
+      open={propertyConfirmOpen}
+      onOpenChange={(next) => {
+        setPropertyConfirmOpen(next);
+        if (!next) setPendingPropertyId(null);
+      }}
+      title="연결 매물을 바꿀까요?"
+      description="매물을 바꾸면 이전에 입력한 값이 모두 사라집니다."
+      confirmLabel="매물 변경"
+      destructive
+      onConfirm={confirmPropertyIdChange}
+    />
+
+    <ConfirmDialog
+      open={dealTypeConfirmOpen}
+      onOpenChange={(next) => {
+        setDealTypeConfirmOpen(next);
+        if (!next) {
+          setPendingDealType(null);
+          setPendingFormStyle(null);
+        }
+      }}
+      title="거래 종류를 바꿀까요?"
+      description={
+        linkedPropertyDealType && pendingDealType
+          ? `해당 연결 매물은 ${linkedPropertyDealType}매물로 등록되어 있어요. 그래도 거래 종류를 ${pendingDealType}(으)로 바꿀까요? 바꾸면 계약내용(금액·지급일정)은 비워 두고, 매물·당사자 등 나머지 정보만 유지해요.`
+          : "거래 종류를 바꾸면 계약서 양식이 바뀌어요."
+      }
+      confirmLabel="바꾸기"
+      onConfirm={confirmDealTypeChange}
     />
     </>
   );
