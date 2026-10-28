@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { addTestCredits, setAiProvider, setBillingMode, setPlanId } from "@/lib/actions/ai-billing";
+import { useBusy } from "@/lib/busy";
 import {
   AI_PROVIDERS,
   BILLING_MODES,
@@ -69,6 +70,7 @@ function ChoiceCard({
 
 export function AiBillingSettings({ isOwner, aiProvider, billingMode, planId, creditBalance }: Props) {
   const [pending, start] = useTransition();
+  useBusy(pending, "AI 설정을 저장하고 있습니다…");
   const providerLabel = AI_PROVIDERS.find((p) => p.id === aiProvider)?.name;
   const modeLabel = BILLING_MODES.find((m) => m.id === billingMode)?.name;
   const plan = PLANS.find((p) => p.id === planId) ?? PLANS[0];

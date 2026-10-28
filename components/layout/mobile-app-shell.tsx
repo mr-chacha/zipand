@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Bell, ChevronLeft } from "lucide-react";
-import { BusyOverlay } from "@/components/busy-overlay";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Logo } from "./logo";
@@ -47,7 +46,6 @@ export function MobileAppShell({ officeName, children }: { officeName: string; c
   // 문서 전체가 아니라 본문만 스크롤해 상단 바·하단 탭이 오버스크롤·키보드에 밀리지 않게 한다
   return (
     <div data-app="" className="fixed inset-0 flex flex-col bg-muted/30">
-      <BusyOverlay />
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b bg-background px-3">
         {isTabRoot ? (
           <div className="flex min-w-0 items-center gap-2">

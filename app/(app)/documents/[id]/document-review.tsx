@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Pencil, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/form/submit-button";
 import { SignalBadge } from "@/components/status-badge";
 import { DatePicker } from "@/components/form/date-picker";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,7 +22,6 @@ import {
   addDocumentField,
   addDocumentSignal,
   completeReview,
-  deleteDocument,
   deleteDocumentField,
   deleteDocumentSignal,
   reopenReview,
@@ -66,7 +65,7 @@ export function DocumentReview({
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [localFields, setLocalFields] = useState(fields);
   const [localSignals, setLocalSignals] = useState(signals);
-  useBusy(pending || extracting || reviewPending);
+  useBusy(pending || extracting || reviewPending, extracting ? "서류를 AI로 추출하고 있습니다…" : undefined);
   const reviewedCount = localFields.filter((f) => f.reviewed).length;
   const reviewedSignalCount = localSignals.filter((signal) => signal.reviewed).length;
   const allReviewed = localFields.length > 0 && reviewedCount === localFields.length;
@@ -137,16 +136,12 @@ export function DocumentReview({
           <div className="space-y-1">
             <CardTitle>핵심 항목 정리</CardTitle>
             <CardDescription>
-              AI 추출 결과의 원문 근거와 값을 대조하세요. 잘못된 값은 수정한 뒤 다시 확인할 수 있어요.
+           AI를 사용하여 서류의 핵심 내용을 추출하여, 계약서 작성시 자동으로 입력하여 계약서 작성 시간을 줄이세요.
             </CardDescription>
           </div>
           <Button type="button" size="sm" variant="outline" disabled={pending || extracting} onClick={runExtract}>
-            {extracting ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <Sparkles data-icon="inline-start" />
-            )}
-            {extracting ? "AI 추출 중…" : hasAiResult ? "AI 다시 추출" : "AI 추출"}
+            <Sparkles data-icon="inline-start" />
+            {hasAiResult ? "AI 다시 추출" : "AI 추출"}
           </Button>
         </div>
         {extractionStatus === "미추출" && (
@@ -188,25 +183,64 @@ export function DocumentReview({
               {localFields.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">아직 입력한 항목이 없어요.</p>
               )}
-              {localFields.length > 0 && (
-                <label
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm",
-                    done ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40"
-                  )}
-                >
-                  <Checkbox
-                    checked={allReviewed}
-                    disabled={done}
-                    onCheckedChange={(v) => toggleAllReviewed(Boolean(v))}
-                    aria-label="추출 항목 전체 확인"
-                  />
-                  <span className="font-medium">전체 확인</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({reviewedCount}/{localFields.length})
-                  </span>
-                </label>
-              )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {localFields.length > 0 ? (
+                  <label
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm",
+                      done ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40"
+                    )}
+                  >
+                    <Checkbox
+                      checked={allReviewed}
+                      disabled={done}
+                      onCheckedChange={(v) => toggleAllReviewed(Boolean(v))}
+                      aria-label="추출 항목 전체 확인"
+                    />
+                    <span className="font-medium">전체 확인</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({reviewedCount}/{localFields.length})
+                    </span>
+                  </label>
+                ) : (
+                  <span />
+                )}
+                {done ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => run(() => reopenReview(documentId))}
+                  >
+                    <RotateCcw data-icon="inline-start" />
+                    다시 검토
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={
+                      pending ||
+                      reviewPending ||
+                      localFields.length === 0 ||
+                      reviewedCount < localFields.length ||
+                      reviewedSignalCount < localSignals.length
+                    }
+                    onClick={() => run(() => completeReview(documentId))}
+                    title={
+                      localFields.length > 0 && reviewedCount < localFields.length
+                        ? `확인하지 않은 항목이 ${localFields.length - reviewedCount}개 있어요`
+                        : reviewedSignalCount < localSignals.length
+                          ? `확인하지 않은 확인 사항이 ${localSignals.length - reviewedSignalCount}개 있어요`
+                          : undefined
+                    }
+                  >
+                    <CheckCircle2 data-icon="inline-start" />
+                    검토 완료
+                  </Button>
+                )}
+              </div>
               {localFields.map((field) => (
                 <div
                   key={field.id}
@@ -360,52 +394,10 @@ export function DocumentReview({
         <div className="flex shrink-0 items-start gap-2 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
           <span>
-            {docType === "등기사항증명서"
-              ? "AI 요약은 법률 판단이 아닌 업무 참고용입니다. 신뢰도와 원문 근거를 확인하고, 복잡한 권리관계는 전문가에게 검토받으세요."
-              : "정리 결과는 업무 참고용입니다. 정리 결과를 확인한 후 계약서를 작성해 주세요."}
+            추출결과는 필히 검토하시고, 잘못된 내용은 수정 후 계약서를 작성해주세요.
           </span>
         </div>
       </CardContent>
-      <CardFooter className="shrink-0 flex flex-wrap justify-between gap-2 border-t bg-card">
-        <ConfirmAction
-          action={() => deleteDocument(documentId)}
-          title="문서를 삭제할까요?"
-          description="원본 파일과 정리한 항목이 모두 삭제되며 되돌릴 수 없어요."
-          trigger={
-            <Button variant="ghost" className="text-destructive">
-              <Trash2 data-icon="inline-start" />
-              문서 삭제
-            </Button>
-          }
-        />
-        {done ? (
-          <Button variant="outline" disabled={pending} onClick={() => run(() => reopenReview(documentId))}>
-            <RotateCcw data-icon="inline-start" />
-            다시 검토
-          </Button>
-        ) : (
-          <Button
-            disabled={
-              pending ||
-              reviewPending ||
-              localFields.length === 0 ||
-              reviewedCount < localFields.length ||
-              reviewedSignalCount < localSignals.length
-            }
-            onClick={() => run(() => completeReview(documentId))}
-            title={
-              localFields.length > 0 && reviewedCount < localFields.length
-                ? `확인하지 않은 항목이 ${localFields.length - reviewedCount}개 있어요`
-                : reviewedSignalCount < localSignals.length
-                  ? `확인하지 않은 확인 사항이 ${localSignals.length - reviewedSignalCount}개 있어요`
-                : undefined
-            }
-          >
-            <CheckCircle2 data-icon="inline-start" />
-            검토 완료
-          </Button>
-        )}
-      </CardFooter>
     </Card>
   );
 }

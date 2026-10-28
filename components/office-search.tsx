@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Loader2, MapPin, Phone, Search, UserRound } from "lucide-react";
+import { Building2, MapPin, Phone, Search, UserRound } from "lucide-react";
 import { NoticeDialog } from "@/components/dialogs";
 import { FormMessage } from "@/components/form/form-message";
 import { SubmitButton } from "@/components/form/submit-button";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { searchOfficeRegistry, type RegistrySearchState } from "@/lib/actions/office";
+import { useBusy } from "@/lib/busy";
 import type { RegistryOffice } from "@/lib/office-registry";
 import { useFormAction } from "@/lib/use-form-action";
 
@@ -32,6 +33,7 @@ export function OfficeSearch({
   const search = useFormAction(searchOfficeRegistry);
   const result = search.state as RegistrySearchState | null;
   const [emptyNotice, setEmptyNotice] = useState(false);
+  useBusy(Boolean(busyRegNo), "사무소 정보를 저장하고 있습니다…");
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     const fd = new FormData(e.currentTarget);
@@ -99,7 +101,6 @@ export function OfficeSearch({
               <li key={o.regNo} className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center">
                 <RegistryOfficeInfo office={o} current={o.regNo === currentRegNo} />
                 <Button type="button" size="sm" onClick={() => onSelect(o)} disabled={disabled || Boolean(busyRegNo)}>
-                  {busyRegNo === o.regNo && <Loader2 data-icon="inline-start" className="animate-spin" />}
                   {selectLabel}
                 </Button>
               </li>

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, Landmark, Loader2, MapPin, Printer } from "lucide-react";
+import { Building2, Landmark, MapPin, Printer } from "lucide-react";
 import { toast } from "sonner";
 import {
   completeRegistryInquiry,
@@ -25,6 +25,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/form/native-select";
+import { useBusy } from "@/lib/busy";
 
 export type RegistryPropertyOption = {
   value: string;
@@ -70,6 +71,7 @@ export function RegistryInquiryDialog({
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
   const [pending, startTransition] = useTransition();
+  useBusy(pending, "등기 정보를 처리하고 있습니다…");
   const [propertyId, setPropertyId] = useState(allowUnlinked ? "" : (properties[0]?.value ?? ""));
   const selectedProperty = useMemo(
     () => properties.find((property) => property.value === propertyId),
@@ -168,7 +170,7 @@ export function RegistryInquiryDialog({
         ? current
         : [...current, { ...next, label }]
     );
-    void downloadPdf(next);
+    await downloadPdf(next);
 
     if (requestKind.current === "main" && includeLand === "1" && realtyType !== "2" && formRef.current) {
       requestKind.current = "land";
@@ -230,11 +232,15 @@ export function RegistryInquiryDialog({
 
   const changeOpen = (next: boolean) => {
     if (pending) return;
-    if (!next) {
-      const pendingPaths = files
-        .map((file) => file.pendingStoragePath)
-        .filter((path): path is string => Boolean(path));
-      if (pendingPaths.length) void discardPendingRegistryFiles(pendingPaths);
+    if (next) {
+      onOpenChange(true);
+      return;
+    }
+    const pendingPaths = files
+      .map((file) => file.pendingStoragePath)
+      .filter((path): path is string => Boolean(path));
+    startTransition(async () => {
+      if (pendingPaths.length) await discardPendingRegistryFiles(pendingPaths);
       if (files.length > 0) router.refresh();
       setAddress(null);
       setResult(null);
@@ -249,8 +255,8 @@ export function RegistryInquiryDialog({
       setIncludeLand("0");
       requestKind.current = "main";
       downloadedUrls.current.clear();
-    }
-    onOpenChange(next);
+      onOpenChange(false);
+    });
   };
 
   const showCompletedFiles =
@@ -508,8 +514,8 @@ export function RegistryInquiryDialog({
                     type="submit"
                     disabled={pending || !address || unitInputMissing}
                   >
-                    {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Landmark data-icon="inline-start" />}
-                    {pending ? "인터넷등기소 열람 중…" : "등기 열람"}
+                    <Landmark data-icon="inline-start" />
+                    등기 열람
                   </Button>
                 </DialogFooter>
               )}
@@ -532,7 +538,7 @@ export function RegistryInquiryDialog({
                 ))}
                 {!propertyId && files.some((file) => file.pendingStoragePath) && (
                   <Button type="button" variant="outline" className="w-full" disabled={pending} onClick={registerProperty}>
-                    {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Building2 data-icon="inline-start" />}
+                    <Building2 data-icon="inline-start" />
                     해당 주소의 매물 등록
                   </Button>
                 )}

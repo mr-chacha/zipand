@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { EyeOff, Link2, Loader2, Trash2 } from "lucide-react";
+import { EyeOff, Link2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { NativeSelect } from "@/components/form/native-select";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ export function DealFormShareLinks({
           ]}
         />
         <Button onClick={create} disabled={pending} className="app:w-full">
-          {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Link2 data-icon="inline-start" />}
+          <Link2 data-icon="inline-start" />
           링크 생성·복사
         </Button>
       </div>

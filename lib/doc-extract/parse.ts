@@ -601,63 +601,28 @@ function pricePerM2(raw: string) {
   return Number.isFinite(n) ? String(Math.round(n)) : cleanValue(raw);
 }
 
-/** 부동산종합공부(토지·건축 요약) */
+/** 부동산종합공부(토지·건축·토지이용계획 요약) */
 function parseComprehensiveCadastre(text: string): ParseResult {
   const fields: ExtractedField[] = [];
 
-  pushField(fields, "소재지", capture(text, [/소\s*재\s*지\s*[:：]?\s*([^\n]{8,80})/, /\[소재지\]\s*([^\n]{8,80})/]));
-  pushField(fields, "지목", capture(text, [/지\s*목\s*[:：]?\s*([가-힣]{1,10})/]));
-  pushField(fields, "소유자", capture(text, [/소\s*유\s*자\s*[:：]?\s*([가-힣]{2,30})/, /명의인\s*[:：]?\s*([가-힣]{2,30})/]));
-
-  const useRaw = capture(text, [
-    /주\s*용\s*도\s*[:：]?\s*([^\n]{2,60})/,
-    /주용도\s*[:：]?\s*([가-힣A-Za-z0-9·\/()\s]{2,60})/,
-    /(공동주택|단독주택|다가구주택|다세대주택|연립주택)(?:\s*\([^)\n]{0,20}\))?/,
-  ]);
-  pushField(fields, "주용도", useRaw ? cleanMainUse(useRaw) : null, useRaw ?? undefined);
-
-  const structure = capture(text, [
-    /주\s*구\s*조\s*[:：]?\s*([^\n]{2,40})/,
-    /구\s*조\s*[:：]?\s*([^\n]{2,40})/,
-    /(철근콘크리트구조|철골철근콘크리트구조|철근콘크리트조|철골구조)/,
-  ]);
-  pushField(fields, "구조", structure);
+  pushField(
+    fields,
+    "토지 소재지",
+    capture(text, [
+      /토\s*지\s*소\s*재\s*지\s*[:：]?\s*([^\n]{8,80})/,
+      /소\s*재\s*지\s*[:：]?\s*([^\n]{8,80})/,
+      /대\s*지\s*위\s*치\s*[:：]?\s*([^\n]{8,80})/,
+      /\[소재지\]\s*([^\n]{8,80})/,
+    ])
+  );
+  pushField(fields, "토지 지목", capture(text, [/지\s*목\s*[:：]?\s*([가-힣]{1,10})/]));
 
   const landArea = capture(text, [
     /대\s*지\s*면\s*적\s*[:：]?\s*([\d,.]+)\s*(?:㎡|m2)?/i,
-    /대지면적\s*([\d,.]+)/i,
+    /토\s*지\s*면\s*적\s*[:：]?\s*([\d,.]+)\s*(?:㎡|m2)?/i,
+    /면\s*적\s*[:：]?\s*([\d,.]+)\s*(?:㎡|m2)?/i,
   ]);
-  if (landArea) pushField(fields, "대지면적", areaValue(landArea), landArea);
-
-  const archArea = capture(text, [
-    /건\s*축\s*면\s*적\s*[:：]?\s*([\d,.]+)\s*(?:㎡|m2)?/i,
-    /건축면적\s*([\d,.]+)/i,
-  ]);
-  if (archArea) pushField(fields, "건축면적", areaValue(archArea), archArea);
-
-  const totalArea = capture(text, [
-    /연\s*면\s*적\s*[:：]?\s*([\d,.]+)\s*(?:㎡|m2)?/i,
-    /연면적\s*([\d,.]+)/i,
-  ]);
-  if (totalArea) pushField(fields, "연면적", areaValue(totalArea), totalArea);
-
-  // 토지 면적만 있고 대지면적 라벨이 없는 경우
-  if (!landArea) {
-    const area = capture(text, [/(?:^|\n)\s*면\s*적\s*[:：]?\s*([\d,.]+)\s*(?:㎡|m2)?/i]);
-    if (area) pushField(fields, "대지면적", areaValue(area), area);
-  }
-
-  const coverage = capture(text, [
-    /건\s*폐\s*율\s*(?:상한|기준|지정)?\s*[:：]?\s*([\d,.]+)\s*%?/,
-    /건폐율\s*([\d,.]+)\s*%?/,
-  ]);
-  if (coverage) pushField(fields, "건폐율", percentValue(coverage), coverage);
-
-  const far = capture(text, [
-    /용\s*적\s*률\s*(?:상한|기준|지정)?\s*[:：]?\s*([\d,.]+)\s*%?/,
-    /용적률\s*([\d,.]+)\s*%?/,
-  ]);
-  if (far) pushField(fields, "용적률", percentValue(far), far);
+  if (landArea) pushField(fields, "토지 면적", areaValue(landArea), landArea);
 
   const officialPrice = capture(text, [
     /개\s*별\s*공\s*시\s*지\s*가\s*[:：]?\s*([^\n]{3,40})/,
@@ -666,8 +631,24 @@ function parseComprehensiveCadastre(text: string): ParseResult {
   ]);
   if (officialPrice) pushField(fields, "개별공시지가", pricePerM2(officialPrice), officialPrice);
 
-  const issued = capture(text, [/발\s*급\s*일\s*[:：]?\s*([\d.\-\/년월일\s]{6,20})/, /열\s*람\s*일\s*[:：]?\s*([\d.\-\/년월일\s]{6,20})/]);
-  pushField(fields, "발급일", issued ? issued.replace(/\s+/g, "") : null);
+  const coverage = capture(text, [
+    /건\s*폐\s*율\s*(?:상한|기준|지정)?\s*[:：]?\s*([\d,.]+)\s*%?/,
+    /건폐율\s*([\d,.]+)\s*%?/,
+  ]);
+  if (coverage) pushField(fields, "건축물 건폐율", percentValue(coverage), coverage);
+
+  const far = capture(text, [
+    /용\s*적\s*률\s*(?:상한|기준|지정)?\s*[:：]?\s*([\d,.]+)\s*%?/,
+    /용적률\s*([\d,.]+)\s*%?/,
+  ]);
+  if (far) pushField(fields, "건축물 용적률", percentValue(far), far);
+
+  const useZone = capture(text, [
+    /용\s*도\s*지\s*역\s*[:：]?\s*([^\n]{2,80})/,
+    /「국토의\s*계획[^」]*」[^:\n]*[:：]?\s*([^\n]{2,80})/,
+    /(제[1-3]종일반주거지역|제[1-3]종전용주거지역|준주거지역|일반상업지역|근린상업지역|중심상업지역|유통상업지역|일반공업지역|준공업지역|전용공업지역|자연녹지지역|생산녹지지역|보전녹지지역|관리지역|농림지역|자연환경보전지역)[^\n]{0,40}/,
+  ]);
+  pushField(fields, "용도지역", useZone);
 
   return { fields, signals: [] };
 }

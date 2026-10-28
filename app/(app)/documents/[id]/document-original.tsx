@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Download, Expand, ExternalLink, Loader2, Printer } from "lucide-react";
+import { Download, Expand, ExternalLink, Printer, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmAction } from "@/components/form/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -13,9 +14,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { deleteDocument } from "@/lib/actions/documents";
+import { useBusy } from "@/lib/busy";
 import { formatDateTime, formatFileSize } from "@/lib/format";
 
 type Props = {
+  documentId: string;
   fileUrl: string | null;
   fileName: string;
   isPdf: boolean;
@@ -28,6 +32,7 @@ type Props = {
 };
 
 export function DocumentOriginal({
+  documentId,
   fileUrl,
   fileName,
   isPdf,
@@ -40,6 +45,7 @@ export function DocumentOriginal({
 }: Props) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [busy, setBusy] = useState<"download" | "print" | null>(null);
+  useBusy(busy !== null, busy === "print" ? "인쇄 화면을 준비하고 있습니다…" : "서류를 다운로드하고 있습니다…");
 
   const download = async () => {
     if (!fileUrl) return;
@@ -107,11 +113,7 @@ export function DocumentOriginal({
               disabled={!fileUrl || busy !== null}
               onClick={() => void download()}
             >
-              {busy === "download" ? (
-                <Loader2 data-icon="inline-start" className="animate-spin" />
-              ) : (
-                <Download data-icon="inline-start" />
-              )}
+              <Download data-icon="inline-start" />
               다운로드
             </Button>
             <Button
@@ -121,11 +123,7 @@ export function DocumentOriginal({
               disabled={!fileUrl || busy !== null}
               onClick={print}
             >
-              {busy === "print" ? (
-                <Loader2 data-icon="inline-start" className="animate-spin" />
-              ) : (
-                <Printer data-icon="inline-start" />
-              )}
+              <Printer data-icon="inline-start" />
               인쇄
             </Button>
             <Button
@@ -137,6 +135,17 @@ export function DocumentOriginal({
               <Expand data-icon="inline-start" />
               크게 보기
             </Button>
+            <ConfirmAction
+              action={() => deleteDocument(documentId)}
+              title="문서를 삭제할까요?"
+              description="원본 파일과 정리한 항목이 모두 삭제되며 되돌릴 수 없어요."
+              trigger={
+                <Button type="button" size="sm" variant="outline" className="text-destructive">
+                  <Trash2 data-icon="inline-start" />
+                  문서 삭제
+                </Button>
+              }
+            />
           </div>
         </CardHeader>
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">

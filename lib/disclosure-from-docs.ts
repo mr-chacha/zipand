@@ -20,17 +20,22 @@ export type PropertyDocsDisclosureResult = {
 const LABEL_TO_KEY: Record<string, string> = {
   // 소유자는 갑구보다 짧게 나오므로 갑구 없을 때만 별도 처리
   소재지: "property_address",
+  "토지 소재지": "property_address",
   주용도: "building_use",
   전용면적: "building_area",
+  주구조: "building_structure",
   구조: "building_structure",
   지목: "land_category",
-  면적: "land_area",
+  "토지 지목": "land_category",
   대지면적: "land_area",
+  "토지 면적": "land_area",
   용도지역: "use_zone",
   용도지구: "use_district",
   용도구역: "use_area",
   건폐율: "building_coverage_limit",
+  "건축물 건폐율": "building_coverage_limit",
   용적률: "floor_area_limit",
+  "건축물 용적률": "floor_area_limit",
   개별공시지가: "land_price_per_m2",
 };
 
@@ -138,6 +143,28 @@ export function mapPropertyDocsToDisclosure(
         continue;
       }
       if (
+        label === "갑구의 등기목적" ||
+        label === "갑구의 등기원인" ||
+        label === "갑구의 권리자 및 기타사항"
+      ) {
+        out.ownership_building = appendLine(
+          out.ownership_building,
+          `${label.replace(/^갑구의\s*/, "")}: ${value}`
+        );
+        continue;
+      }
+      if (
+        label === "을구의 등기목적" ||
+        label === "을구의 등기원인" ||
+        label === "을구의 권리자 및 기타사항"
+      ) {
+        out.rights_building = appendLine(
+          out.rights_building,
+          `${label.replace(/^을구의\s*/, "")}: ${value}`
+        );
+        continue;
+      }
+      if (
         label === "갑구 등기목적" ||
         label === "갑구 등기원인" ||
         label === "갑구 권리자 및 기타사항" ||
@@ -188,9 +215,21 @@ export function mapPropertyDocsToDisclosure(
         continue;
       }
 
-      if (label === "건폐율" || label === "용적률") {
+      if (label === "건폐율" || label === "용적률" || label === "건축물 건폐율" || label === "건축물 용적률") {
         const key = LABEL_TO_KEY[label];
         if (key && !out[key]) out[key] = value.includes("%") ? value : `${value}%`;
+        continue;
+      }
+
+      if (label === "면적") {
+        if (docType === "건축물대장" || docType === "부동산종합공부") {
+          if (!out.building_area) {
+            const n = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+            out.building_area = n?.[1] ?? value;
+          }
+        } else if (!out.land_area) {
+          out.land_area = value;
+        }
         continue;
       }
 

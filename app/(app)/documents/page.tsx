@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getSession } from "@/lib/auth";
 import { getOfficeGate } from "@/lib/office-gate";
 import { getPropertyOptions } from "@/lib/queries";
+import { DocumentIssueLinks } from "./document-issue-links";
 import { DocumentUploader } from "./document-uploader";
 import {
   PropertyDocumentsTable,
@@ -95,6 +96,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
+          <DocumentIssueLinks />
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -102,15 +104,11 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
                 AI 추출 안내
               </CardTitle>
               <CardDescription>
-                업로드만으로는 분석하지 않아요. 매물 목록에서 매물의 「서류」 탭을 열고 분석할 문서를 선택해 AI
-                추출하세요. 검토 완료한 서류만 확인설명서에 반영됩니다.
+                매물 목록에서 매물의 「서류」 탭을 열고 분석할 문서를 선택해 AI 추출을 해서 계약서 작성시간을 줄일 수 있어요.
               </CardDescription>
             </CardHeader>
           </Card>
-          <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0" />
-            업로드한 문서는 비공개 저장소에 보관되고, 같은 사무소 구성원만 열람할 수 있어요. 열람 링크는 1시간 후 만료돼요.
-          </div>
+         
         </div>
       </div>
 
@@ -119,9 +117,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
           <div>
             <h2 className="text-base font-semibold">
               매물별 보관 문서
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                매물 {properties.length} · 서류 {totalDocs}건
-              </span>
+             
             </h2>
             {selectedTitle ? (
               <p className="mt-1 text-xs text-muted-foreground">

@@ -31,7 +31,6 @@ export type PropertyWithDocuments = {
 const DOC_TYPE_SHORT: Record<DocType, string> = {
   등기사항증명서: "등기",
   건축물대장: "건축물대장",
-  토지대장: "토지대장",
   지적도: "지적도",
   토지이용계획확인서: "토지이용",
   부동산종합공부: "종합공부",
@@ -116,7 +115,7 @@ export function PropertyDocumentsTable({
             {properties.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="pl-4">
-                  <Link href={`/properties/${p.id}`} className="block min-w-0 hover:underline">
+                  <Link href={`/properties/${p.id}?tab=docs`} className="block min-w-0 hover:underline">
                     <p className="max-w-56 truncate font-medium">{p.title}</p>
                     <p className="max-w-56 truncate text-xs text-muted-foreground">{p.address}</p>
                     <p className="text-[11px] text-muted-foreground">
@@ -145,7 +144,7 @@ export function PropertyDocumentsTable({
           return (
             <Card key={p.id} className="gap-3 p-4">
               <div className="min-w-0">
-                <Link href={`/properties/${p.id}`} className="font-medium hover:underline">
+                <Link href={`/properties/${p.id}?tab=docs`} className="font-medium hover:underline">
                   {p.title}
                 </Link>
                 <p className="truncate text-xs text-muted-foreground">{p.address}</p>

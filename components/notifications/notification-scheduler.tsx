@@ -6,6 +6,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { fetchUpcomingReminders } from "@/lib/actions/reminders";
+import { useBusy } from "@/lib/busy";
 import {
   getNotificationPermission,
   requestNotificationPermission,
@@ -74,6 +75,7 @@ export function NotificationScheduler() {
 export function NotificationPermissionCard() {
   const [permission, setPermission] = useState<NotificationPermissionState | null>(null);
   const [busy, setBusy] = useState(false);
+  useBusy(busy, "알림 권한을 요청하고 있습니다…");
 
   useEffect(() => {
     void getNotificationPermission().then(setPermission);

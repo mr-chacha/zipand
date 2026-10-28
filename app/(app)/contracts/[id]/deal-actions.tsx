@@ -1,7 +1,7 @@
 "use client";
 
 import { useOptimistic, useState, useTransition } from "react";
-import { Ban, BookOpen, Check, Copy, ExternalLink, EyeOff, Link2, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Ban, BookOpen, Check, Copy, ExternalLink, EyeOff, Link2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -170,7 +170,7 @@ export function DealShareLinks({ dealId, links, siteUrl, disabled }: { dealId: s
           ]}
         />
         <Button onClick={create} disabled={pending || disabled}>
-          {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Link2 data-icon="inline-start" />}
+          <Link2 data-icon="inline-start" />
           링크 생성·복사
         </Button>
       </div>

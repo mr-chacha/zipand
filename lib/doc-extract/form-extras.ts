@@ -60,7 +60,9 @@ export function mergeDocFormExtras(
       const value = f.value.trim();
       if (!value) continue;
 
-      if (label === "전용면적" && !out.buildingArea) out.buildingArea = numPart(value);
+      if ((label === "전용면적" || (label === "면적" && (doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부"))) && !out.buildingArea) {
+        out.buildingArea = numPart(value);
+      }
       if (label === "연면적") {
         if (!out.totalFloorArea) out.totalFloorArea = numPart(value);
         // 전용면적 없을 때 계약서 건물면적 후보
@@ -69,17 +71,22 @@ export function mergeDocFormExtras(
       if ((label === "건축면적" || label === "건축면적(㎡)") && !out.archArea) {
         out.archArea = numPart(value);
       }
-      if ((label === "대지면적" || (label === "면적" && doc.doc_type !== "건축물대장")) && !out.landArea) {
+      if (
+        (label === "대지면적" ||
+          label === "토지 면적" ||
+          (label === "면적" && doc.doc_type !== "건축물대장" && doc.doc_type !== "부동산종합공부")) &&
+        !out.landArea
+      ) {
         out.landArea = numPart(value);
       }
-      if (label === "구조" && !out.buildingStructure) out.buildingStructure = value;
+      if ((label === "주구조" || label === "구조") && !out.buildingStructure) out.buildingStructure = value;
       if (label === "주용도" && !out.buildingUse) out.buildingUse = value;
-      if (label === "지목" && !out.landCategory) out.landCategory = value;
+      if ((label === "지목" || label === "토지 지목") && !out.landCategory) out.landCategory = value;
       if (label === "개별공시지가" && !out.landPricePerM2) out.landPricePerM2 = numPart(value);
-      if (label === "건폐율" && !out.buildingCoverage) {
+      if ((label === "건폐율" || label === "건축물 건폐율") && !out.buildingCoverage) {
         out.buildingCoverage = value.includes("%") ? value : `${numPart(value)}%`;
       }
-      if (label === "용적률" && !out.floorAreaRatio) {
+      if ((label === "용적률" || label === "건축물 용적률") && !out.floorAreaRatio) {
         out.floorAreaRatio = value.includes("%") ? value : `${numPart(value)}%`;
       }
     }

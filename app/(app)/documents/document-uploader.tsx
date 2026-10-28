@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileUp, Loader2, Upload } from "lucide-react";
+import { FileUp, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { NativeSelect } from "@/components/form/native-select";
 import { DatePicker } from "@/components/form/date-picker";
@@ -44,7 +44,7 @@ export function DocumentUploader({
   const [docType, setDocType] = useState<DocType>("등기사항증명서");
   const [issuedAt, setIssuedAt] = useState(() => todayKst());
   const [pending, startTransition] = useTransition();
-  useBusy(pending);
+  useBusy(pending, "서류를 업로드하고 있습니다…");
 
   if (properties.length === 0) {
     return (
@@ -155,7 +155,7 @@ export function DocumentUploader({
           <DatePicker id="doc-issued" value={issuedAt} onChange={setIssuedAt} />
         </div>
         <Button className="w-full" onClick={submit} disabled={!file || pending}>
-          {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Upload data-icon="inline-start" />}
+          <Upload data-icon="inline-start" />
           업로드
         </Button>
       </div>

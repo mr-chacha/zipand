@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Copy, Loader2, Sparkles } from "lucide-react";
+import { Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { suggestPropertyAdCopy } from "@/lib/actions/ai-assist";
+import { useBusy } from "@/lib/busy";
 
 type AdDraft = {
   naver: string;
@@ -68,6 +69,7 @@ export function AdCopyButton({ formId, aiAvailable = true }: { formId?: string; 
   const [pending, start] = useTransition();
   const [draft, setDraft] = useState<AdDraft | null>(null);
   const sourceForm = useRef<HTMLFormElement | null>(null);
+  useBusy(pending, "추천 광고 문구를 작성하고 있습니다…");
 
   const apply = (description: string) => {
     const form = sourceForm.current;
@@ -118,11 +120,7 @@ export function AdCopyButton({ formId, aiAvailable = true }: { formId?: string; 
             });
           }}
         >
-          {pending ? (
-            <Loader2 className="animate-spin" data-icon="inline-start" />
-          ) : (
-            <Sparkles data-icon="inline-start" />
-          )}
+          <Sparkles data-icon="inline-start" />
           추천 광고 문구
         </Button>
         <AiAccessBadge available={aiAvailable} compact />

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { FileText, Loader2, Sparkles } from "lucide-react";
+import { FileText, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentExtractionBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,7 @@ export function PropertyDocumentsList({
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
-  useBusy(pending);
+  useBusy(pending, "선택한 서류를 AI로 추출하고 있습니다…");
   const allSelected = documents.length > 0 && documents.every((doc) => selected.includes(doc.id));
 
   const toggle = (id: string, checked: boolean) => {
@@ -66,12 +66,8 @@ export function PropertyDocumentsList({
             {allSelected ? "전체 선택 해제" : "전체 선택"}
           </Button>
           <Button type="button" size="sm" disabled={!selected.length || pending} onClick={extract}>
-            {pending ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <Sparkles data-icon="inline-start" />
-            )}
-            {pending ? "AI 추출 중…" : "선택 서류 AI 추출"}
+            <Sparkles data-icon="inline-start" />
+            선택 서류 AI 추출
           </Button>
         </div>
       </div>

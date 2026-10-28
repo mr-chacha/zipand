@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { Copy, ExternalLink, Link2, Loader2, Search, Trash2, X } from "lucide-react";
+import { Copy, ExternalLink, Link2, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { NativeSelect } from "@/components/form/native-select";
@@ -330,7 +330,7 @@ export function ListBuilder({
                 />
               </div>
               <Button onClick={() => officeGuard.guard(create)} disabled={pending || selected.length === 0}>
-                {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Link2 data-icon="inline-start" />}
+                <Link2 data-icon="inline-start" />
                 링크 생성·복사
               </Button>
             </div>

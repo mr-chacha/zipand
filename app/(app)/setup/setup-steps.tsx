@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, BadgeCheck, Copy, ExternalLink, Link2, Loader2, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Copy, ExternalLink, Link2, ShieldCheck, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_SECTIONS } from "@/components/briefing-view";
 import { FormMessage } from "@/components/form/form-message";
@@ -71,7 +71,6 @@ function FinishButton({ label, variant = "default" }: { label: string; variant?:
         })
       }
     >
-      {pending && <Loader2 className="animate-spin" data-icon="inline-start" />}
       {label}
     </Button>
   );
@@ -276,7 +275,7 @@ export function BriefingStep({
         </div>
       ) : (
         <Button variant="outline" className="w-full" onClick={create} disabled={pending || !propertyId}>
-          {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Link2 data-icon="inline-start" />}
+          <Link2 data-icon="inline-start" />
           브리핑 링크 만들기
         </Button>
       )}

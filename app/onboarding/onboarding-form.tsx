@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { completeOnboarding, skipOnboarding } from "@/lib/actions/settings";
+import { useBusy } from "@/lib/busy";
 import { useFormAction } from "@/lib/use-form-action";
 
 interface OnboardingFormProps {
@@ -21,6 +22,7 @@ interface OnboardingFormProps {
 export function OnboardingForm({ isOwner, defaultName, defaultOfficeName, defaultPhone }: OnboardingFormProps) {
   const { state, pending, onSubmit } = useFormAction(completeOnboarding);
   const [skipping, startSkip] = useTransition();
+  useBusy(skipping, "온보딩을 건너뛰고 있습니다…");
 
   const skip = () =>
     startSkip(async () => {

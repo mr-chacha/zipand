@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { useBusy } from "@/lib/busy";
 import { TaskDialog } from "@/components/tasks/task-board";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -136,6 +137,7 @@ export const dayHref = (date: string) => `/schedule/${date}`;
 /** 하루치 일정 목록. 할 일은 바로 완료 처리할 수 있다 */
 export function DayEventList({ events, emptyText = "일정이 없어요." }: { events: CalendarEvent[]; emptyText?: string }) {
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
 
   const toggleDone = (taskId: string, done: boolean) =>
     startTransition(async () => {

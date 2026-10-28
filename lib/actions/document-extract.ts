@@ -148,7 +148,7 @@ export async function extractDocumentFields(documentId: string): Promise<ActionS
         }
         // 건축물대장·종합공부: 해당 동 기준 구조·주용도를 매물에 저장(대장 값이 있으면 갱신)
         if (doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부") {
-          const structure = parsed.fields.find((f) => f.label === "구조")?.value?.trim();
+          const structure = parsed.fields.find((f) => f.label === "주구조" || f.label === "구조")?.value?.trim();
           const mainUse = parsed.fields.find((f) => f.label === "주용도")?.value?.trim();
           if (structure) patch.structure = structure;
           if (mainUse) patch.main_use = mainUse;
@@ -205,6 +205,18 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
     if (error) throw error;
     if (!doc) return { error: "문서를 찾을 수 없어요." };
 
+    let propertyBuilding: string | null = null;
+    let propertyUnit: string | null = null;
+    if (doc.property_id) {
+      const { data: property } = await supabase
+        .from("properties")
+        .select("building, unit, area_m2, structure, main_use")
+        .eq("id", doc.property_id)
+        .maybeSingle();
+      propertyBuilding = property?.building ?? null;
+      propertyUnit = property?.unit ?? null;
+    }
+
     await supabase
       .from("documents")
       .update({ extraction_status: "추출 중", extraction_error: null })
@@ -242,24 +254,27 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       mime,
       bytes,
       textHint,
+      propertyBuilding,
+      propertyUnit,
     });
 
     if (!parsed.fields.length && !parsed.signals.length) {
       throw new FormError("AI가 항목을 찾지 못했어요. 원문을 대조해 직접 입력해 주세요.");
     }
 
-    // AI 재요약은 직전 AI 결과만 교체하고 사용자가 직접 입력한 항목은 보존한다.
-    const { error: deleteFieldError } = await supabase
-      .from("document_fields")
-      .delete()
-      .eq("document_id", id)
-      .eq("ai_generated", true);
+    // 등기·건축물대장은 과거 OCR·규칙 추출 항목을 남기지 않고 지정된 AI 항목으로 완전히 교체한다.
+    // 다른 서류는 직전 AI 결과만 교체하고 사용자가 직접 입력한 항목을 보존한다.
+    const replaceAllFields =
+      doc.doc_type === "등기사항증명서" || doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부";
+    let deleteFields = supabase.from("document_fields").delete().eq("document_id", id);
+    let deleteSignals = supabase.from("document_signals").delete().eq("document_id", id);
+    if (!replaceAllFields) {
+      deleteFields = deleteFields.eq("ai_generated", true);
+      deleteSignals = deleteSignals.eq("ai_generated", true);
+    }
+    const { error: deleteFieldError } = await deleteFields;
     if (deleteFieldError) throw deleteFieldError;
-    const { error: deleteSignalError } = await supabase
-      .from("document_signals")
-      .delete()
-      .eq("document_id", id)
-      .eq("ai_generated", true);
+    const { error: deleteSignalError } = await deleteSignals;
     if (deleteSignalError) throw deleteSignalError;
 
     const { data: existing } = await supabase.from("document_fields").select("label").eq("document_id", id);
@@ -322,6 +337,32 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       if (sigRows.length) {
         const { error: sigErr } = await supabase.from("document_signals").insert(sigRows);
         if (sigErr) throw sigErr;
+      }
+    }
+
+    if (doc.property_id && doc.doc_type === "건축물대장") {
+      const { data: prop } = await supabase
+        .from("properties")
+        .select("area_m2, structure, main_use")
+        .eq("id", doc.property_id)
+        .maybeSingle();
+      if (prop) {
+        const patch: { area_m2?: number; structure?: string; main_use?: string } = {};
+        const areaField = parsed.fields.find((f) => f.label === "면적");
+        if (areaField && (prop.area_m2 == null || prop.area_m2 === 0)) {
+          const n = Number(areaField.value.replace(/,/g, "").match(/\d+(?:\.\d+)?/)?.[0] ?? "");
+          if (Number.isFinite(n) && n > 0) patch.area_m2 = n;
+        }
+        const structure = parsed.fields.find((f) => f.label === "주구조")?.value?.trim();
+        const mainUse = parsed.fields.find((f) => f.label === "주용도")?.value?.trim();
+        if (structure && structure !== "확인 필요") patch.structure = structure;
+        if (mainUse && mainUse !== "확인 필요") patch.main_use = mainUse;
+        if (Object.keys(patch).length) {
+          await supabase.from("properties").update(patch).eq("id", doc.property_id);
+          revalidatePath(`/properties/${doc.property_id}`);
+          revalidatePath("/properties");
+          revalidatePath("/contracts");
+        }
       }
     }
 

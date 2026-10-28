@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { FileAudio, Loader2, Mic, RotateCcw, Square, X } from "lucide-react";
+import { FileAudio, Mic, RotateCcw, Square, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { AUDIO_MAX_BYTES, formatDuration, normalizeAudioFile, readAudioDuration } from "@/lib/audio";
+import { useBusy } from "@/lib/busy";
 import { toErrorMessage } from "@/lib/errors";
 import { formatFileSize } from "@/lib/format";
 import { hasNativeRecorder } from "@/lib/native-recorder";
@@ -47,9 +48,12 @@ export function AudioAttach({
   idleText?: string;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [removing, setRemoving] = useState(false);
   const [failed, setFailed] = useState<Recording | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const canRecord = useSyncExternalStore(noopSubscribe, hasNativeRecorder, () => false);
+  useBusy(uploading, "녹음 파일을 업로드하고 있습니다…");
+  useBusy(removing, "첨부 파일을 삭제하고 있습니다…");
 
   const setBusy = setUploading;
 
@@ -79,7 +83,7 @@ export function AudioAttach({
   };
 
   const recorder = useAudioRecorder({ filePrefix, onRecorded: upload });
-  const busy = uploading || recorder.recording;
+  const busy = uploading || removing || recorder.recording;
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
@@ -89,9 +93,17 @@ export function AudioAttach({
     await upload({ file, durationSec: durationSec ?? 0 });
   };
 
-  const detach = () => {
-    if (value) removeFromStorage(bucket, [value.path]);
-    onChange(null);
+  const detach = async () => {
+    if (!value) return;
+    setRemoving(true);
+    try {
+      await removeFromStorage(bucket, [value.path]);
+      onChange(null);
+    } catch (error) {
+      toast.error(`첨부 파일을 삭제하지 못했어요. (${toErrorMessage(error)})`);
+    } finally {
+      setRemoving(false);
+    }
   };
 
   const defaultIdle = canRecord
@@ -141,7 +153,7 @@ export function AudioAttach({
               <FileAudio className="size-3.5 shrink-0" />
               <span className="truncate">{value.name}</span>
               {value.durationSec ? <span className="shrink-0">· {formatDuration(value.durationSec)}</span> : null}
-              <button type="button" onClick={detach} className="shrink-0 hover:text-foreground" aria-label="첨부 해제">
+              <button type="button" onClick={() => void detach()} className="shrink-0 hover:text-foreground" aria-label="첨부 해제">
                 <X className="size-3.5" />
               </button>
             </p>
@@ -161,7 +173,7 @@ export function AudioAttach({
             disabled={uploading || recorder.recording}
             onClick={() => fileRef.current?.click()}
           >
-            {uploading ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <FileAudio data-icon="inline-start" />}
+            <FileAudio data-icon="inline-start" />
             {fileLabel}
           </Button>
         )}

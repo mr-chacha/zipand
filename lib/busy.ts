@@ -21,7 +21,7 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-/** 진행 중인 작업을 등록한다. 앱(MobileAppShell)에서만 전체 화면 로딩으로 보인다 */
+/** 진행 중인 작업을 등록하고 루트의 전체 화면 로딩 오버레이에 표시한다. */
 export function useBusy(active: boolean, label: string = BUSY_LABELS.default) {
   useEffect(() => {
     if (!active) return;

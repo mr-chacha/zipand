@@ -82,6 +82,7 @@ export default async function DocumentDetailPage({
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,1fr)]">
         <DocumentOriginal
+          documentId={id}
           fileUrl={fileUrl}
           fileName={doc.file_name}
           isPdf={isPdf}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ export function ClauseSuggestButton({ dealId, aiAvailable }: { dealId: string; a
     <>
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" size="sm" variant="outline" disabled={pending} onClick={run}>
-          {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}
+          <Sparkles data-icon="inline-start" />
           AI 특약 추천
         </Button>
         <AiAccessBadge available={aiAvailable} compact />

@@ -8,6 +8,7 @@ import { RegistryInquiryButton } from "@/components/deal-forms/registry-inquiry-
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocumentIssueLinks } from "@/app/(app)/documents/document-issue-links";
 import { DocumentUploader } from "@/app/(app)/documents/document-uploader";
 import { getSession } from "@/lib/auth";
 import {
@@ -103,41 +104,54 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
       <PropertySubnav propertyId={id} active={subnavActive} />
 
       {docsMode ? (
-        <div className="mx-auto w-full max-w-3xl space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>서류 업로드</CardTitle>
-              <CardDescription>PDF, JPG, PNG · 최대 20MB · 이 매물에 바로 연결돼요</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {gate.blocked.document ? (
-                <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-medium">
-                        {hasRegistryDocument ? "최신 등기가 필요하신가요?" : "등기사항증명서가 아직 없어요"}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {hasRegistryDocument
-                          ? "등기를 재열람하면 기존 문서는 유지되고 새 원문 PDF가 이 매물 서류함에 추가됩니다."
-                          : "주소로 등기를 열람하면 원문 PDF가 이 매물 서류함에 자동 저장됩니다."}
-                      </p>
-                    </div>
-                    <RegistryInquiryButton
-                      label={hasRegistryDocument ? "등기 재열람" : "등기 열람"}
-                      properties={[
-                        {
-                          value: id,
-                          label: [property.title, property.address].filter(Boolean).join(" · "),
-                          address: property.address ?? "",
-                          building: property.building ?? "",
-                          unit: property.unit ?? "",
-                        },
-                      ]}
-                    />
-                  </div>
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="space-y-4 lg:col-span-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">간편하게 등기부등본 열람</CardTitle>
+                <CardDescription>
+                  {hasRegistryDocument
+                    ? "등기를 재열람하면 새 등기부등본이 자동 저장됩니다."
+                    : "주소로 등기를 열람하면 등기부등본이 자동 저장됩니다."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RegistryInquiryButton
+                  label={hasRegistryDocument ? "등기 재열람" : "등기 열람"}
+                  properties={[
+                    {
+                      value: id,
+                      label: [property.title, property.address].filter(Boolean).join(" · "),
+                      address: property.address ?? "",
+                      building: property.building ?? "",
+                      unit: property.unit ?? "",
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">서류 발급</CardTitle>
+                <CardDescription>
+                  {property.address
+                    ? "외부에서 발급·열람한 뒤 아래에 업로드하세요."
+                    : "인터넷등기·건축물대장은 바로 열 수 있어요. 부동산종합공부는 매물 주소를 등록하면 지역에 맞게 표시됩니다."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DocumentIssueLinks address={property.address} variant="inline" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>서류 업로드</CardTitle>
+                <CardDescription>PDF, JPG, PNG · 최대 20MB · 이 매물에 바로 연결돼요</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {gate.blocked.document ? (
+                  <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
+                ) : (
                   <DocumentUploader
                     officeId={office.id}
                     properties={[{ value: id, label: property.title }]}
@@ -145,18 +159,14 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
                     lockProperty
                     goToDetail={false}
                   />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle>등록된 공부서류 ({docs.data?.length ?? 0})</CardTitle>
-              <CardAction>
-                <Link href={`/documents?property=${id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                  문서 관리에서 보기
-                </Link>
-              </CardAction>
+            
             </CardHeader>
             <CardContent>
               <PropertyDocumentsList propertyId={id} documents={docs.data ?? []} />

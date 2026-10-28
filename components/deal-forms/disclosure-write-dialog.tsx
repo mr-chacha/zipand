@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, FileStack, Loader2, MapPin, Printer, Save } from "lucide-react";
+import { Building2, FileStack, MapPin, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
 import type { WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
 import {
@@ -155,6 +155,9 @@ function DisclosureWriteBody({
   const [hubPending, setHubPending] = useState(false);
   const [docsPending, setDocsPending] = useState(false);
   const [locPending, setLocPending] = useState(false);
+  useBusy(hubPending, "건축물 정보를 조회하고 있습니다…");
+  useBusy(docsPending, "매물 서류를 확인설명서에 반영하고 있습니다…");
+  useBusy(locPending, "주변 입지 정보를 조회하고 있습니다…");
 
   const matchedDeals = useMemo(() => matchDeals(deals, pickProperty, pickDeal), [deals, pickProperty, pickDeal]);
 
@@ -431,11 +434,7 @@ function DisclosureWriteBody({
             disabled={!active || (!propertyId && !dealId) || docsPending}
             onClick={() => void applyDocsFromLinked()}
           >
-            {docsPending ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <FileStack data-icon="inline-start" />
-            )}
+            <FileStack data-icon="inline-start" />
             매물 서류에서 채우기
           </Button>
           <Button
@@ -486,11 +485,7 @@ function DisclosureWriteBody({
                 .finally(() => setLocPending(false));
             }}
           >
-            {locPending ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <MapPin data-icon="inline-start" />
-            )}
+            <MapPin data-icon="inline-start" />
             카카오 입지 조회
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={onClose}>
@@ -565,11 +560,7 @@ function DisclosureWriteBody({
               </div>
             </div>
             <Button type="button" disabled={hubPending || !hubAddr} onClick={() => void applyHubLookup()}>
-              {hubPending ? (
-                <Loader2 className="animate-spin" data-icon="inline-start" />
-              ) : (
-                <Building2 data-icon="inline-start" />
-              )}
+              <Building2 data-icon="inline-start" />
               조회 후 반영
             </Button>
           </div>

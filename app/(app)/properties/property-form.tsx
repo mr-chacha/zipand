@@ -24,6 +24,7 @@ import {
   PROPERTY_STATUSES,
   PROPERTY_TYPES,
 } from "@/lib/constants";
+import { useBusy } from "@/lib/busy";
 import { pickKakaoPostcode, toPropertyAddressFields } from "@/lib/kakao-postcode";
 import { useFormAction } from "@/lib/use-form-action";
 import { removeFromStorage, uploadToStorage } from "@/lib/upload-client";
@@ -145,6 +146,7 @@ export function PropertyForm({
   const [address, setAddress] = useState(d?.address ?? "");
   const [region, setRegion] = useState(d?.region ?? "");
   const [addressSearching, setAddressSearching] = useState(false);
+  useBusy(addressSearching, "주소 검색을 불러오고 있습니다…");
 
   const searchAddress = async () => {
     setAddressSearching(true);
@@ -215,7 +217,7 @@ export function PropertyForm({
                   disabled={pending || addressSearching}
                   onClick={() => void searchAddress()}
                 >
-                  {addressSearching ? "검색 중…" : "주소 검색"}
+                  주소 검색
                 </Button>
               </div>
               <Input

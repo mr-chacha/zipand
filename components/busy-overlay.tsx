@@ -3,7 +3,7 @@
 import { Loader2 } from "lucide-react";
 import { useBusyLabel } from "@/lib/busy";
 
-/** 저장·삭제 등 서버 작업 중 화면 전체를 덮는 로딩 표시 (앱 전용) */
+/** 저장·삭제·AI 처리 등 비동기 작업 중 화면 전체를 덮고 추가 조작을 막는다. */
 export function BusyOverlay() {
   const label = useBusyLabel();
   if (!label) return null;
