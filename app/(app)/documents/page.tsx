@@ -117,7 +117,6 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
           <div>
             <h2 className="text-base font-semibold">
               매물별 보관 문서
-             
             </h2>
             {selectedTitle ? (
               <p className="mt-1 text-xs text-muted-foreground">
