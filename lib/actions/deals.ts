@@ -16,6 +16,71 @@ import type { TablesUpdate } from "@/lib/supabase/database.types";
 import type { ActionState } from "@/types";
 import { logPropertyEvent } from "./properties";
 
+/**
+ * 매물에 연결된 진행 중 거래를 찾거나, 없으면 초안 거래를 만든다.
+ * 계약서·확인설명서에서 연결 매물만 고른 경우에도 deal_id를 맞추기 위함.
+ */
+export async function ensureDealForProperty(
+  propertyId: string
+): Promise<{ ok: true; dealId: string; created: boolean } | { ok: false; error: string }> {
+  try {
+    const id = propertyId.trim();
+    if (!id) return { ok: false, error: "매물을 선택해 주세요." };
+    const { supabase, profile } = await getSession();
+
+    const { data: existing, error: findError } = await supabase
+      .from("deals")
+      .select("id")
+      .eq("property_id", id)
+      .neq("stage", "취소")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (findError) throw findError;
+    if (existing?.id) return { ok: true, dealId: existing.id, created: false };
+
+    const { data: property, error: propertyError } = await supabase
+      .from("properties")
+      .select("status, deal_type, price, monthly_rent, title")
+      .eq("id", id)
+      .single();
+    if (propertyError) throw propertyError;
+
+    const { data: created, error } = await supabase
+      .from("deals")
+      .insert({
+        property_id: id,
+        amount: property.price,
+        monthly_rent: property.deal_type === "월세" ? property.monthly_rent : null,
+        created_by: profile.id,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+
+    const withLoan = property.deal_type !== "월세";
+    const { error: checklistError } = await supabase.from("deal_checklist_items").insert(
+      DEFAULT_DEAL_CHECKLIST.filter((item) => withLoan || !item.loanOnly).map((item, i) => ({
+        deal_id: created.id,
+        stage: item.stage,
+        category: item.category,
+        label: item.label,
+        sort_order: i,
+      }))
+    );
+    if (checklistError) throw checklistError;
+
+    if (property.status !== "계약 완료") {
+      await supabase.from("properties").update({ status: "계약 진행" }).eq("id", id);
+    }
+    await logPropertyEvent(id, "계약관리 시작(서식 작성)");
+    revalidatePath("/contracts");
+    return { ok: true, dealId: created.id, created: true };
+  } catch (e) {
+    return { ok: false, error: toErrorMessage(e) };
+  }
+}
+
 export async function createDeal(_prev: ActionState | null, fd: FormData): Promise<ActionState> {
   const { supabase, profile } = await getSession();
   let id: string;

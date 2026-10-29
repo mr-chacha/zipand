@@ -21,12 +21,8 @@ import { getSession } from "@/lib/auth";
 import { DEAL_TYPES, DEFAULT_NEARBY_KEYWORDS } from "@/lib/constants";
 import { FormError } from "@/lib/errors";
 import { str, toErrorMessage } from "@/lib/form";
-import {
-  lookupKakaoNearby,
-  nearbyFactsText,
-  normalizeNearbyKeywords,
-  type KakaoNearbyPlace,
-} from "@/lib/kakao-local";
+import { fetchDisclosureLocationFields } from "@/lib/disclosure-location";
+import { lookupKakaoNearby, nearbyFactsText, normalizeNearbyKeywords } from "@/lib/kakao-local";
 import { isPropertyPath } from "@/lib/storage";
 
 const AUDIO_MAX = 25 * 1024 * 1024;
@@ -206,66 +202,12 @@ export async function suggestPropertyAdCopy(fd: FormData): Promise<AdCopyResult>
 
 export type LocationResult = { ok: true; fields: LocationDraft } | { ok: false; error: string };
 
-function firstPlace(places: KakaoNearbyPlace[], keyword: string) {
-  return places.find((place) => place.keyword === keyword);
-}
-
-function placeFields(place: KakaoNearbyPlace | undefined) {
-  return place
-    ? { name: place.name, minutes: String(place.estimatedWalkMinutes) }
-    : { name: "", minutes: "" };
-}
-
 export async function suggestDisclosureLocation(address: string): Promise<LocationResult> {
   try {
     await getSession();
     const trimmed = address.trim();
     if (!trimmed) throw new FormError("입지를 채우려면 주소가 필요해요.");
-    const dislikedKeywords = ["장례식장", "화장장", "소각장", "폐기물처리시설", "하수처리장"];
-    const keywords = [
-      "버스정류장",
-      "지하철역",
-      "초등학교",
-      "중학교",
-      "고등학교",
-      ...dislikedKeywords,
-    ];
-    const nearby = await lookupKakaoNearby(trimmed, keywords, { radius: 3_000, sizePerKeyword: 1 });
-    const bus = placeFields(firstPlace(nearby.places, "버스정류장"));
-    const subway = placeFields(firstPlace(nearby.places, "지하철역"));
-    const elementary = placeFields(firstPlace(nearby.places, "초등학교"));
-    const middle = placeFields(firstPlace(nearby.places, "중학교"));
-    const high = placeFields(firstPlace(nearby.places, "고등학교"));
-    const disliked = nearby.places.filter(
-      (place) => dislikedKeywords.includes(place.keyword) && place.distanceM <= 1_000
-    );
-    const fields: LocationDraft = {
-      road_width: "",
-      road_paved: "",
-      road_access: "",
-      bus_stop: bus.name,
-      bus_minutes: bus.minutes,
-      bus_mode: "도보",
-      subway_station: subway.name,
-      subway_minutes: subway.minutes,
-      subway_mode: "도보",
-      parking: "",
-      school_elem: elementary.name,
-      school_elem_min: elementary.minutes,
-      school_elem_mode: "도보",
-      school_mid: middle.name,
-      school_mid_min: middle.minutes,
-      school_mid_mode: "도보",
-      school_high: high.name,
-      school_high_min: high.minutes,
-      school_high_mode: "도보",
-      disliked_facility: disliked.length ? "있음" : "",
-      disliked_facility_detail: disliked
-        .map((place) => `${place.name} 약 ${(place.distanceM / 1_000).toFixed(1)}km`)
-        .join(", "),
-      note:
-        "카카오 장소의 직선거리로 도보 시간을 추정했어요. 실제 보행시간과 비선호시설 누락 여부를 현장·공적 자료로 확인해 주세요.",
-    };
+    const fields = await fetchDisclosureLocationFields(trimmed);
     return { ok: true, fields };
   } catch (e) {
     return { ok: false, error: toErrorMessage(e) };

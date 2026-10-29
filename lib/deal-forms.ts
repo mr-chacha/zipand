@@ -79,6 +79,23 @@ function money(v: number | null | undefined) {
   return v == null ? "" : String(v);
 }
 
+/**
+ * 「임대할 부분」문구 — 호만 있거나 동+호가 있을 때만 생성.
+ * 동만 있고 호가 없으면 비움.
+ */
+export function leasedPortionFromBuildingUnit(
+  building: string | null | undefined,
+  unit: string | null | undefined
+) {
+  const dong = building?.trim() ?? "";
+  const ho = unit?.trim() ?? "";
+  if (!ho) return "";
+  const parts: string[] = [];
+  if (dong) parts.push(`제${dong}동`);
+  parts.push(`${ho}호`);
+  return `위 건물 중 ${parts.join(" ")} 전부`;
+}
+
 /** 거래·매물 정보로 서식 초안 data 채우기 */
 export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): Record<string, string> {
   const clauses = defaultSpecialTermsForDeal(p.dealType, p.clauses);
@@ -147,7 +164,8 @@ export function buildDealFormDefaults(kind: DealFormKind, p: DealFormPrefill): R
         rent_arrears_periods: p.dealType === "매매" ? "" : "2기",
         building: str(p.building),
         unit: str(p.unit),
-        leased_portion: "",
+        leased_portion:
+          p.dealType === "매매" ? "" : leasedPortionFromBuildingUnit(p.building, p.unit),
         leased_portion_area: "",
         rent_pay_day: "",
         rent_pay_timing: "후불",

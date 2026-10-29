@@ -60,7 +60,10 @@ export default async function ContractsPage() {
     extrasByProperty.set(pid, mergeDocFormExtras(docs));
   }
 
-  const list = (forms ?? []).filter((f) => (isApp ? f.status === "finalized" : true));
+  /** 계약관리 목록에는 계약서만 표시 — 확인설명서는 계약서 작성창에서 세트로 작성·조회 */
+  const list = (forms ?? []).filter(
+    (f) => f.kind === "contract" && (isApp ? f.status === "finalized" : true)
+  );
 
   /** 거래별 최신 계약서 data (확인설명서 작성 시 소재지·면적·인적사항) */
   const contractByDeal = new Map<string, Record<string, string>>();
@@ -93,6 +96,7 @@ export default async function ContractsPage() {
       kind: f.kind as DealFormKind,
       title: f.title,
       status: f.status as "draft" | "finalized",
+      createdAt: f.created_at,
       data: d,
       contractDate: d.contract_date || d.paid_at || "",
       expiryDate: d.expiry_date || "",

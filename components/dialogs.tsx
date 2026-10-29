@@ -29,7 +29,9 @@ function DialogHead({ title, description, icon }: Pick<BaseDialogProps, "title" 
     <AlertDialogHeader>
       {icon && <AlertDialogMedia>{icon}</AlertDialogMedia>}
       <AlertDialogTitle>{title}</AlertDialogTitle>
-      {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
+      {description && (
+        <AlertDialogDescription className="whitespace-pre-line">{description}</AlertDialogDescription>
+      )}
     </AlertDialogHeader>
   );
 }

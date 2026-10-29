@@ -16,6 +16,8 @@ export type PropertyDocsDisclosureResult = {
   /** UI 안내용 요약 */
   summary: string[];
   documentCount: number;
+  /** 매물에 저장된 카카오 입지(있으면) */
+  locationFields?: Record<string, string>;
 };
 
 /** document_fields.label → 확인설명서 키 (수동 입력분, AI 없음) */

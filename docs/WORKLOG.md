@@ -4,14 +4,13 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: 계약관리 연결매물·작성 UX + 확인설명서 서류 병합 우선순위 (브랜치 `feat/ai-registry-summary`)
-  - 계약관리 테이블에 연결매물 컬럼(클릭 시 매물 상세), 삭제 버튼은 작성 툴바 오른쪽(빨간 버튼)
-  - 계약서 작성: 제목 클릭=동일 작성창 수정, `property_id` 저장, 매물 변경 확인·사본만들기
-  - 서식·부동산·거래 종류 수정 가능 / 연결 매물 거래종류 동기화 / 불일치 시 확인 후 계약내용만 비움
-  - 확인설명서·계약서 서류 병합: 건축물대장 > 종합공부 > 토지대장, 면적·건폐율 등 빈값·0이면 하위 서류로 대체
-  - (기존) 서류 발급 링크·종합공부 AI·검토 UI·busy 오버레이
-- **다음 작업 시작 지점**: 연결매물↔거래종류 불일치 확인·계약내용 비움 스모크, 확인설명서 서류 병합(0/빈값 fallthrough) 실 PDF 확인
-- **환경**: `KAKAO_REST_API_KEY`, 선택 AI 키 필요. 마이그레이션 **`20261021120000`, `20261023160000`, `20261027100000`, `20261027170000` 적용 필요**
+- **단계**: 계약서·확인설명서 작성 팝업 UX + 연결매물 자동 반영 (브랜치 `feat/ai-registry-summary`)
+  - 계약서/확인설명서 전용 페이지 팝업(1200×900), 같은 계약 재클릭은 포커스만·다른 계약은 창 전환
+  - 연결 매물 있으면 확인설명서에 동일 이름 표시, 거래 자동 연결(`ensureDealForProperty`)
+  - 검토완료 서류·매물 `location_fields`(카카오 입지) 자동 채움 — 수동 채우기/건축HUB/입지 버튼 제거
+  - 임대차 잔금일↔존속기간 인도일 양방향 동기화, 만기=인도+개월−1일
+- **다음 작업 시작 지점**: `npm run db:push`로 `20261028120000_property_location_fields` 적용 → 연결매물 있는 계약서에서 확인설명서 자동 채움·작성창 재클릭 스모크
+- **환경**: `KAKAO_REST_API_KEY`, 선택 AI 키 필요. 마이그레이션 **`20261021120000`, `20261023160000`, `20261027100000`, `20261027170000`, `20261028120000` 적용 필요**
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -62,6 +61,29 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-29 — 계약서·확인설명서 작성 팝업·연결매물 자동 채움
+**작업 요약**
+- 계약서/확인설명서 작성을 고정 크기 팝업 페이지로 분리, 시드로 창 전환
+- 같은 계약서 재오픈은 새로고침 없이 포커스, 다른 계약서는 기존 창을 전환
+- 연결 매물 → 확인설명서 「연결 매물」에 동일 라벨, 없으면 거래 생성(`ensureDealForProperty`)
+- 검토완료 서류·카카오 입지 자동 반영, 매물 등록 시 `location_fields` 저장
+- 확인설명서 수동 「매물 서류/건축HUB/카카오 입지」 버튼 제거
+- 임대차 잔금일↔존속기간 인도일 양방향 동기화
+
+**변경 파일**
+- `app/(app)/contracts/{write,disclosure/write}/*`, `lib/open-contract-write.ts`, `lib/contract-write-data.ts`
+- `lib/disclosure-{location,write-seed}.ts`, `components/deal-forms/{contract,disclosure}-write-dialog.tsx`
+- `components/deal-forms/contract-form-sheet.tsx`, `lib/actions/{deals,properties,disclosure-docs,ai-assist}.ts`
+- `supabase/migrations/20261028120000_property_location_fields.sql`
+
+**결정 사항**
+- 작성 창은 단일 팝업 이름 유지, form id로 동일/다른 계약 판별
+- 입지는 매물 저장 시 캐시하고 확인설명서에서 우선 사용(없으면 조회)
+
+**남은 TODO**
+- `db:push`로 location_fields 마이그레이션 적용
+- 연결매물·확인설명서 자동 채움·작성창 재클릭 실기기 스모크
 
 ### 2026-10-28 — 계약관리 연결매물·작성 UX·확인설명서 서류 병합
 **작업 요약**

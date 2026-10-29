@@ -6,17 +6,20 @@ import {
   type PropertyDocForDisclosure,
   type PropertyDocsDisclosureResult,
 } from "@/lib/disclosure-from-docs";
+import { parseStoredLocationFields } from "@/lib/disclosure-location";
 import { toErrorMessage } from "@/lib/form";
 
 async function loadDocsForPropertyId(propertyId: string) {
   const { supabase } = await getSession();
   const { data: property, error: propErr } = await supabase
     .from("properties")
-    .select("id, title, address, area_m2, building, unit, structure, main_use")
+    .select("id, title, address, area_m2, building, unit, structure, main_use, location_fields")
     .eq("id", propertyId)
     .maybeSingle();
   if (propErr) throw propErr;
   if (!property) return { ok: false as const, error: "매물을 찾을 수 없어요." };
+
+  const locationFields = parseStoredLocationFields(property.location_fields);
 
   const { data: docs, error: docsErr } = await supabase
     .from("documents")
@@ -27,10 +30,25 @@ async function loadDocsForPropertyId(propertyId: string) {
   if (docsErr) throw docsErr;
 
   if (!docs?.length) {
+    // 검토 완료 서류가 없어도 매물 기본값·저장된 입지는 반환(근거자료 체크는 건드리지 않음)
+    const fields: Record<string, string> = { ...locationFields };
+    if (property.address?.trim()) fields.property_address = property.address.trim();
+    if (property.title?.trim()) fields.property_title = property.title.trim();
+    if (property.building?.trim()) fields.building = property.building.trim();
+    if (property.unit?.trim()) fields.unit = property.unit.trim();
+    if (property.structure?.trim()) fields.building_structure = property.structure.trim();
+    if (property.main_use?.trim()) fields.building_use = property.main_use.trim();
+    if (property.area_m2 != null && Number.isFinite(property.area_m2)) {
+      fields.building_area = String(property.area_m2);
+    }
     return {
-      ok: false as const,
-      error:
-        "검토 완료된 서류가 없어요. 문서 관리에서 AI 추출한 값을 원문과 대조하고 검토 완료해 주세요.",
+      ok: true as const,
+      result: {
+        fields,
+        summary: [],
+        documentCount: 0,
+        locationFields,
+      },
     };
   }
 
@@ -47,17 +65,23 @@ async function loadDocsForPropertyId(propertyId: string) {
     };
   });
 
+  const mappedResult = mapPropertyDocsToDisclosure(mapped, {
+    title: property.title,
+    address: property.address,
+    areaM2: property.area_m2,
+    building: property.building,
+    unit: property.unit,
+    structure: property.structure,
+    mainUse: property.main_use,
+  });
+
   return {
     ok: true as const,
-    result: mapPropertyDocsToDisclosure(mapped, {
-      title: property.title,
-      address: property.address,
-      areaM2: property.area_m2,
-      building: property.building,
-      unit: property.unit,
-      structure: property.structure,
-      mainUse: property.main_use,
-    }),
+    result: {
+      ...mappedResult,
+      fields: { ...mappedResult.fields, ...locationFields },
+      locationFields,
+    },
   };
 }
 

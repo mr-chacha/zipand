@@ -7,10 +7,10 @@ import { Download, Printer, RotateCcw, Search, Trash2, Upload } from "lucide-rea
 import { toast } from "sonner";
 import { DocumentsWriteControls } from "@/components/deal-forms/contract-write-entry";
 import type {
-  ContractWriteEditSeed,
   WriteDealOption,
   WritePropertyOption,
 } from "@/components/deal-forms/contract-write-dialog";
+import { openContractWriteWindow } from "@/lib/open-contract-write";
 import { PrivacyConsentWriteButton } from "@/components/deal-forms/privacy-consent-dialog";
 import {
   RegistryInquiryButton,
@@ -32,7 +32,6 @@ import { useBusy } from "@/lib/busy";
 import { CONTRACT_DEAL_TYPES, CONTRACT_PROPERTY_TYPES } from "@/lib/contract-templates";
 import {
   DEAL_FORM_KIND_LABELS,
-  DEAL_FORM_KINDS,
   formatDealAmount,
   formatShortDate,
   type DealFormKind,
@@ -81,6 +80,8 @@ export type DocumentRow = {
   kind: DealFormKind;
   title: string;
   status: "draft" | "finalized";
+  /** 목록 세트 정렬용 */
+  createdAt: string;
   /** 계약서 작성 창에서 다시 열 때 사용 */
   data: Record<string, string>;
   contractDate: string;
@@ -300,7 +301,6 @@ export function DocumentsTable({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS);
   const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS);
-  const [editSeed, setEditSeed] = useState<ContractWriteEditSeed | null>(null);
   useBusy(pending);
 
   const openContractRow = (row: DocumentRow) => {
@@ -308,17 +308,7 @@ export function DocumentsTable({
       router.push(formHref(row));
       return;
     }
-    const fromData = row.data.property_id?.trim() ?? "";
-    const fromDeal = row.dealId
-      ? (deals.find((d) => d.value === row.dealId)?.propertyId?.trim() ?? "")
-      : "";
-    setEditSeed({
-      formId: row.id,
-      title: row.title,
-      data: row.data,
-      propertyId: fromData || fromDeal || undefined,
-      status: row.status,
-    });
+    openContractWriteWindow(row.id);
   };
 
   const filtered = useMemo(() => filterRows(rows, applied), [rows, applied]);
@@ -479,7 +469,7 @@ export function DocumentsTable({
               onChange={(e) => patchDraft("kind", e.target.value)}
               options={[
                 { value: "", label: "전체" },
-                ...DEAL_FORM_KINDS.map((k) => ({ value: k, label: DEAL_FORM_KIND_LABELS[k] })),
+                { value: "contract", label: DEAL_FORM_KIND_LABELS.contract },
               ]}
               className="w-32"
             />
@@ -530,11 +520,6 @@ export function DocumentsTable({
 
       {!isApp && (
         <DocumentsWriteControls
-          properties={writeProperties}
-          deals={deals}
-          office={office}
-          editSeed={editSeed}
-          onEditSeedChange={setEditSeed}
           trailing={
             <Button
               type="button"
@@ -681,7 +666,7 @@ export function DocumentsTable({
                           row.kind === "contract" ? (
                             <button
                               type="button"
-                              className="text-left text-primary hover:underline"
+                              className="cursor-pointer text-left text-primary hover:underline"
                               onClick={() => openContractRow(row)}
                             >
                               {value || "—"}

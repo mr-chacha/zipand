@@ -1188,6 +1188,7 @@ export type Database = {
           id: string
           internal_memo: string | null
           landlord_phone: string | null
+          location_fields: Json | null
           maintenance_fee: number | null
           maintenance_items: string[]
           maintenance_status: string | null
@@ -1226,6 +1227,7 @@ export type Database = {
           id?: string
           internal_memo?: string | null
           landlord_phone?: string | null
+          location_fields?: Json | null
           maintenance_fee?: number | null
           maintenance_items?: string[]
           maintenance_status?: string | null
@@ -1264,6 +1266,7 @@ export type Database = {
           id?: string
           internal_memo?: string | null
           landlord_phone?: string | null
+          location_fields?: Json | null
           maintenance_fee?: number | null
           maintenance_items?: string[]
           maintenance_status?: string | null

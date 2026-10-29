@@ -289,6 +289,19 @@ export function addMonthsToYmd(ymd: string, months: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+/** 임대차 만기: 인도일 + 개월 − 1일 (예: 2026-12-25 + 24개월 → 2028-12-24) */
+export function leaseExpiryFromStart(ymd: string, months: number): string {
+  const end = addMonthsToYmd(ymd, months);
+  const m = end.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  const dt = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  dt.setDate(dt.getDate() - 1);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
 export function contractArticlesForDeal(dealType: ContractDealType) {
   if (dealType === "매매") return STANDARD_SALE_ARTICLES;
   if (dealType === "전세") return STANDARD_JEONSE_ARTICLES;
