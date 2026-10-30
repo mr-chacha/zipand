@@ -4,12 +4,13 @@ export const PROPERTY_STATUSES = ["임장 전", "광고 중", "계약 진행", "
 export const DOC_TYPES = [
   "등기사항증명서",
   "건축물대장",
-  "토지대장",
   "지적도",
   "토지이용계획확인서",
   "부동산종합공부",
   "기타",
 ] as const;
+/** 업로드는 중단했지만 기존 문서·확인설명서 매핑용 */
+export const LEGACY_DOC_TYPES = ["토지대장"] as const;
 export const DOC_STATUSES = ["검토 필요", "검토 완료"] as const;
 export const SIGNAL_LEVELS = ["전문가 검토", "확인 필요", "참고"] as const;
 export const CUSTOMER_STATUSES = ["연락 전", "연락 완료", "진행 중", "관심 고객", "계약 완료", "중개 완료", "종료"] as const;
@@ -26,6 +27,7 @@ export type DealType = (typeof DEAL_TYPES)[number];
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 export type PropertyStatus = (typeof PROPERTY_STATUSES)[number];
 export type DocType = (typeof DOC_TYPES)[number];
+export type KnownDocType = DocType | (typeof LEGACY_DOC_TYPES)[number];
 export type DocStatus = (typeof DOC_STATUSES)[number];
 export type SignalLevel = (typeof SIGNAL_LEVELS)[number];
 export type CustomerStatus = (typeof CUSTOMER_STATUSES)[number];
@@ -75,51 +77,47 @@ export const DEFAULT_VISIT_CHECKLIST = [
   "전기·조명",
 ];
 
-/** 공부서류 주요 추출 항목 프리셋 (기획서 7.4) — AI 없이 문서 상세에서 수동 입력 */
-export const DOC_FIELD_PRESETS: Record<DocType, string[]> = {
+/** 확인설명서에 연결할 공부서류별 AI 추출·수동 검토 항목 */
+export const DOC_FIELD_PRESETS: Record<KnownDocType, string[]> = {
   등기사항증명서: [
-    "소유자",
+    "등기요약",
     "소재지",
-    "갑구 등기목적",
-    "갑구 등기원인",
-    "갑구 권리자 및 기타사항",
-    "을구 등기목적",
-    "을구 등기원인",
-    "을구 권리자 및 기타사항",
+    "갑구의 등기목적",
+    "갑구의 등기원인",
+    "갑구의 권리자 및 기타사항",
+    "을구의 등기목적",
+    "을구의 등기원인",
+    "을구의 권리자 및 기타사항",
+    "등기열람 날짜",
   ],
   건축물대장: [
+    "소재지",
     "주용도",
-    "위반건축물 여부",
-    "전용면적",
-    "건축면적",
+    "주구조",
+    "면적",
     "연면적",
-    "허가일",
-    "사용승인일",
-    "구조",
-    "발급일",
+    "용적률",
+    "건폐율",
+    "사용승인일자",
+    "위반건축물 여부",
   ],
   토지대장: ["지목", "면적", "소유자", "발급일"],
   지적도: ["소재지", "발급일"],
   토지이용계획확인서: ["용도지역", "용도지구", "용도구역", "발급일"],
   부동산종합공부: [
-    "소재지",
-    "지목",
-    "소유자",
-    "주용도",
-    "구조",
-    "대지면적",
-    "건축면적",
-    "연면적",
-    "건폐율",
-    "용적률",
+    "토지 소재지",
+    "토지 지목",
+    "토지 면적",
     "개별공시지가",
-    "발급일",
+    "건축물 건폐율",
+    "건축물 용적률",
+    "용도지역",
   ],
   기타: ["항목"],
 };
 
 /** 서류 종류 → 확인설명서 「근거자료」 체크 필드 */
-export const DOC_TYPE_TO_DISCLOSURE_CHECK: Partial<Record<DocType, string>> = {
+export const DOC_TYPE_TO_DISCLOSURE_CHECK: Partial<Record<KnownDocType, string>> = {
   등기사항증명서: "doc_registry",
   건축물대장: "doc_building_ledger",
   토지대장: "doc_land_ledger",
@@ -127,6 +125,18 @@ export const DOC_TYPE_TO_DISCLOSURE_CHECK: Partial<Record<DocType, string>> = {
   토지이용계획확인서: "doc_land_use",
   부동산종합공부: "doc_other",
 };
+
+export const DEFAULT_NEARBY_KEYWORDS = [
+  "지하철역",
+  "버스정류장",
+  "초등학교",
+  "중학교",
+  "고등학교",
+  "병원",
+  "대형마트",
+  "편의점",
+  "공원",
+] as const;
 
 export type DealChecklistStage = (typeof DEAL_CHECKLIST_STAGES)[number];
 export type DealStep = (typeof DEAL_STEPS)[number];

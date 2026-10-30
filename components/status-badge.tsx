@@ -25,6 +25,18 @@ export function DocStatusBadge({ status }: { status: string }) {
   );
 }
 
+const extractionStyle: Record<string, string> = {
+  미추출: "bg-muted text-muted-foreground",
+  "추출 중": "bg-primary/10 text-primary",
+  "검토 필요": "bg-warning/15 text-warning",
+  "추출 완료": "bg-success/15 text-success",
+  "추출 실패": "bg-destructive/10 text-destructive",
+};
+
+export function DocumentExtractionBadge({ status }: { status: string }) {
+  return <Badge className={cn("border-0", extractionStyle[status] ?? extractionStyle.미추출)}>{status}</Badge>;
+}
+
 const signalStyle: Record<string, { className: string; icon: React.ElementType }> = {
   "전문가 검토": { className: "bg-destructive/10 text-destructive", icon: ShieldAlert },
   "확인 필요": { className: "bg-warning/15 text-warning", icon: AlertTriangle },

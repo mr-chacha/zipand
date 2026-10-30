@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FileText, Plus } from "lucide-react";
-import { DocStatusBadge } from "@/components/status-badge";
+import { DocumentExtractionBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -12,6 +12,8 @@ export type PropertyDocumentRow = {
   doc_type: string;
   file_name: string;
   status: string;
+  extraction_status: string;
+  extraction_error: string | null;
   issued_at: string | null;
   created_at: string;
 };
@@ -29,7 +31,6 @@ export type PropertyWithDocuments = {
 const DOC_TYPE_SHORT: Record<DocType, string> = {
   등기사항증명서: "등기",
   건축물대장: "건축물대장",
-  토지대장: "토지대장",
   지적도: "지적도",
   토지이용계획확인서: "토지이용",
   부동산종합공부: "종합공부",
@@ -66,7 +67,7 @@ function DocCell({
     <Link href={`/documents/${doc.id}`} className="group flex min-w-0 flex-col gap-0.5">
       <span className="flex items-center gap-1">
         <FileText className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
-        <DocStatusBadge status={doc.status} />
+        <DocumentExtractionBadge status={doc.extraction_status} />
       </span>
       <span className="truncate text-[11px] text-muted-foreground group-hover:underline">
         {doc.issued_at ? formatDate(doc.issued_at) : formatDate(doc.created_at)}
@@ -114,7 +115,7 @@ export function PropertyDocumentsTable({
             {properties.map((p) => (
               <TableRow key={p.id}>
                 <TableCell className="pl-4">
-                  <Link href={`/properties/${p.id}`} className="block min-w-0 hover:underline">
+                  <Link href={`/properties/${p.id}?tab=docs`} className="block min-w-0 hover:underline">
                     <p className="max-w-56 truncate font-medium">{p.title}</p>
                     <p className="max-w-56 truncate text-xs text-muted-foreground">{p.address}</p>
                     <p className="text-[11px] text-muted-foreground">
@@ -143,7 +144,7 @@ export function PropertyDocumentsTable({
           return (
             <Card key={p.id} className="gap-3 p-4">
               <div className="min-w-0">
-                <Link href={`/properties/${p.id}`} className="font-medium hover:underline">
+                <Link href={`/properties/${p.id}?tab=docs`} className="font-medium hover:underline">
                   {p.title}
                 </Link>
                 <p className="truncate text-xs text-muted-foreground">{p.address}</p>
@@ -165,7 +166,7 @@ export function PropertyDocumentsTable({
                             {d.doc_type}
                             <span className="ml-1 text-xs text-muted-foreground">{d.file_name}</span>
                           </span>
-                          <DocStatusBadge status={d.status} />
+                          <DocumentExtractionBadge status={d.extraction_status} />
                         </Link>
                       </li>
                     ))}

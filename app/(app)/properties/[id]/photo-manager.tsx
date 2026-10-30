@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { ImagePlus, Loader2, Play, Star, Trash2, Video } from "lucide-react";
+import { ImagePlus, Play, Star, Trash2, Video } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { PropertyThumbnail } from "@/components/property-thumbnail";
@@ -260,8 +260,8 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos, video
             disabled={uploadingPhoto || uploadingVideo}
             className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
           >
-            {uploadingPhoto ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
-            {uploadingPhoto ? "업로드 중" : "사진 추가"}
+            <ImagePlus className="size-4" />
+            사진 추가
           </button>
         )}
         {canAddVideo && (
@@ -271,8 +271,8 @@ export function PhotoManager({ officeId, propertyId, propertyType, photos, video
             disabled={uploadingPhoto || uploadingVideo}
             className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-lg border-2 border-dashed text-[11px] text-muted-foreground hover:border-primary/40 hover:text-primary"
           >
-            {uploadingVideo ? <Loader2 className="size-4 animate-spin" /> : <Video className="size-4" />}
-            {uploadingVideo ? "업로드 중" : "동영상 추가"}
+            <Video className="size-4" />
+            동영상 추가
           </button>
         )}
 

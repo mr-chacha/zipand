@@ -47,6 +47,8 @@ export type LocationDraft = {
   school_high: string;
   school_high_min: string;
   school_high_mode: string;
+  disliked_facility: string;
+  disliked_facility_detail: string;
   note: string;
 };
 
@@ -72,6 +74,8 @@ export type DocumentAiField = {
   label: string;
   value: string;
   evidence_text: string | null;
+  page: number | null;
+  confidence: number;
 };
 
 export type DocumentAiSignal = {
@@ -80,4 +84,6 @@ export type DocumentAiSignal = {
   description: string | null;
   evidence_text: string | null;
   next_action: string | null;
+  page: number | null;
+  confidence: number;
 };

@@ -1,14 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Building2, Compass, FileText, Layers, Lock, Maximize, Phone, Users } from "lucide-react";
+import { Building2, Compass, Layers, Lock, Maximize, Phone, Users } from "lucide-react";
 import { OfficeRequiredNotice } from "@/components/office-gate";
 import { PageHeader } from "@/components/page-header";
 import { PropertySubnav } from "@/components/property-subnav";
 import { RegistryInquiryButton } from "@/components/deal-forms/registry-inquiry-dialog";
-import { DocStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { DocumentIssueLinks } from "@/app/(app)/documents/document-issue-links";
 import { DocumentUploader } from "@/app/(app)/documents/document-uploader";
 import { getSession } from "@/lib/auth";
 import {
@@ -23,6 +23,7 @@ import { getOfficeGate } from "@/lib/office-gate";
 import { getCustomerOptions } from "@/lib/queries";
 import { signedUrls } from "@/lib/storage";
 import { PhotoManager } from "./photo-manager";
+import { PropertyDocumentsList } from "./property-documents-list";
 import { LinkedCustomers, PropertyHeaderActions, PropertyStatusSelect } from "./property-actions";
 
 export async function generateMetadata({ params }: PageProps<"/properties/[id]">) {
@@ -55,7 +56,11 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
       .eq("property_id", id)
       .order("sort_order")
       .order("created_at"),
-    supabase.from("documents").select("id, doc_type, file_name, status, created_at").eq("property_id", id).order("created_at", { ascending: false }),
+    supabase
+      .from("documents")
+      .select("id, doc_type, file_name, status, extraction_status, created_at")
+      .eq("property_id", id)
+      .order("created_at", { ascending: false }),
     supabase.from("customer_properties").select("customer:customers(id, name, status, phone)").eq("property_id", id),
     getCustomerOptions(),
     getOfficeGate(),
@@ -99,38 +104,54 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
       <PropertySubnav propertyId={id} active={subnavActive} />
 
       {docsMode ? (
-        <div className="mx-auto w-full max-w-3xl space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>서류 업로드</CardTitle>
-              <CardDescription>PDF, JPG, PNG · 최대 20MB · 이 매물에 바로 연결돼요</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {gate.blocked.document ? (
-                <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
-              ) : (
-                <div className="space-y-3">
-                  {!hasRegistryDocument && (
-                    <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm font-medium">등기사항증명서가 아직 없어요</p>
-                        <p className="text-xs text-muted-foreground">
-                          주소로 등기를 열람하면 원문 PDF가 이 매물 서류함에 자동 저장됩니다.
-                        </p>
-                      </div>
-                      <RegistryInquiryButton
-                        properties={[
-                          {
-                            value: id,
-                            label: [property.title, property.address].filter(Boolean).join(" · "),
-                            address: property.address ?? "",
-                            building: property.building ?? "",
-                            unit: property.unit ?? "",
-                          },
-                        ]}
-                      />
-                    </div>
-                  )}
+        <div className="grid gap-6 lg:grid-cols-5">
+          <div className="space-y-4 lg:col-span-2">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">간편하게 등기부등본 열람</CardTitle>
+                <CardDescription>
+                  {hasRegistryDocument
+                    ? "등기를 재열람하면 새 등기부등본이 자동 저장됩니다."
+                    : "주소로 등기를 열람하면 등기부등본이 자동 저장됩니다."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RegistryInquiryButton
+                  label={hasRegistryDocument ? "등기 재열람" : "등기 열람"}
+                  properties={[
+                    {
+                      value: id,
+                      label: [property.title, property.address].filter(Boolean).join(" · "),
+                      address: property.address ?? "",
+                      building: property.building ?? "",
+                      unit: property.unit ?? "",
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">서류 발급</CardTitle>
+                <CardDescription>
+                  {property.address
+                    ? "외부에서 발급·열람한 뒤 아래에 업로드하세요."
+                    : "인터넷등기·건축물대장은 바로 열 수 있어요. 부동산종합공부는 매물 주소를 등록하면 지역에 맞게 표시됩니다."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <DocumentIssueLinks address={property.address} variant="inline" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle>서류 업로드</CardTitle>
+                <CardDescription>PDF, JPG, PNG · 최대 20MB · 이 매물에 바로 연결돼요</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {gate.blocked.document ? (
+                  <OfficeRequiredNotice kind="document" isOwner={gate.isOwner} next={`/properties/${id}?tab=docs`} />
+                ) : (
                   <DocumentUploader
                     officeId={office.id}
                     properties={[{ value: id, label: property.title }]}
@@ -138,37 +159,17 @@ export default async function PropertyDetailPage({ params, searchParams }: PageP
                     lockProperty
                     goToDetail={false}
                   />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+          <Card className="lg:col-span-3">
             <CardHeader>
               <CardTitle>등록된 공부서류 ({docs.data?.length ?? 0})</CardTitle>
-              <CardAction>
-                <Link href={`/documents?property=${id}`} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                  문서 관리에서 보기
-                </Link>
-              </CardAction>
+            
             </CardHeader>
-            <CardContent className="space-y-2">
-              {(docs.data ?? []).length === 0 && (
-                <p className="py-8 text-center text-sm text-muted-foreground">등록된 서류가 없어요.</p>
-              )}
-              {docs.data?.map((doc) => (
-                <Link
-                  key={doc.id}
-                  href={`/documents/${doc.id}?return=${encodeURIComponent(`/properties/${id}?tab=docs`)}`}
-                  className="flex items-center gap-3 rounded-lg border p-3 hover:bg-muted/50"
-                >
-                  <FileText className="size-5 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{doc.doc_type}</p>
-                    <p className="truncate text-xs text-muted-foreground">{doc.file_name}</p>
-                  </div>
-                  <DocStatusBadge status={doc.status} />
-                </Link>
-              ))}
+            <CardContent>
+              <PropertyDocumentsList propertyId={id} documents={docs.data ?? []} />
             </CardContent>
           </Card>
         </div>

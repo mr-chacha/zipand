@@ -8,7 +8,7 @@ import { resolveAiProvider } from "@/lib/ai/provider";
 import { runBriefingComment } from "@/lib/ai/run-briefing";
 import { runClauseSuggestions } from "@/lib/ai/run-clauses";
 import { runConsultationFromAudio } from "@/lib/ai/run-consult";
-import { runAdCopy, runLocationDraft } from "@/lib/ai/run-text";
+import { runAdCopy } from "@/lib/ai/run-text";
 import { runVisitOrganize, runVisitTranscribe } from "@/lib/ai/run-visit";
 import type {
   ClauseSuggestion,
@@ -18,9 +18,11 @@ import type {
   VisitDraft,
 } from "@/lib/ai/types";
 import { getSession } from "@/lib/auth";
-import { DEAL_TYPES } from "@/lib/constants";
+import { DEAL_TYPES, DEFAULT_NEARBY_KEYWORDS } from "@/lib/constants";
 import { FormError } from "@/lib/errors";
 import { str, toErrorMessage } from "@/lib/form";
+import { fetchDisclosureLocationFields } from "@/lib/disclosure-location";
+import { lookupKakaoNearby, nearbyFactsText, normalizeNearbyKeywords } from "@/lib/kakao-local";
 import { isPropertyPath } from "@/lib/storage";
 
 const AUDIO_MAX = 25 * 1024 * 1024;
@@ -150,27 +152,48 @@ export async function applyConsultationDraft(
   }
 }
 
-export type AdCopyResult = { ok: true; description: string; highlights: string } | { ok: false; error: string };
+export type AdCopyResult =
+  | { ok: true; naver: string; zigbangDabang: string; highlights: string; nearbyCount: number }
+  | { ok: false; error: string };
 
 export async function suggestPropertyAdCopy(fd: FormData): Promise<AdCopyResult> {
   try {
     const { supabase, office } = await getSession();
     const ai = resolveAiProvider(office.ai_provider);
+    const address = str(fd, "address") ?? "";
+    const inputKeywords = normalizeNearbyKeywords(str(fd, "nearby_keywords"));
+    const nearby = await lookupKakaoNearby(
+      address,
+      inputKeywords.length ? inputKeywords : [...DEFAULT_NEARBY_KEYWORDS],
+      { radius: 3_000, sizePerKeyword: 2 }
+    );
     await consumeAiCredit(supabase, office, 1);
     const result = await runAdCopy(ai, {
       title: str(fd, "title") ?? "",
-      address: str(fd, "address") ?? "",
+      address,
       dealType: str(fd, "deal_type") ?? "",
       propertyType: str(fd, "property_type") ?? "",
       price: str(fd, "price") ?? "",
       monthlyRent: str(fd, "monthly_rent") ?? "",
       area: str(fd, "area_m2") ?? "",
+      floor: str(fd, "floor") ?? "",
+      totalFloors: str(fd, "total_floors") ?? "",
+      direction: str(fd, "direction") ?? "",
+      available:
+        str(fd, "available_mode") === "negotiable"
+          ? "협의 가능"
+          : str(fd, "available_mode") === "date"
+            ? (str(fd, "available_from") ?? "")
+            : "",
       highlights: str(fd, "highlights") ?? "",
+      nearbyFacts: nearbyFactsText(nearby.places),
     });
     return {
       ok: true,
-      description: result.description?.trim() || "",
+      naver: result.naver?.trim() || "",
+      zigbangDabang: result.zigbang_dabang?.trim() || "",
       highlights: result.highlights?.trim() || "",
+      nearbyCount: nearby.places.length,
     };
   } catch (e) {
     return { ok: false, error: toErrorMessage(e) };
@@ -181,12 +204,10 @@ export type LocationResult = { ok: true; fields: LocationDraft } | { ok: false; 
 
 export async function suggestDisclosureLocation(address: string): Promise<LocationResult> {
   try {
-    const { supabase, office } = await getSession();
+    await getSession();
     const trimmed = address.trim();
     if (!trimmed) throw new FormError("입지를 채우려면 주소가 필요해요.");
-    const ai = resolveAiProvider(office.ai_provider);
-    await consumeAiCredit(supabase, office, 1);
-    const fields = await runLocationDraft(ai, trimmed);
+    const fields = await fetchDisclosureLocationFields(trimmed);
     return { ok: true, fields };
   } catch (e) {
     return { ok: false, error: toErrorMessage(e) };

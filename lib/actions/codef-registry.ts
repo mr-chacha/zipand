@@ -153,7 +153,7 @@ async function saveFileToProperty(
     bytes: buf.length,
     fileKind: file.fileKind,
   });
-  return { documentId: created.id, downloadUrl };
+  return { documentId: created.id, downloadUrl, message: created.message };
 }
 
 async function savePendingFile(
@@ -211,6 +211,7 @@ async function finishWithFile(
       fileName,
       fileKind: result.fileKind,
       downloadUrl: saved.downloadUrl,
+      message: saved.message,
     };
   } catch (e) {
     // 저장 실패여도 이미 열람비가 나갔을 수 있으므로 소용량 PDF는 내려받을 수 있게 한다.
@@ -371,16 +372,17 @@ export async function registerPropertyFromRegistry(
       if (uploadError) throw uploadError;
       uploadedPaths.push(finalPath);
 
-      const { error: documentError } = await supabase.from("documents").insert({
-        property_id: propertyId,
-        doc_type: "등기사항증명서",
-        file_name: fileName,
-        storage_path: finalPath,
-        file_size: bytes.length,
-        issued_at: new Date().toISOString().slice(0, 10),
-        uploaded_by: profile.id,
+      const created = await createDocument({
+        propertyId,
+        docType: "등기사항증명서",
+        fileName,
+        storagePath: finalPath,
+        fileSize: bytes.length,
+        issuedAt: new Date().toISOString().slice(0, 10),
       });
-      if (documentError) throw documentError;
+      if (created.error || !created.id) {
+        throw new Error(created.error ?? "등기 문서 저장에 실패했어요.");
+      }
     }
 
     await supabase.storage.from("documents").remove(paths);
@@ -401,7 +403,7 @@ export async function registerPropertyFromRegistry(
   return {
     ok: true,
     propertyId,
-    message: "매물을 등록하고 등기 PDF를 서류함에 연결했어요.",
+    message: `매물을 등록하고 등기 PDF ${paths.length}건을 연결했어요. 서류 목록에서 선택해 AI 추출할 수 있어요.`,
   };
 }
 

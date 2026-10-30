@@ -3,10 +3,35 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { DEAL_TYPES, MAINTENANCE_STATUSES, PROPERTY_STATUSES, PROPERTY_TYPES, type PropertyStatus } from "@/lib/constants";
+import {
+  DEAL_TYPES,
+  DEFAULT_NEARBY_KEYWORDS,
+  MAINTENANCE_STATUSES,
+  PROPERTY_STATUSES,
+  PROPERTY_TYPES,
+  type PropertyStatus,
+} from "@/lib/constants";
+import { fetchDisclosureLocationFields } from "@/lib/disclosure-location";
 import { FormError, int, lines, num, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
+import { normalizeNearbyKeywords } from "@/lib/kakao-local";
 import { isPropertyPath, MEDIA_LIMITS } from "@/lib/storage";
 import type { ActionState } from "@/types";
+
+/** 매물 주소로 카카오 입지를 조회해 location_fields에 저장(실패해도 매물 저장은 유지). */
+async function refreshPropertyLocationFields(
+  supabase: Awaited<ReturnType<typeof getSession>>["supabase"],
+  propertyId: string,
+  address: string
+) {
+  try {
+    const trimmed = address.trim();
+    if (!trimmed) return;
+    const fields = await fetchDisclosureLocationFields(trimmed);
+    await supabase.from("properties").update({ location_fields: fields }).eq("id", propertyId);
+  } catch {
+    /* 입지 조회 실패는 매물 등록을 막지 않음 */
+  }
+}
 
 function readPropertyForm(fd: FormData) {
   const deal_type = oneOf(fd, "deal_type", DEAL_TYPES, "거래 유형");
@@ -21,6 +46,7 @@ function readPropertyForm(fd: FormData) {
           ]),
         ].filter(Boolean)
       : [];
+  const nearbyKeywords = normalizeNearbyKeywords(str(fd, "nearby_keywords"));
   return {
     title: requiredStr(fd, "title", "매물명"),
     address: requiredStr(fd, "address", "주소"),
@@ -49,6 +75,7 @@ function readPropertyForm(fd: FormData) {
     description: str(fd, "description"),
     highlights: lines(str(fd, "highlights")),
     internal_memo: str(fd, "internal_memo"),
+    nearby_keywords: nearbyKeywords.length ? nearbyKeywords : [...DEFAULT_NEARBY_KEYWORDS],
     landlord_phone: str(fd, "landlord_phone"),
     caretaker_phone: str(fd, "caretaker_phone"),
     tenant_phone: str(fd, "tenant_phone"),
@@ -118,6 +145,7 @@ export async function createProperty(_prev: ActionState | null, fd: FormData): P
       .filter(Boolean)
       .join(", ");
     await logPropertyEvent(id, media ? `매물 등록 (${media})` : "매물 등록");
+    await refreshPropertyLocationFields(supabase, id, values.address);
   } catch (e) {
     await Promise.all([
       photoPaths.length && supabase.storage.from("property-photos").remove(photoPaths),
@@ -137,6 +165,7 @@ export async function updateProperty(id: string, _prev: ActionState | null, fd: 
     const { error } = await supabase.from("properties").update(values).eq("id", id);
     if (error) throw error;
     await logPropertyEvent(id, "매물 정보 수정");
+    await refreshPropertyLocationFields(supabase, id, values.address);
   } catch (e) {
     return { error: toErrorMessage(e) };
   }

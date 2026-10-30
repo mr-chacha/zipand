@@ -1,10 +1,12 @@
 import { DOC_TYPE_TO_DISCLOSURE_CHECK, type DocType } from "@/lib/constants";
+import { isBlankOrZeroMetric, sortDocsByMergePriority } from "@/lib/doc-extract/form-extras";
 
 export type PropertyDocForDisclosure = {
   id: string;
   docType: string;
   fileName: string;
   issuedAt: string | null;
+  createdAt?: string;
   fields: { label: string; value: string }[];
 };
 
@@ -14,23 +16,30 @@ export type PropertyDocsDisclosureResult = {
   /** UI 안내용 요약 */
   summary: string[];
   documentCount: number;
+  /** 매물에 저장된 카카오 입지(있으면) */
+  locationFields?: Record<string, string>;
 };
 
 /** document_fields.label → 확인설명서 키 (수동 입력분, AI 없음) */
 const LABEL_TO_KEY: Record<string, string> = {
   // 소유자는 갑구보다 짧게 나오므로 갑구 없을 때만 별도 처리
   소재지: "property_address",
+  "토지 소재지": "property_address",
   주용도: "building_use",
   전용면적: "building_area",
+  주구조: "building_structure",
   구조: "building_structure",
   지목: "land_category",
-  면적: "land_area",
+  "토지 지목": "land_category",
   대지면적: "land_area",
+  "토지 면적": "land_area",
   용도지역: "use_zone",
   용도지구: "use_district",
   용도구역: "use_area",
   건폐율: "building_coverage_limit",
+  "건축물 건폐율": "building_coverage_limit",
   용적률: "floor_area_limit",
+  "건축물 용적률": "floor_area_limit",
   개별공시지가: "land_price_per_m2",
 };
 
@@ -46,9 +55,19 @@ function yearFromDate(value: string) {
   return m?.[1] ?? "";
 }
 
+function takeFirst(out: Record<string, string>, key: string, value: string) {
+  if (!out[key]) out[key] = value;
+}
+
+/** 용적률·건폐율·면적 등: 상위 서류가 비어 있거나 0이면 하위 서류 값으로 채운다 */
+function takeMetricField(out: Record<string, string>, key: string, value: string) {
+  if (isBlankOrZeroMetric(out[key])) out[key] = value;
+}
+
 /**
  * 매물에 업로드된 서류·수동 입력 필드를 확인설명서 칸에 매핑한다.
- * document_fields(자동 추출·수동 입력)에 있는 값만 사용한다.
+ * 서류 우선순위는 계약서와 동일(건축물대장 > 부동산종합공부 > 토지대장 > 기타).
+ * 용적률·건폐율 등은 상위 값이 비어 있거나 0이면 종합공부 등 하위 값으로 대체한다.
  */
 export function mapPropertyDocsToDisclosure(
   docs: PropertyDocForDisclosure[],
@@ -66,7 +85,7 @@ export function mapPropertyDocsToDisclosure(
   const summary: string[] = [];
   let ownerName = "";
 
-  // 근거자료 체크: 기본 전부 → 있는 종류만 1
+  // 근거자료 체크: 기본 Unchecked → 있는 종류만 1
   for (const key of [
     "doc_title_deed",
     "doc_registry",
@@ -80,8 +99,9 @@ export function mapPropertyDocsToDisclosure(
   out.doc_other = "";
 
   const otherNames: string[] = [];
+  const sortedDocs = sortDocsByMergePriority(docs);
 
-  for (const doc of docs) {
+  for (const doc of sortedDocs) {
     const docType = doc.docType as DocType;
     const checkKey = DOC_TYPE_TO_DISCLOSURE_CHECK[docType];
     if (checkKey === "doc_other") {
@@ -111,22 +131,52 @@ export function mapPropertyDocsToDisclosure(
         continue;
       }
       if (label === "사용승인일" || label === "사용승인일자") {
-        if (!out.use_approval_date) out.use_approval_date = value;
+        takeFirst(out, "use_approval_date", value);
         const y = yearFromDate(value);
-        if (y && !out.building_year) out.building_year = y;
+        if (y) takeFirst(out, "building_year", y);
         continue;
       }
       if (label === "허가일" || label === "허가일자" || label === "건축허가일") {
-        if (!out.permit_date) out.permit_date = value;
+        takeFirst(out, "permit_date", value);
         continue;
       }
       // 갑구·을구 요약 → 확인설명서 권리관계 (세부 컬럼은 문서 상세에서 검토)
       if (label === "갑구") {
-        if (!out.ownership_building) out.ownership_building = value;
+        takeFirst(out, "ownership_building", value);
+        continue;
+      }
+      if (label === "갑구(소유권에 관한 사항)") {
+        takeFirst(out, "ownership_building", value);
         continue;
       }
       if (label === "을구") {
-        if (!out.rights_building) out.rights_building = value;
+        takeFirst(out, "rights_building", value);
+        continue;
+      }
+      if (label === "을구(소유권 외의 권리에 관한 사항)") {
+        takeFirst(out, "rights_building", value);
+        continue;
+      }
+      if (
+        label === "갑구의 등기목적" ||
+        label === "갑구의 등기원인" ||
+        label === "갑구의 권리자 및 기타사항"
+      ) {
+        out.ownership_building = appendLine(
+          out.ownership_building,
+          `${label.replace(/^갑구의\s*/, "")}: ${value}`
+        );
+        continue;
+      }
+      if (
+        label === "을구의 등기목적" ||
+        label === "을구의 등기원인" ||
+        label === "을구의 권리자 및 기타사항"
+      ) {
+        out.rights_building = appendLine(
+          out.rights_building,
+          `${label.replace(/^을구의\s*/, "")}: ${value}`
+        );
         continue;
       }
       if (
@@ -158,36 +208,51 @@ export function mapPropertyDocsToDisclosure(
       if (label === "발급일") continue;
 
       if (label === "건축면적") {
-        if (!out.arch_area) {
-          const n = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
-          out.arch_area = n?.[1] ?? value;
-        }
+        const n = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+        takeMetricField(out, "arch_area", n?.[1] ?? value);
         continue;
       }
       if (label === "연면적") {
-        if (!out.total_floor_area) {
-          const n = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
-          out.total_floor_area = n?.[1] ?? value;
-        }
+        const n = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+        takeMetricField(out, "total_floor_area", n?.[1] ?? value);
         continue;
       }
 
       if (label === "개별공시지가") {
-        if (!out.land_price_per_m2) {
-          const n = value.replace(/[^\d.]/g, "");
-          out.land_price_per_m2 = n || value;
+        const n = value.replace(/[^\d.]/g, "");
+        takeMetricField(out, "land_price_per_m2", n || value);
+        continue;
+      }
+
+      if (label === "건폐율" || label === "용적률" || label === "건축물 건폐율" || label === "건축물 용적률") {
+        const key = LABEL_TO_KEY[label];
+        if (key) takeMetricField(out, key, value.includes("%") ? value : `${value}%`);
+        continue;
+      }
+
+      if (label === "면적") {
+        if (docType === "건축물대장" || docType === "부동산종합공부") {
+          const n = value.replace(/,/g, "").match(/(\d+(?:\.\d+)?)/);
+          takeMetricField(out, "building_area", n?.[1] ?? value);
+        } else {
+          takeMetricField(out, "land_area", value);
         }
         continue;
       }
 
-      if (label === "건폐율" || label === "용적률") {
-        const key = LABEL_TO_KEY[label];
-        if (key && !out[key]) out[key] = value.includes("%") ? value : `${value}%`;
-        continue;
-      }
-
       const key = LABEL_TO_KEY[label];
-      if (key && !out[key]) out[key] = value;
+      if (!key) continue;
+      if (
+        key === "land_area" ||
+        key === "building_area" ||
+        key === "land_price_per_m2" ||
+        key === "building_coverage_limit" ||
+        key === "floor_area_limit"
+      ) {
+        takeMetricField(out, key, value);
+      } else {
+        takeFirst(out, key, value);
+      }
     }
   }
 

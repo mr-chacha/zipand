@@ -1,8 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DatePicker } from "@/components/form/date-picker";
 import { NativeSelect } from "@/components/form/native-select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,7 +21,7 @@ import {
   LAND_CATEGORIES,
   LEASE_MONTH_OPTIONS,
   RENT_ARREARS_OPTIONS,
-  addMonthsToYmd,
+  leaseExpiryFromStart,
   contractArticle1Text,
   contractArticlesForDeal,
   defaultSpecialTermsForDeal,
@@ -32,6 +39,50 @@ const ASSUME_OPTIONS = [
   { value: "해당없음", label: "해당없음" },
 ] as const;
 
+/** 융자금·현 임대보증금 승계 여부 — 옵션을 트리거 바로 아래에 고정 */
+function AssumeSelect({
+  name,
+  value,
+  onValueChange,
+}: {
+  name: string;
+  value: string;
+  onValueChange: (value: string) => void;
+}) {
+  const label = ASSUME_OPTIONS.find((o) => o.value === value)?.label ?? value;
+  return (
+    <Select
+      name={name}
+      value={value}
+      onValueChange={(next) => {
+        if (next != null) onValueChange(String(next));
+      }}
+    >
+      <SelectTrigger
+        className={cn(
+          "h-8 w-full min-w-0 max-w-full gap-1 rounded-md border-2 border-foreground/35 bg-background px-2 text-[14px] shadow-none",
+          "focus-visible:border-foreground/60 focus-visible:ring-1 app:h-8"
+        )}
+      >
+        <SelectValue className="min-w-0 truncate">{label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent
+        side="bottom"
+        align="start"
+        sideOffset={4}
+        alignItemWithTrigger={false}
+        className="z-[200] min-w-(--anchor-width) w-max max-w-[min(100vw,22rem)]"
+      >
+        {ASSUME_OPTIONS.map((o) => (
+          <SelectItem key={o.value} value={o.value} className="text-[14px]">
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 const fieldBorder =
   "rounded-md border-2 border-foreground/35 bg-background shadow-none focus-visible:border-foreground/60 focus-visible:ring-1";
 
@@ -47,36 +98,60 @@ function normalizeLeaseMonths(raw: string | undefined) {
 }
 
 /** 임대차 제2조 [존속기간]: 인도일·만기일·계약개월(1~24, 기본 24) */
-function LeaseTermClause({ data }: { data: Record<string, string> }) {
+function LeaseTermClause({
+  data,
+  balanceDate,
+  onDeliveryDateChange,
+}: {
+  data: Record<string, string>;
+  /** 계약내용 잔금일 — 있으면 인도일·만기일(+2년)에 반영 */
+  balanceDate?: string;
+  /** 인도일 변경 시 잔금일도 맞춤 */
+  onDeliveryDateChange?: (ymd: string) => void;
+}) {
+  const initialStart =
+    data.delivery_date ||
+    data.move_in_date ||
+    data.lease_start_date ||
+    data.balance_date ||
+    "";
   const [months, setMonths] = useState(() => normalizeLeaseMonths(data.lease_months));
-  const [delivery, setDelivery] = useState(
-    () => data.delivery_date ?? data.move_in_date ?? ""
-  );
+  const [delivery, setDelivery] = useState(() => initialStart);
   const [leaseStart, setLeaseStart] = useState(
-    () =>
-      data.lease_start_date ||
-      data.delivery_date ||
-      data.move_in_date ||
-      ""
+    () => data.lease_start_date || initialStart
   );
   const [expiry, setExpiry] = useState(() => {
     if (data.expiry_date) return data.expiry_date;
-    const start =
-      data.lease_start_date ||
-      data.delivery_date ||
-      data.move_in_date ||
-      "";
-    return start
-      ? addMonthsToYmd(start, Number(normalizeLeaseMonths(data.lease_months)))
+    return initialStart
+      ? leaseExpiryFromStart(initialStart, Number(normalizeLeaseMonths(data.lease_months)))
       : "";
   });
   const [dayRule, setDayRule] = useState(data.day_count_rule || "초일불산입");
 
   const syncExpiry = (start: string, monthStr: string) => {
     if (!start) return;
-    const next = addMonthsToYmd(start, Number(monthStr));
+    const next = leaseExpiryFromStart(start, Number(monthStr));
     if (next) setExpiry(next);
   };
+
+  const applyStartDate = (ymd: string, opts?: { syncBalance?: boolean; resetMonths?: boolean }) => {
+    const d = ymd.trim();
+    setDelivery(d);
+    setLeaseStart(d);
+    const monthStr = opts?.resetMonths ? "24" : months;
+    if (opts?.resetMonths) setMonths("24");
+    syncExpiry(d, monthStr);
+    if (opts?.syncBalance !== false) onDeliveryDateChange?.(d);
+  };
+
+  // 잔금일 → 인도일, 인도일+24개월−1일 → 만기일 (예: 12.25 → 24개월 후 12.24)
+  useEffect(() => {
+    const d = balanceDate?.trim();
+    if (!d || d === delivery.trim()) return;
+    applyStartDate(d, { syncBalance: false, resetMonths: true });
+    // balanceDate만 외부 동기화 트리거 — delivery는 의도적으로 의존에서 제외
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [balanceDate]);
 
   return (
     <span className="inline">
@@ -84,11 +159,7 @@ function LeaseTermClause({ data }: { data: Record<string, string> }) {
       <DatePicker
         name="delivery_date"
         value={delivery}
-        onChange={(v) => {
-          setDelivery(v);
-          setLeaseStart(v);
-          syncExpiry(v, months);
-        }}
+        onChange={(v) => applyStartDate(v, { syncBalance: true })}
         className="mx-1 inline-flex min-w-36 align-baseline"
         inputClassName="h-7 border-0 border-b border-dotted border-foreground/50 rounded-none px-1"
       />{" "}
@@ -172,7 +243,10 @@ function LeaseTerminateClause({
   );
 }
 
-/** 만원 저장값 ↔ 원 표시(쉼표). 입력 중에는 원 자릿수를 유지하고, blur 시 만원 단위로 맞춘다. */
+/**
+ * 금액 입력(만원 단위): 포커스 중 숫자, blur 시 한글(사억육천오백만).
+ * 원정 옆에는 원 환산액(쉼표)을 TermsRow detail에 표시한다.
+ */
 function WonAmountInput({
   name,
   manwon,
@@ -184,46 +258,52 @@ function WonAmountInput({
   onManwonChange?: (manwon: string) => void;
   className?: string;
 }) {
-  /** null이면 manwon에서 표시, 문자열이면 입력 중인 원 자리 */
+  /** null이면 blur(한글) 표시, 문자열이면 입력 중인 만원 자리 */
   const [draft, setDraft] = useState<string | null>(null);
-  const wonFromManwon = (() => {
-    const won = parseManwon(manwon) * 10_000;
-    return won > 0 ? String(won) : "";
-  })();
-  const wonDigits = draft !== null ? draft : wonFromManwon;
-
-  const commitManwon = (digits: string) => {
-    if (!onManwonChange) return;
-    if (!digits) {
-      onManwonChange("");
-      return;
-    }
-    onManwonChange(String(Math.floor(Number(digits) / 10_000)));
-  };
+  const manwonNum = parseManwon(manwon);
+  const manwonDigits = manwonNum > 0 ? String(manwonNum) : "";
+  const hangul = manwonToHangul(manwonNum).replace(/원$/, "");
+  const editing = draft !== null;
+  const digits = editing ? draft : manwonDigits;
+  const displayValue = editing
+    ? digits
+      ? formatNumberInput(digits)
+      : ""
+    : hangul;
 
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
       <Input
         inputMode="numeric"
         autoComplete="off"
-        value={wonDigits ? formatNumberInput(wonDigits) : ""}
-        onFocus={() => setDraft(wonFromManwon)}
+        value={displayValue}
+        onFocus={() => setDraft(manwonDigits)}
         onBlur={() => setDraft(null)}
         onChange={(e) => {
-          const digits = e.target.value
+          const next = e.target.value
             .replace(/\D/g, "")
             .replace(/^0+(?=\d)/, "")
-            .slice(0, 15);
-          setDraft(digits);
-          commitManwon(digits);
+            .slice(0, 12);
+          setDraft(next);
+          onManwonChange?.(next);
         }}
-        placeholder="0"
+        placeholder="만원"
         className={cn(
-          "h-8 min-w-0 flex-1 text-[14px] tabular-nums md:text-[14px] app:text-[14px]",
+          "h-8 min-w-0 flex-1 text-[14px] md:text-[14px] app:text-[14px]",
+          editing ? "tabular-nums" : null,
           fieldBorder
         )}
       />
-      <span className="shrink-0 text-muted-foreground">원</span>
+      {/* 한글 표시 때는 '원정' 칸과 겹치지 않게 자리만 맞춤 */}
+      <span
+        className={cn(
+          "shrink-0 text-muted-foreground",
+          !editing && hangul ? "invisible select-none" : null
+        )}
+        aria-hidden={!editing && Boolean(hangul)}
+      >
+        만원
+      </span>
       <input type="hidden" name={name} value={manwon} />
     </div>
   );
@@ -415,9 +495,13 @@ function TermsRow({
 function ContractTermsTable({
   dealType,
   data,
+  balanceDate,
+  onBalanceDateChange,
 }: {
   dealType: ContractDealType;
   data: Record<string, string>;
+  balanceDate: string;
+  onBalanceDateChange: (value: string) => void;
 }) {
   const isSale = dealType === "매매";
   const isMonthly = dealType === "월세";
@@ -520,7 +604,12 @@ function ContractTermsTable({
         name="down_payment_date"
         value={data.down_payment_date ?? ""}
       />
-      <table className="w-full border-collapse border text-[14px] print:border-b-0">
+      <table
+        className={cn(
+          "contract-terms-table w-full border-collapse border text-[14px] print:border-b-0",
+          isSale && "contract-terms-table-sale"
+        )}
+      >
         <tbody>
           <TermsRow
             className={isSale ? "print:hidden" : undefined}
@@ -534,9 +623,9 @@ function ContractTermsTable({
             }
             mid="원정"
             detail={
-              amount ? (
-                <span className="text-muted-foreground tabular-nums">
-                  (₩ {formatNumberInput(String(parseManwon(amount) * 10_000))})
+              parseManwon(amount) > 0 ? (
+                <span className="tabular-nums text-foreground">
+                  {formatNumberInput(String(parseManwon(amount) * 10_000))}
                 </span>
               ) : null
             }
@@ -578,13 +667,10 @@ function ContractTermsTable({
                 }
                 mid="원정은"
                 detail={
-                  <NativeSelect
+                  <AssumeSelect
                     name="loan_assume"
                     value={loanAssume}
-                    onChange={(e) => setLoanAssume(e.target.value)}
-                    options={[...ASSUME_OPTIONS]}
-                    className="min-w-0 w-full"
-                    selectClassName={cn("h-8", fieldBorder, "app:h-8")}
+                    onValueChange={setLoanAssume}
                   />
                 }
               />
@@ -600,13 +686,10 @@ function ContractTermsTable({
                 }
                 mid="원정은"
                 detail={
-                  <NativeSelect
+                  <AssumeSelect
                     name="deposit_assume"
                     value={depositAssume}
-                    onChange={(e) => setDepositAssume(e.target.value)}
-                    options={[...ASSUME_OPTIONS]}
-                    className="min-w-0 w-full"
-                    selectClassName={cn("h-8", fieldBorder, "app:h-8")}
+                    onValueChange={setDepositAssume}
                   />
                 }
               />
@@ -667,7 +750,7 @@ function ContractTermsTable({
               isSale
                 ? undefined
                 : printOptional(balanceManwon > 0 || Boolean(data.balance_date)),
-              !isMonthly && "print:border-b-0"
+              "contract-balance-row"
             )}
             label="잔금"
             amount={
@@ -678,7 +761,8 @@ function ContractTermsTable({
               <>
                 <DatePicker
                   name="balance_date"
-                  defaultValue={data.balance_date ?? ""}
+                  value={balanceDate}
+                  onChange={onBalanceDateChange}
                   className="min-w-0 flex-1"
                   inputClassName="h-8"
                 />
@@ -1268,6 +1352,7 @@ export function ContractFormSheet({
   const [specialTerms, setSpecialTerms] = useState(
     () => data.special_terms || defaultSpecialTermsForDeal(dealType)
   );
+  const [balanceDate, setBalanceDate] = useState(data.balance_date ?? "");
 
   return (
     <div
@@ -1290,7 +1375,7 @@ export function ContractFormSheet({
         <h3 className="mb-2 font-bold print:mb-0 print:border-b print:border-black">
           1. 부동산의 표시
         </h3>
-        <table className="w-full border-collapse border text-[14px] print:border-t-0">
+        <table className="contract-property-table w-full border-collapse border text-[14px] print:border-t-0">
           <tbody>
             <tr className="border-b">
               <th className="w-28 border-r bg-muted/40 px-2 py-1.5 text-left">
@@ -1307,18 +1392,20 @@ export function ContractFormSheet({
                     )}
                     placeholder="주소"
                   />
-                  <span className="text-muted-foreground">동</span>
                   <CellInput
                     name="building"
                     data={data}
                     className={cn("w-16 bg-background px-1.5", fieldBorder)}
+                    placeholder="동"
                   />
-                  <span className="text-muted-foreground">호</span>
+                  <span className="text-muted-foreground">동</span>
                   <CellInput
                     name="unit"
                     data={data}
                     className={cn("w-16 bg-background px-1.5", fieldBorder)}
+                    placeholder="호"
                   />
+                  <span className="text-muted-foreground">호</span>
                 </div>
               </td>
             </tr>
@@ -1475,13 +1562,18 @@ export function ContractFormSheet({
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <h3 className="font-bold">2. 계약내용</h3>
           <p className="text-[14px] text-muted-foreground print:hidden">
-            입력·표시: 원 (저장은 만원 단위)
+            금액은 만원 단위로 입력 · 다음 칸으로 이동하면 한글로 표시
           </p>
         </div>
         <p className="mb-2 text-[14px] leading-relaxed text-muted-foreground print:mb-0 print:text-[10.5px] print:leading-relaxed print:text-foreground">
           {contractArticle1Text(dealType)}
         </p>
-        <ContractTermsTable dealType={dealType} data={data} />
+        <ContractTermsTable
+          dealType={dealType}
+          data={data}
+          balanceDate={balanceDate}
+          onBalanceDateChange={setBalanceDate}
+        />
       </section>
 
       {/* 일반조항 제2조~제9조 + 추가 특약 (매매·임대차 조항 상이, 협회 PDF 원문) */}
@@ -1493,7 +1585,11 @@ export function ContractFormSheet({
                 제{article.no}조 [{article.title}]
               </strong>
               {"variant" in article && article.variant === "lease_term" ? (
-                <LeaseTermClause data={data} />
+                <LeaseTermClause
+                  data={data}
+                  balanceDate={isSale ? undefined : balanceDate}
+                  onDeliveryDateChange={isSale ? undefined : setBalanceDate}
+                />
               ) : "variant" in article && article.variant === "lease_terminate" ? (
                 <LeaseTerminateClause
                   data={data}

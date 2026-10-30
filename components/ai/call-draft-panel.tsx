@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { analyzeCallAudio } from "@/lib/actions/ai-assist";
 import type { ConsultationDraft, PropertyMatch } from "@/lib/ai/types";
+import { useBusy } from "@/lib/busy";
 import type { Customer } from "@/types";
 import { ConsultResultDialog } from "./consult-result-dialog";
 
@@ -30,6 +31,7 @@ export function CallDraftPanel({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ConsultationDraft | null>(null);
   const [matches, setMatches] = useState<PropertyMatch[]>([]);
+  useBusy(pending, "통화 녹음을 AI로 분석하고 있습니다…");
 
   const run = () => {
     if (!audio) {
@@ -94,7 +96,7 @@ export function CallDraftPanel({
             idleText="통화 녹음 파일을 선택하세요"
           />
           <Button type="button" disabled={!audio || busy || pending} onClick={run}>
-            {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Sparkles data-icon="inline-start" />}
+            <Sparkles data-icon="inline-start" />
             AI로 고객 정보 채우기
           </Button>
         </CardContent>

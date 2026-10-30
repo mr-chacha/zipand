@@ -51,10 +51,10 @@ const features = [
   },
   {
     icon: Bot,
-    title: "광고 문구 · 입지",
-    description: "매물 광고 문구와 확인설명서 입지 조건을 AI 초안으로 채워요.",
-    href: "/settings?tab=subscription",
-    cta: "AI·요금 설정",
+    title: "광고 문구 · 주변 입지",
+    description: "카카오 주변 장소를 조회해 AI 광고 문구와 확인설명서 입지 조건을 채워요.",
+    href: "/properties",
+    cta: "매물 관리",
   },
 ];
 

@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth";
 import { DOC_TYPES, SIGNAL_LEVELS, type DocType } from "@/lib/constants";
 import { int, oneOf, requiredStr, str, toErrorMessage } from "@/lib/form";
 import type { ActionState } from "@/types";
-import { extractDocumentFields } from "./document-extract";
 import { logPropertyEvent } from "./properties";
 
 interface NewDocument {
@@ -16,8 +15,6 @@ interface NewDocument {
   storagePath: string;
   fileSize: number;
   issuedAt: string | null;
-  /** false면 업로드만 (기본: PDF일 때 자동 추출) */
-  skipExtract?: boolean;
 }
 
 export async function createDocument(input: NewDocument): Promise<ActionState & { id?: string }> {
@@ -45,25 +42,7 @@ export async function createDocument(input: NewDocument): Promise<ActionState & 
   revalidatePath("/documents");
   revalidatePath(`/properties/${input.propertyId}`);
 
-  const isPdf = input.fileName.toLowerCase().endsWith(".pdf");
-  if (!input.skipExtract && isPdf) {
-    const extracted = await extractDocumentFields(data.id);
-    if (extracted.count && extracted.count > 0) {
-      return {
-        message: `업로드했어요. ${extracted.count}개 항목을 자동으로 채웠어요. 값을 검토해 주세요.`,
-        id: data.id,
-      };
-    }
-    // 스캔 PDF 등 — 업로드 자체는 성공
-    return {
-      message: extracted.error
-        ? "업로드했어요. 자동 추출은 못 했어요(스캔본일 수 있어요). 문서 상세에서 다시 시도하거나 직접 입력해 주세요."
-        : "업로드했어요. 핵심 항목을 정리해 주세요.",
-      id: data.id,
-    };
-  }
-
-  return { message: "업로드했어요.", id: data.id };
+  return { message: "업로드했어요. 서류 목록에서 선택한 뒤 AI 추출을 실행해 주세요.", id: data.id };
 }
 
 export async function deleteDocument(id: string): Promise<ActionState> {
@@ -90,7 +69,12 @@ async function markNeedsReview(documentId: string) {
   const { supabase } = await getSession();
   await supabase
     .from("documents")
-    .update({ status: "검토 필요", reviewed_at: null, reviewed_by: null })
+    .update({
+      status: "검토 필요",
+      extraction_status: "검토 필요",
+      reviewed_at: null,
+      reviewed_by: null,
+    })
     .eq("id", documentId);
 }
 
@@ -134,8 +118,39 @@ export async function deleteDocumentField(fieldId: string, documentId: string): 
   const { supabase } = await getSession();
   const { error } = await supabase.from("document_fields").delete().eq("id", fieldId);
   if (error) return { error: toErrorMessage(error) };
+  await markNeedsReview(documentId);
   revalidatePath(`/documents/${documentId}`);
   return { message: "항목을 삭제했어요." };
+}
+
+export async function updateDocumentField(
+  fieldId: string,
+  documentId: string,
+  _prev: ActionState | null,
+  fd: FormData
+): Promise<ActionState> {
+  const { supabase } = await getSession();
+  try {
+    const { error } = await supabase
+      .from("document_fields")
+      .update({
+        label: requiredStr(fd, "label", "항목명"),
+        value: requiredStr(fd, "value", "값"),
+        page: int(fd, "page"),
+        evidence_text: str(fd, "evidence_text"),
+        confidence: null,
+        ai_generated: false,
+        reviewed: false,
+      })
+      .eq("id", fieldId)
+      .eq("document_id", documentId);
+    if (error) throw error;
+    await markNeedsReview(documentId);
+  } catch (e) {
+    return { error: toErrorMessage(e) };
+  }
+  revalidatePath(`/documents/${documentId}`);
+  return { message: "추출 항목을 수정했어요. 원문과 다시 대조해 주세요." };
 }
 
 export async function addDocumentSignal(documentId: string, _prev: ActionState | null, fd: FormData): Promise<ActionState> {
@@ -151,6 +166,7 @@ export async function addDocumentSignal(documentId: string, _prev: ActionState |
       next_action: str(fd, "next_action"),
     });
     if (error) throw error;
+    await markNeedsReview(documentId);
   } catch (e) {
     return { error: toErrorMessage(e) };
   }
@@ -162,8 +178,21 @@ export async function deleteDocumentSignal(signalId: string, documentId: string)
   const { supabase } = await getSession();
   const { error } = await supabase.from("document_signals").delete().eq("id", signalId);
   if (error) return { error: toErrorMessage(error) };
+  await markNeedsReview(documentId);
   revalidatePath(`/documents/${documentId}`);
   return { message: "확인 사항을 삭제했어요." };
+}
+
+export async function setSignalReviewed(
+  signalId: string,
+  documentId: string,
+  reviewed: boolean
+): Promise<ActionState> {
+  const { supabase } = await getSession();
+  const { error } = await supabase.from("document_signals").update({ reviewed }).eq("id", signalId);
+  if (error) return { error: toErrorMessage(error) };
+  if (!reviewed) await markNeedsReview(documentId);
+  return {};
 }
 
 export async function completeReview(documentId: string): Promise<ActionState> {
@@ -175,9 +204,21 @@ export async function completeReview(documentId: string): Promise<ActionState> {
     .eq("reviewed", false);
   if (count) return { error: `확인하지 않은 항목이 ${count}개 있어요.` };
 
+  const { count: signalCount } = await supabase
+    .from("document_signals")
+    .select("id", { count: "exact", head: true })
+    .eq("document_id", documentId)
+    .eq("reviewed", false);
+  if (signalCount) return { error: `확인하지 않은 확인 사항이 ${signalCount}개 있어요.` };
+
   const { data: doc, error } = await supabase
     .from("documents")
-    .update({ status: "검토 완료", reviewed_by: profile.id, reviewed_at: new Date().toISOString() })
+    .update({
+      status: "검토 완료",
+      extraction_status: "추출 완료",
+      reviewed_by: profile.id,
+      reviewed_at: new Date().toISOString(),
+    })
     .eq("id", documentId)
     .select("property_id, doc_type")
     .single();

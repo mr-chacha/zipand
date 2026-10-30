@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Copy, ExternalLink, EyeOff, Link2, Loader2, Printer, Sparkles, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, EyeOff, Link2, Printer, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { BriefingView, DEFAULT_SECTIONS, type BriefingData } from "@/components/briefing-view";
 import { AiAccessBadge } from "@/components/ai/ai-access-badge";
@@ -147,11 +147,7 @@ export function BriefingBuilder({
                   });
                 }}
               >
-                {aiPending ? (
-                  <Loader2 className="animate-spin" data-icon="inline-start" />
-                ) : (
-                  <Sparkles data-icon="inline-start" />
-                )}
+                <Sparkles data-icon="inline-start" />
                 AI로 설명 작성
               </Button>
               <AiAccessBadge available={aiAvailable} compact />
@@ -186,7 +182,7 @@ export function BriefingBuilder({
                 />
               </div>
               <Button onClick={() => officeGuard.guard(create)} disabled={pending}>
-                {pending ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Link2 data-icon="inline-start" />}
+                <Link2 data-icon="inline-start" />
                 링크 생성·복사
               </Button>
             </div>

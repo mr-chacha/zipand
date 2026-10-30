@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { FileAudio, Link2, Link2Off, ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { FileAudio, Link2, Link2Off, ListChecks, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { ConsultResultDialog } from "@/components/ai/consult-result-dialog";
@@ -220,11 +220,7 @@ export function ConsultationPanel({
                       disabled={aiPending}
                       onClick={() => runAi(c.id)}
                     >
-                      {aiPending ? (
-                        <Loader2 className="animate-spin" data-icon="inline-start" />
-                      ) : (
-                        <Sparkles data-icon="inline-start" />
-                      )}
+                      <Sparkles data-icon="inline-start" />
                       AI 요약·고객 반영
                     </Button>
                     <AiAccessBadge available={aiAvailable} compact />

@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useBusy } from "@/lib/busy";
 
 interface BaseDialogProps {
   open?: boolean;
@@ -28,7 +29,9 @@ function DialogHead({ title, description, icon }: Pick<BaseDialogProps, "title" 
     <AlertDialogHeader>
       {icon && <AlertDialogMedia>{icon}</AlertDialogMedia>}
       <AlertDialogTitle>{title}</AlertDialogTitle>
-      {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
+      {description && (
+        <AlertDialogDescription className="whitespace-pre-line">{description}</AlertDialogDescription>
+      )}
     </AlertDialogHeader>
   );
 }
@@ -78,6 +81,7 @@ export function ConfirmDialog({
   pending?: boolean;
   onConfirm: () => void;
 }) {
+  useBusy(Boolean(pending), pendingLabel);
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       {trigger && <AlertDialogTrigger render={trigger} />}
@@ -86,7 +90,7 @@ export function ConfirmDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{cancelLabel}</AlertDialogCancel>
           <AlertDialogAction variant={destructive ? "destructive" : "default"} onClick={onConfirm} disabled={pending}>
-            {pending ? pendingLabel : confirmLabel}
+            {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

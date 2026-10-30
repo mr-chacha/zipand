@@ -148,7 +148,7 @@ export async function extractDocumentFields(documentId: string): Promise<ActionS
         }
         // 건축물대장·종합공부: 해당 동 기준 구조·주용도를 매물에 저장(대장 값이 있으면 갱신)
         if (doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부") {
-          const structure = parsed.fields.find((f) => f.label === "구조")?.value?.trim();
+          const structure = parsed.fields.find((f) => f.label === "주구조" || f.label === "구조")?.value?.trim();
           const mainUse = parsed.fields.find((f) => f.label === "주용도")?.value?.trim();
           if (structure) patch.structure = structure;
           if (mainUse) patch.main_use = mainUse;
@@ -189,11 +189,7 @@ export async function extractDocumentFields(documentId: string): Promise<ActionS
 
 /**
  * AI로 공부서류 항목·확인 사항을 추출한다.
- * 텍스트 PDF는 규칙 추출이 약한 경우에도 LLM으로 보강하고, 스캔본은 Gemini 파일 첨부로 시도한다.
- *
- * TODO(문서 AI 추출): 당분간 UI에서 비활성(규칙 기반 「자동 추출」만 노출).
- * 다시 켤 때 document-review의 AI 추출 버튼·AiAccessBadge를 복구하고 이 액션을 연결한다.
- * 구현 본체는 lib/ai/run-document.ts 에 유지.
+ * 등기는 전체 원문을 바탕으로 현재 유효한 권리와 확인 사항을 요약한다.
  */
 export async function extractDocumentFieldsAi(documentId: string): Promise<ActionState & { count?: number }> {
   const { supabase, office } = await getSession();
@@ -208,6 +204,25 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       .maybeSingle();
     if (error) throw error;
     if (!doc) return { error: "문서를 찾을 수 없어요." };
+
+    let propertyBuilding: string | null = null;
+    let propertyUnit: string | null = null;
+    if (doc.property_id) {
+      const { data: property } = await supabase
+        .from("properties")
+        .select("building, unit, area_m2, structure, main_use")
+        .eq("id", doc.property_id)
+        .maybeSingle();
+      propertyBuilding = property?.building ?? null;
+      propertyUnit = property?.unit ?? null;
+    }
+
+    await supabase
+      .from("documents")
+      .update({ extraction_status: "추출 중", extraction_error: null })
+      .eq("id", id);
+    revalidatePath("/documents");
+    revalidatePath(`/documents/${id}`);
 
     const ai = resolveAiProvider(office.ai_provider);
     await consumeAiCredit(supabase, office, 1);
@@ -239,11 +254,28 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       mime,
       bytes,
       textHint,
+      propertyBuilding,
+      propertyUnit,
     });
 
     if (!parsed.fields.length && !parsed.signals.length) {
-      return { error: "AI가 항목을 찾지 못했어요. 원문을 대조해 직접 입력해 주세요." };
+      throw new FormError("AI가 항목을 찾지 못했어요. 원문을 대조해 직접 입력해 주세요.");
     }
+
+    // 등기·건축물대장은 과거 OCR·규칙 추출 항목을 남기지 않고 지정된 AI 항목으로 완전히 교체한다.
+    // 다른 서류는 직전 AI 결과만 교체하고 사용자가 직접 입력한 항목을 보존한다.
+    const replaceAllFields =
+      doc.doc_type === "등기사항증명서" || doc.doc_type === "건축물대장" || doc.doc_type === "부동산종합공부";
+    let deleteFields = supabase.from("document_fields").delete().eq("document_id", id);
+    let deleteSignals = supabase.from("document_signals").delete().eq("document_id", id);
+    if (!replaceAllFields) {
+      deleteFields = deleteFields.eq("ai_generated", true);
+      deleteSignals = deleteSignals.eq("ai_generated", true);
+    }
+    const { error: deleteFieldError } = await deleteFields;
+    if (deleteFieldError) throw deleteFieldError;
+    const { error: deleteSignalError } = await deleteSignals;
+    if (deleteSignalError) throw deleteSignalError;
 
     const { data: existing } = await supabase.from("document_fields").select("label").eq("document_id", id);
     const have = new Set((existing ?? []).map((f) => f.label));
@@ -255,7 +287,9 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
         label: f.label,
         value: f.value,
         evidence_text: f.evidence_text,
-        page: null as number | null,
+        page: f.page,
+        confidence: f.confidence,
+        ai_generated: true,
         reviewed: false,
       }));
 
@@ -264,16 +298,27 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       if (insErr) throw insErr;
     }
 
-    for (const f of parsed.fields.filter((x) => have.has(x.label))) {
-      await supabase
+    for (const f of parsed.fields.filter((field) => have.has(field.label))) {
+      const { error: updateError } = await supabase
         .from("document_fields")
-        .update({ value: f.value, evidence_text: f.evidence_text, reviewed: false })
+        .update({
+          value: f.value,
+          evidence_text: f.evidence_text,
+          page: f.page,
+          confidence: f.confidence,
+          ai_generated: true,
+          reviewed: false,
+        })
         .eq("document_id", id)
         .eq("label", f.label);
+      if (updateError) throw updateError;
     }
 
     if (parsed.signals.length) {
-      const { data: sigExist } = await supabase.from("document_signals").select("title").eq("document_id", id);
+      const { data: sigExist } = await supabase
+        .from("document_signals")
+        .select("title")
+        .eq("document_id", id);
       const sigHave = new Set((sigExist ?? []).map((s) => s.title));
       const sigRows = parsed.signals
         .filter((s) => !sigHave.has(s.title))
@@ -284,7 +329,10 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
           description: s.description,
           evidence_text: s.evidence_text,
           next_action: s.next_action,
-          page: null as number | null,
+          page: s.page,
+          confidence: s.confidence,
+          ai_generated: true,
+          reviewed: false,
         }));
       if (sigRows.length) {
         const { error: sigErr } = await supabase.from("document_signals").insert(sigRows);
@@ -292,16 +340,91 @@ export async function extractDocumentFieldsAi(documentId: string): Promise<Actio
       }
     }
 
-    await supabase.from("documents").update({ status: "검토 필요", reviewed_at: null, reviewed_by: null }).eq("id", id);
+    if (doc.property_id && doc.doc_type === "건축물대장") {
+      const { data: prop } = await supabase
+        .from("properties")
+        .select("area_m2, structure, main_use")
+        .eq("id", doc.property_id)
+        .maybeSingle();
+      if (prop) {
+        const patch: { area_m2?: number; structure?: string; main_use?: string } = {};
+        const areaField = parsed.fields.find((f) => f.label === "면적");
+        if (areaField && (prop.area_m2 == null || prop.area_m2 === 0)) {
+          const n = Number(areaField.value.replace(/,/g, "").match(/\d+(?:\.\d+)?/)?.[0] ?? "");
+          if (Number.isFinite(n) && n > 0) patch.area_m2 = n;
+        }
+        const structure = parsed.fields.find((f) => f.label === "주구조")?.value?.trim();
+        const mainUse = parsed.fields.find((f) => f.label === "주용도")?.value?.trim();
+        if (structure && structure !== "확인 필요") patch.structure = structure;
+        if (mainUse && mainUse !== "확인 필요") patch.main_use = mainUse;
+        if (Object.keys(patch).length) {
+          await supabase.from("properties").update(patch).eq("id", doc.property_id);
+          revalidatePath(`/properties/${doc.property_id}`);
+          revalidatePath("/properties");
+          revalidatePath("/contracts");
+        }
+      }
+    }
+
+    await supabase
+      .from("documents")
+      .update({
+        status: "검토 필요",
+        extraction_status: "검토 필요",
+        extraction_error: null,
+        extracted_at: new Date().toISOString(),
+        reviewed_at: null,
+        reviewed_by: null,
+      })
+      .eq("id", id);
     await logPropertyEvent(doc.property_id, `${doc.doc_type} AI 추출 (${toInsert.length}항목)`);
     revalidatePath(`/documents/${id}`);
     revalidatePath("/documents");
 
     return {
-      message: `AI로 ${toInsert.length || parsed.fields.length}개 항목을 채웠어요. 원문과 대조한 뒤 검토 완료해 주세요.`,
-      count: toInsert.length || parsed.fields.length,
+      message: `AI로 ${parsed.fields.length}개 항목과 ${parsed.signals.length}개 확인 사항을 정리했어요. 원문과 대조한 뒤 검토 완료해 주세요.`,
+      count: parsed.fields.length + parsed.signals.length,
     };
   } catch (e) {
-    return { error: toErrorMessage(e) };
+    const message = toErrorMessage(e);
+    await supabase
+      .from("documents")
+      .update({ extraction_status: "추출 실패", extraction_error: message })
+      .eq("id", id);
+    revalidatePath(`/documents/${id}`);
+    revalidatePath("/documents");
+    return { error: message };
   }
+}
+
+export type BatchDocumentAiResult = ActionState & {
+  succeeded?: number;
+  failed?: number;
+};
+
+/** 서류 목록에서 선택한 문서를 순서대로 AI 추출한다. 문서마다 AI 사용량 1회가 차감된다. */
+export async function extractDocumentsAi(documentIds: string[]): Promise<BatchDocumentAiResult> {
+  const ids = [...new Set(documentIds.map((id) => id.trim()).filter(Boolean))];
+  if (!ids.length) return { error: "AI 추출할 서류를 선택해 주세요." };
+  if (ids.length > 10) return { error: "AI 추출은 한 번에 최대 10건까지 선택할 수 있어요." };
+
+  let succeeded = 0;
+  const errors: string[] = [];
+  for (const id of ids) {
+    const result = await extractDocumentFieldsAi(id);
+    if (result.error) errors.push(result.error);
+    else succeeded += 1;
+  }
+  revalidatePath("/documents");
+  revalidatePath("/properties/[id]", "page");
+  const failed = ids.length - succeeded;
+  return {
+    message:
+      failed > 0
+        ? `${succeeded}건 추출 완료, ${failed}건 실패했어요. 실패한 서류의 상태를 확인해 주세요.`
+        : `${succeeded}건을 AI로 추출했어요. 각 서류의 원문과 대조해 주세요.`,
+    succeeded,
+    failed,
+    ...(succeeded === 0 && errors[0] ? { error: errors[0] } : {}),
+  };
 }

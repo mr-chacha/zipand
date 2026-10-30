@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getSession } from "@/lib/auth";
 import { getOfficeGate } from "@/lib/office-gate";
 import { getPropertyOptions } from "@/lib/queries";
+import { DocumentIssueLinks } from "./document-issue-links";
 import { DocumentUploader } from "./document-uploader";
 import {
   PropertyDocumentsTable,
@@ -27,7 +28,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
     supabase
       .from("properties")
       .select(
-        "id, title, address, property_type, deal_type, updated_at, documents(id, doc_type, file_name, status, issued_at, created_at)"
+        "id, title, address, property_type, deal_type, updated_at, documents(id, doc_type, file_name, status, extraction_status, extraction_error, issued_at, created_at)"
       )
       .order("updated_at", { ascending: false }),
     getPropertyOptions(),
@@ -69,7 +70,7 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
         description={
           selectedTitle
             ? `「${selectedTitle}」 서류 · 등기·건축물대장 등을 업로드·검토할 수 있어요.`
-            : "등록한 매물별로 등기·건축물대장·지적도 등 보관 서류를 보고, 업로드·검토할 수 있어요. 문서 상세에서 PDF 자동 추출로 면적·구조를 채울 수 있어요."
+            : "등록한 매물별 보관 서류와 AI 추출·검토 상태를 확인할 수 있어요."
         }
         backHref={selectedPropertyId ? `/properties/${selectedPropertyId}` : undefined}
         backLabel={selectedPropertyId ? "매물 상세" : undefined}
@@ -95,22 +96,19 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
           </CardContent>
         </Card>
         <div className="space-y-4 lg:col-span-2">
+          <DocumentIssueLinks />
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="flex items-center gap-2 text-base">
                 <FileSearch className="size-4 text-primary" />
-                PDF 자동 추출
+                AI 추출 안내
               </CardTitle>
               <CardDescription>
-                PDF를 올리면 전용면적·구조·소유자 등을 자동으로 읽어요. 문서 상세에서 값을 검토하면 확인설명서·계약서에 반영됩니다.
-                스캔(사진) PDF는 인식이 어려울 수 있어요 — 그때는 「자동 추출」을 다시 누르거나 직접 입력하세요.
+                매물 목록에서 매물의 「서류」 탭을 열고 분석할 문서를 선택해 AI 추출을 해서 계약서 작성시간을 줄일 수 있어요.
               </CardDescription>
             </CardHeader>
           </Card>
-          <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
-            <ShieldCheck className="mt-0.5 size-4 shrink-0" />
-            업로드한 문서는 비공개 저장소에 보관되고, 같은 사무소 구성원만 열람할 수 있어요. 열람 링크는 1시간 후 만료돼요.
-          </div>
+         
         </div>
       </div>
 
@@ -119,9 +117,6 @@ export default async function DocumentsPage({ searchParams }: PageProps<"/docume
           <div>
             <h2 className="text-base font-semibold">
               매물별 보관 문서
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                매물 {properties.length} · 서류 {totalDocs}건
-              </span>
             </h2>
             {selectedTitle ? (
               <p className="mt-1 text-xs text-muted-foreground">

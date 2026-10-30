@@ -22,14 +22,16 @@ export function DisclosurePageTabs({
   page,
   onPageChange,
   className,
+  pageCount = 4,
 }: {
   page: DisclosurePageNo;
   onPageChange: (page: DisclosurePageNo) => void;
   className?: string;
+  pageCount?: 3 | 4;
 }) {
   return (
     <div className={cn("flex flex-wrap gap-1 bg-muted px-4 py-2 print:hidden", className)}>
-      {DISCLOSURE_PAGES.map((p) => (
+      {DISCLOSURE_PAGES.filter((p) => p.no <= pageCount).map((p) => (
         <button
           key={p.no}
           type="button"
@@ -180,17 +182,19 @@ function Page({
   active,
   children,
   className,
+  lastPage = false,
 }: {
   no: DisclosurePageNo;
   active: boolean;
   children: React.ReactNode;
   className?: string;
+  lastPage?: boolean;
 }) {
   return (
     <section
       className={cn(
         "disclosure-page space-y-2 border border-foreground/30 bg-white p-3 print:break-after-page print:border-0 print:p-0",
-        no === 4 && "print:break-after-auto",
+        (no === 4 || lastPage) && "print:break-after-auto",
         active ? "block" : "hidden print:block",
         className
       )}
@@ -318,6 +322,108 @@ function formatWon(v: string | undefined) {
   return n.toLocaleString("ko-KR");
 }
 
+/** 비주거용 건축물 확인·설명서 — 3쪽 서식 */
+export function NonResidentialDisclosureFormSheet({
+  title,
+  data,
+  page,
+}: {
+  title: string;
+  data: Record<string, string>;
+  page: DisclosurePageNo;
+}) {
+  const field = (name: string, label: string, className = "") => (
+    <div className={cn("flex min-w-0 items-center gap-2", className)}>
+      <span className="shrink-0 font-medium">{label}</span>
+      <Cell name={name} data={data} className="min-w-0 flex-1" />
+    </div>
+  );
+  const check = (name: string, label: string) => (
+    <DocCheck name={name} data={data} label={label} />
+  );
+
+  return (
+    <div id="disclosure-print-root" className="space-y-4 bg-white text-[12px] text-foreground print:space-y-0 print:text-[10.5px]">
+      <input type="hidden" name="template_title" value={title} />
+      <input type="hidden" name="form_template" value="disclosure_nonresidential_v1" />
+      <input type="hidden" name="disclosure_building_type" value="nonresidential" />
+      <input type="hidden" name="property_title" defaultValue={data.property_title ?? ""} />
+      <input type="hidden" name="property_type" defaultValue={data.property_type ?? ""} />
+      <input type="hidden" name="deal_type" defaultValue={data.deal_type ?? ""} />
+
+      <Page no={1} active={page === 1}>
+        <header className="space-y-1 text-center">
+          <h2 className="text-[16px] font-bold tracking-tight print:text-[14px]">중개대상물 확인·설명서[Ⅱ] (비주거용 건축물)</h2>
+          <p className="text-[11px] print:text-foreground">{title}</p>
+          <div className="flex flex-wrap items-center justify-center gap-4 py-1">
+            <span className="font-medium">거래 형태</span>
+            <Opt name="trade_type" value="매매·교환" data={data} label="매매·교환" />
+            <Opt name="trade_type" value="임대차" data={data} label="임대차" />
+            <Opt name="trade_type" value="그 밖의 유형" data={data} label="그 밖의 유형" />
+          </div>
+        </header>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th className="w-32">확인·설명 근거자료 등</Th><Td><div className="flex flex-wrap gap-x-3 gap-y-1">{check("doc_registry", "등기사항증명서")}{check("doc_land_ledger", "토지대장")}{check("doc_building_ledger", "건축물대장")}{check("doc_cadastral", "지적도")}{check("doc_land_use", "토지이용계획확인서")}{check("nonres_doc_other", "그 밖의 자료")}</div></Td></tr>
+          <tr><Th>대상물건 상태 자료 요구사항</Th><Td>중개대상물의 권리관계와 상태를 확인하고, 거래당사자에게 확인한 내용을 설명합니다.</Td></tr>
+        </tbody></table>
+        <h3 className="pt-1 text-[13px] font-bold">I. 개업공인중개사 기본 확인사항</h3>
+        <h4 className="font-semibold">① 대상물건의 표시</h4>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th className="w-24">소재지</Th><Td colSpan={3}><Cell name="property_address" data={data} /></Td></tr>
+          <tr><Th>토지 지목</Th><Td><Cell name="land_category" data={data} /></Td><Th>면적(㎡)</Th><Td><Cell name="land_area" data={data} /></Td></tr>
+          <tr><Th>건물 구조</Th><Td><Cell name="building_structure" data={data} /></Td><Th>주 용도</Th><Td><Cell name="building_use" data={data} /></Td></tr>
+          <tr><Th>건축물 면적(㎡)</Th><Td><Cell name="building_area" data={data} /></Td><Th>사용승인일</Th><Td><Cell name="approval_date" data={data} /></Td></tr>
+        </tbody></table>
+        <h4 className="font-semibold">② 권리관계 및 거래 관련 사항</h4>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th className="w-28">소유권에 관한 사항</Th><Td><Area name="ownership_note" data={data} rows={2} /></Td></tr>
+          <tr><Th>소유권 외 권리사항</Th><Td><Area name="rights_note" data={data} rows={2} /></Td></tr>
+          <tr><Th>임대차 및 점유관계</Th><Td><Area name="occupancy_note" data={data} rows={2} /></Td></tr>
+        </tbody></table>
+      </Page>
+
+      <Page no={2} active={page === 2}>
+        <h3 className="text-[13px] font-bold">③ 입지조건 및 관리에 관한 사항</h3>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th className="w-28">도로와의 관계</Th><Td>{field("road_width", "도로 폭", "w-full")}</Td><Th className="w-24">접근성</Th><Td><Opt name="accessibility" value="양호" data={data} label="양호" /> <Opt name="accessibility" value="불편" data={data} label="불편" /></Td></tr>
+          <tr><Th>대중교통</Th><Td colSpan={3}>{field("public_transport", "교통수단 및 거리", "w-full")}</Td></tr>
+          <tr><Th>주차장</Th><Td colSpan={3}><Opt name="parking" value="없음" data={data} label="없음" /> <Opt name="parking" value="전용" data={data} label="전용 주차시설" /> <Opt name="parking" value="공동" data={data} label="공동 주차시설" /> <Cell name="parking_note" data={data} className="ml-2 inline-flex w-48" /></Td></tr>
+          <tr><Th>관리주체</Th><Td><Opt name="management" value="위탁관리" data={data} label="위탁관리" /> <Opt name="management" value="자체관리" data={data} label="자체관리" /></Td><Th>관리비</Th><Td><Cell name="management_fee" data={data} /></Td></tr>
+        </tbody></table>
+        <h3 className="pt-2 text-[13px] font-bold">④ 거래예정금액 및 세금 관련 사항</h3>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th className="w-32">거래예정금액</Th><Td><Cell name="amount" data={data} /></Td><Th className="w-28">개별공시지가</Th><Td><Cell name="land_public_price" data={data} /></Td></tr>
+          <tr><Th>건물 기준시가</Th><Td><Cell name="building_standard_price" data={data} /></Td><Th>취득세 등</Th><Td><Cell name="acquisition_tax" data={data} /></Td></tr>
+          <tr><Th>세율·부담사항</Th><Td colSpan={3}><Area name="tax_note" data={data} rows={2} /></Td></tr>
+        </tbody></table>
+        <h3 className="pt-2 text-[13px] font-bold">⑤ 시설물의 상태</h3>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th>항목</Th><Th>상태</Th><Th>확인 내용 및 위치</Th></tr>
+          {["수도", "전기", "가스", "소방", "승강기", "배수", "냉난방"].map((item, i) => <tr key={item}><Th className="w-24">{item}</Th><Td><Opt name={`facility_${i}`} value="정상" data={data} label="정상" /> <Opt name={`facility_${i}`} value="수리필요" data={data} label="수리 필요" /> <Opt name={`facility_${i}`} value="없음" data={data} label="해당 없음" /></Td><Td><Cell name={`facility_note_${i}`} data={data} /></Td></tr>)}
+          <tr><Th>그 밖의 시설물</Th><Td colSpan={2}><Area name="facility_other" data={data} rows={2} /></Td></tr>
+        </tbody></table>
+      </Page>
+
+      <Page no={3} active={page === 3} lastPage>
+        <h3 className="text-[13px] font-bold">⑥ 중개보수 및 실비의 금액과 산출내역</h3>
+        <table className="w-full border-collapse"><tbody>
+          <tr><Th className="w-32">중개보수</Th><Td><Cell name="brokerage_fee" data={data} /></Td><Th className="w-24">요율</Th><Td><Cell name="brokerage_rate" data={data} /></Td></tr>
+          <tr><Th>실비</Th><Td><Cell name="brokerage_expenses" data={data} /></Td><Th>지급시기</Th><Td><Cell name="brokerage_payment_date" data={data} /></Td></tr>
+          <tr><Th>산출 근거</Th><Td colSpan={3}><Area name="brokerage_note" data={data} rows={2} /></Td></tr>
+        </tbody></table>
+        <div className="rounded-sm border border-foreground/40 px-2 py-1.5 text-[10.5px] leading-relaxed">
+          「공인중개사법」에 따라 위 내용을 확인·설명받았으며 확인설명서와 중개대상물에 관한 자료를 교부받았습니다.
+        </div>
+        <p className="pt-1 text-right">작성일 <Cell name="explanation_date" data={data} className="inline-flex w-36" /></p>
+        <h3 className="pt-2 text-[13px] font-bold">거래당사자 확인</h3>
+        <div className="space-y-1"><PartyBlock roleLabel="매도인(임대인)" prefix="lessor" data={data} /><PartyBlock roleLabel="매수인(임차인)" prefix="lessee" data={data} /></div>
+        <h3 className="pt-2 text-[13px] font-bold">개업공인중개사 확인</h3>
+        <OfficeBlock prefix="" data={data} label="개업공인중개사" />
+      </Page>
+    </div>
+  );
+}
+
 /** 중개대상물 확인·설명서[I] — PDF 4쪽 정식 양식 */
 export function DisclosureFormSheet({
   propertyType,
@@ -356,6 +462,7 @@ export function DisclosureFormSheet({
       <input type="hidden" name="property_title" defaultValue={data.property_title ?? ""} />
       <input type="hidden" name="template_id" defaultValue={data.template_id ?? ""} />
       <input type="hidden" name="form_template" defaultValue={data.form_template ?? "disclosure_v1"} />
+      <input type="hidden" name="disclosure_building_type" value="residential" />
       <input type="hidden" name="amount" defaultValue={data.amount ?? ""} />
       <input type="hidden" name="ownership_note" defaultValue={data.ownership_note ?? ""} />
       <input type="hidden" name="rights_note" defaultValue={data.rights_note ?? ""} />

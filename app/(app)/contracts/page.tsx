@@ -60,16 +60,44 @@ export default async function ContractsPage() {
     extrasByProperty.set(pid, mergeDocFormExtras(docs));
   }
 
-  const list = (forms ?? []).filter((f) => (isApp ? f.status === "finalized" : true));
+  /** 계약관리 목록에는 계약서만 표시 — 확인설명서는 계약서 작성창에서 세트로 작성·조회 */
+  const list = (forms ?? []).filter(
+    (f) => f.kind === "contract" && (isApp ? f.status === "finalized" : true)
+  );
+
+  /** 거래별 최신 계약서 data (확인설명서 작성 시 소재지·면적·인적사항) */
+  const contractByDeal = new Map<string, Record<string, string>>();
+  for (const f of forms ?? []) {
+    if (f.kind !== "contract" || !f.deal_id || contractByDeal.has(f.deal_id)) continue;
+    contractByDeal.set(f.deal_id, asStringRecord(f.data));
+  }
+
+  const propertyLabelById = new Map(
+    (propertyRows ?? []).map((p) => [
+      p.id,
+      [p.title, p.address].filter(Boolean).join(" · ") || p.id.slice(0, 8),
+    ])
+  );
+  const dealPropertyIdByDeal = new Map(
+    (deals ?? []).map((deal) => {
+      const property = Array.isArray(deal.property) ? deal.property[0] : deal.property;
+      return [deal.id, deal.property_id ?? property?.id ?? ""] as const;
+    })
+  );
 
   const rows: DocumentRow[] = list.map((f) => {
     const d = asStringRecord(f.data);
+    const linkedId =
+      (d.property_id?.trim() || "") ||
+      (f.deal_id ? dealPropertyIdByDeal.get(f.deal_id) || "" : "");
     return {
       id: f.id,
       dealId: f.deal_id ?? null,
       kind: f.kind as DealFormKind,
       title: f.title,
       status: f.status as "draft" | "finalized",
+      createdAt: f.created_at,
+      data: d,
       contractDate: d.contract_date || d.paid_at || "",
       expiryDate: d.expiry_date || "",
       interim1: d.interim_payment_1 || "",
@@ -79,6 +107,8 @@ export default async function ContractsPage() {
       monthlyRent: d.monthly_rent || "",
       dealType: d.deal_type || "",
       propertyType: d.property_type || "",
+      linkedProperty: linkedId ? propertyLabelById.get(linkedId) || "" : "",
+      linkedPropertyId: linkedId || null,
       lessorName: d.lessor_name || d.payee_name || "",
       lessorPhone: d.lessor_phone || "",
       lesseeName: d.lessee_name || d.payer_name || "",
@@ -93,13 +123,6 @@ export default async function ContractsPage() {
       contractNo: d.contract_no || f.id.replace(/-/g, "").slice(0, 8),
     };
   });
-
-  /** 거래별 최신 계약서 data (확인설명서 작성 시 소재지·면적·인적사항) */
-  const contractByDeal = new Map<string, Record<string, string>>();
-  for (const f of forms ?? []) {
-    if (f.kind !== "contract" || !f.deal_id || contractByDeal.has(f.deal_id)) continue;
-    contractByDeal.set(f.deal_id, asStringRecord(f.data));
-  }
 
   const dealOptions: WriteDealOption[] = (deals ?? []).map((deal) => {
     const property = Array.isArray(deal.property) ? deal.property[0] : deal.property;

@@ -4,14 +4,13 @@
 > 새 작업 시작 시 **현재 상태 → 다음 작업**부터 이어서 진행한다.
 
 ## 현재 상태
-- **단계**: CODEF 등기 원문 PDF 자동 열람 (브랜치 `feat/codef-registry-pdf`)
-  - 계약관리·매물 서류 탭에서 주소 검색 → 인터넷등기소 원문 PDF 열람·자동 다운로드·매물 서류함 저장
-  - 현재 유효사항/말소사항 포함, 같은 지번 토지등기 추가 열람 선택. 기본값은 현재 유효사항·토지 미열람
-  - 계약관리 매물 미선택 시 PDF 임시 저장 → 검색 주소·동·호로 매물 생성 → 등기 PDF 연결
-  - 입력 순서: 매물 선택 → 부동산 구분 라디오 → 주소 검색 → 동+호/동/호 선택·숫자 입력 → 등기 옵션
-  - 원문 포함 `originDataYN=1`, PDF 검증, 2Way 주소 선택, 민감 로그 제거
-- **다음 작업 시작 지점**: `feat/codef-registry-pdf` → `develop` PR 리뷰·머지 후 전자민원캐시 실열람 스모크(현재 유효사항·말소사항·토지·매물 미선택 등록)
-- **환경**: 원격 Supabase + AI 키. 마이그레이션 **`20261021120000` 필요**(이전과 동일)
+- **단계**: 계약서·확인설명서 작성 및 인쇄 UX 정리 (브랜치 `feat/ai-registry-summary`)
+  - 확인설명서 작성 전 현재 창에서 주거용/비주거용 선택, 선택한 서식만 별도 작성 창으로 열기
+  - 주거용 기존 서식 유지, 비주거용 확인설명서 3쪽 작성·인쇄 폼 추가
+  - 계약서 인쇄의 외곽선·표 셀 여백·당사자 표 경계선을 조정. 매매계약서 인쇄폼은 현재 상태로 유지
+  - 계약서 작성/확인설명서 팝업 및 연결 매물 자동 채움 흐름 유지
+- **다음 작업 시작 지점**: PR #7 (`develop`)에 반영 완료 → 확인설명서에서 주거용·비주거용 저장 및 4쪽/3쪽 인쇄 흐름 실기기 확인
+- **환경**: `KAKAO_REST_API_KEY`, 선택 AI 키 필요. 마이그레이션 **`20261021120000`, `20261023160000`, `20261027100000`, `20261027170000`, `20261028120000` 적용 필요**
 
 > ⚠️ **아직 진행하지 못한 서비스**
 > 1. ~~계약서·확인설명서~~ → `feat/contract-forms`에서 진행 중 (영수증·기타 서식 포함)
@@ -62,6 +61,148 @@ npm run db:types   # 원격(--linked) 기준 lib/supabase/database.types.ts 재�
 - 브랜드 컬러 `--primary` (oklch 0.52 0.19 262), 토큰 `--success`, `--warning` / 폰트 Noto Sans KR
 
 ## 기록
+
+### 2026-10-30 — 계약서 인쇄 정리 및 비주거용 확인설명서 추가
+**작업 요약**
+- 계약서 인쇄 영역의 텍스트 1mm 여백, 표·당사자 테두리 및 인쇄선 렌더링 규칙 정리
+- 확인설명서 작성 클릭 후 현재 창에서 주거용/비주거용 선택, 확인 시 선택 유형이 적용된 작성 팝업 실행
+- 주거용 기존 확인설명서 폼 유지, 비주거용 건축물 확인설명서 3쪽 입력·탭·인쇄 폼 추가
+- 선택 모달 및 확인/취소 버튼 크기 조정 요청에 따라 최종 크기 반영
+
+**변경 파일/화면**
+- 계약서·확인설명서 작성 팝업: `components/deal-forms/contract-write-dialog.tsx`, `components/deal-forms/disclosure-write-dialog.tsx`
+- 확인설명서 3쪽 서식: `components/deal-forms/disclosure-form-sheet.tsx`
+- 계약·확인설명서 인쇄 스타일: `app/globals.css`
+- 작업 로그: `docs/WORKLOG.md`
+
+**결정 사항**
+- 계약서 작성 화면에서 서식 종류를 먼저 선택하고, 확정 후 별도 확인설명서 창을 연다
+- 비주거용 양식은 기존 확인설명서 저장 구조의 `form_template` 식별자로 구분한다
+- 매매계약서 인쇄폼은 현재 상태에서 추가 수정하지 않는다
+
+**검증 및 남은 TODO**
+- `npm run build` 통과
+- 변경 파일 ESLint는 통과; 전체 lint 및 계약 작성 파일 lint에는 기존 React 훅 오류가 남아 있음
+- 인쇄 미리보기에서 계약서·비주거용 확인설명서 쪽수 및 경계선 최종 확인
+- PR #7 (`develop`) 생성, README 업데이트 내역에 사용자 관점 변경 요약 추가
+
+### 2026-10-29 — 계약서·확인설명서 작성 팝업·연결매물 자동 채움
+**작업 요약**
+- 계약서/확인설명서 작성을 고정 크기 팝업 페이지로 분리, 시드로 창 전환
+- 같은 계약서 재오픈은 새로고침 없이 포커스, 다른 계약서는 기존 창을 전환
+- 연결 매물 → 확인설명서 「연결 매물」에 동일 라벨, 없으면 거래 생성(`ensureDealForProperty`)
+- 검토완료 서류·카카오 입지 자동 반영, 매물 등록 시 `location_fields` 저장
+- 확인설명서 수동 「매물 서류/건축HUB/카카오 입지」 버튼 제거
+- 임대차 잔금일↔존속기간 인도일 양방향 동기화
+
+**변경 파일**
+- `app/(app)/contracts/{write,disclosure/write}/*`, `lib/open-contract-write.ts`, `lib/contract-write-data.ts`
+- `lib/disclosure-{location,write-seed}.ts`, `components/deal-forms/{contract,disclosure}-write-dialog.tsx`
+- `components/deal-forms/contract-form-sheet.tsx`, `lib/actions/{deals,properties,disclosure-docs,ai-assist}.ts`
+- `supabase/migrations/20261028120000_property_location_fields.sql`
+
+**결정 사항**
+- 작성 창은 단일 팝업 이름 유지, form id로 동일/다른 계약 판별
+- 입지는 매물 저장 시 캐시하고 확인설명서에서 우선 사용(없으면 조회)
+
+**남은 TODO**
+- `db:push`로 location_fields 마이그레이션 적용
+- 연결매물·확인설명서 자동 채움·작성창 재클릭 실기기 스모크
+
+### 2026-10-28 — 계약관리 연결매물·작성 UX·확인설명서 서류 병합
+**작업 요약**
+- 계약관리 목록에 연결매물 컬럼 추가(맨 끝), 클릭 시 `/properties/[id]` 이동
+- 삭제 버튼을 작성 툴바(`justify-between`) 오른쪽 빨간 버튼으로 배치
+- 계약서 제목 클릭 시 작성창으로 수정, 연결 매물 `property_id` 저장, 매물 변경 확인·사본만들기
+- 서식·부동산·거래 종류를 저장 후에도 변경 가능 / 연결 매물에 맞춰 거래종류 동기화
+- 연결 매물과 다른 거래종류로 바꿀 때 확인 후 계약내용(금액·지급일정)만 비우고 나머지 유지
+- 확인설명서·계약서 서류 병합 우선순위를 맞추고, 용적률·건폐율·면적 등은 상위가 빈값·0이면 하위 서류 값 사용
+- 문서 검토 추출 항목·시그널 삭제 확인을 웹에서도 표시(`appOnly` 제거)
+
+**변경 파일**
+- `app/(app)/contracts/page.tsx`, `components/deal-forms/{documents-table,contract-write-dialog,contract-write-entry}.tsx`
+- `lib/actions/deal-forms.ts`, `lib/{disclosure-from-docs,doc-extract/form-extras}.ts`, `lib/actions/disclosure-docs.ts`
+- `app/(app)/documents/[id]/document-review.tsx`
+
+**결정 사항**
+- 연결 매물≠거래종류여도 연결은 유지하고, 확인 후 계약내용만 비움(잔금은 금액 미채움으로 자동 계산되지 않게)
+- 서류 병합: 건축물대장 > 부동산종합공부 > 토지대장 > 기타
+
+**남은 TODO**
+- 거래종류 불일치·사본만들기·연결매물 링크 실기기 스모크
+- 확인설명서 병합 fallthrough 실 PDF 확인
+
+### 2026-10-28 — 서류 발급 링크·종합공부 AI·검토 UI·busy 오버레이
+**작업 요약**
+- 문서관리·매물 서류탭에 서류 발급 바로가기(인터넷등기소·건축물대장·KRAS 시·도별 부동산종합) 추가
+- 매물 서류탭 레이아웃: 간편 등기 열람·발급·업로드(좌) / 등록 공부서류(우), 매물 클릭 시 `?tab=docs`로 이동
+- 부동산종합공부 AI·규칙 추출을 토지 소재지·지목·면적·개별공시지가·건축물 건폐율·용적률·용도지역 7항목으로 고정
+- 문서 검토 화면에서 문서 삭제를 원문(다운로드·인쇄·크게보기) 옆으로, 검토 완료를 전체 확인 옆으로 이동
+- 비동기 작업 버튼 스피너 대신 공통 전체화면 busy 오버레이 적용
+
+**변경 파일**
+- `app/(app)/documents/{page,document-issue-links,property-documents-table,[id]/*}.tsx`
+- `app/(app)/properties/[id]/page.tsx`, `lib/kras.ts`
+- `lib/{constants,ai/run-document,doc-extract/*,disclosure-from-docs,actions/document-extract,busy}.ts`
+- `components/busy-overlay.tsx` 및 busy 연동 UI 다수
+
+**결정 사항**
+- KRAS는 시도별 baseInfo URL 고정, 광주·전남은 전남광주통합 포털 사용
+- 종합공부 AI는 등기·건축물대장과 같이 지정 라벨로 전체 교체
+
+**남은 TODO**
+- 종합공부·건축물대장·등기 실 PDF 스모크
+- 발급 외부 링크 모바일 웹뷰 동작 확인
+
+### 2026-10-27 — 매물 서류 선택형 AI 추출·검토 흐름
+**작업 요약**
+- 업로드 즉시 자동 추출을 제거하고 매물 상세 서류 탭에서 전체/개별 선택한 문서를 일괄 AI 추출하도록 변경
+- 문서별 추출 상태 뱃지와 실패 사유를 표시하고 문서 상세에서 추출값 수정·검토 완료 처리
+- 검토 완료 문서만 확인설명서에 반영해 미검증 AI 결과의 자동 사용 방지
+- Gemini SDK를 Interactions API 기반 `@google/genai`로 교체하고, 원본 PDF 요청이 거부되면 추출 텍스트로 자동 재시도
+
+**변경 파일**
+- `app/(app)/properties/[id]/{page,property-documents-list}.tsx`
+- `app/(app)/documents/**`, `components/status-badge.tsx`
+- `lib/actions/{document-extract,documents,disclosure-docs,codef-registry}.ts`
+- `lib/ai/{gemini,run-document}.ts`, `lib/disclosure-from-docs.ts`, `lib/constants.ts`
+- `lib/supabase/database.types.ts`, `supabase/migrations/20261027170000_document_ai_extraction_status.sql`
+- `package.json`, `package-lock.json`
+
+**결정 사항**
+- 서류 업로드와 AI 추출을 분리하고 AI 추출 시작 위치는 문서관리 목록이 아닌 매물 상세 서류 탭으로 한정
+- AI 결과는 사용자가 문서 상세에서 원문과 대조해 검토 완료하기 전까지 확인설명서에 사용하지 않음
+- 인터넷등기소 보호·특수 인코딩 PDF는 원본 분석을 우선하되 Gemini 400 응답 시 읽을 수 있는 원문 텍스트로 재시도
+
+**남은 TODO**
+- `npm run db:push` 후 실제 등기·건축물대장·토지이용계획확인서로 선택 추출 및 검토 흐름 스모크
+- 텍스트 추출도 불가능한 보호·스캔 PDF의 Gemini Files API 또는 OCR 보완 검토
+
+### 2026-10-27 — AI 등기 요약·카카오 입지·플랫폼별 광고 문구
+**작업 요약**
+- 등기 규칙 파싱을 AI 우선 요약으로 전환하고 AI 결과에 원문 근거·쪽수·신뢰도·검토 상태 추가
+- 등기 재열람 UI, 매물 미선택→신규 매물 연결 이후 AI 요약까지 연결
+- 매물별 주변 검색 키워드를 저장하고 카카오 Local 검색 결과를 광고 문구·확인설명서 입지에 반영
+- 네이버 부동산용과 직방·다방용 문구를 동시에 생성해 각각 복사하거나 매물 설명에 적용하는 모달 추가
+- Gemini 종료 모델을 `gemini-3.5-flash-lite`로 교체하고 계약 서식 상세의 화면 미리보기 제거(인쇄용 DOM 유지)
+
+**변경 파일**
+- `lib/ai/{gemini,run-document,run-text,types}.ts`, `lib/actions/{document-extract,documents,ai-assist,properties,codef-registry}.ts`
+- `lib/kakao-local.ts`, `lib/constants.ts`, `lib/supabase/database.types.ts`, `.env.example`
+- `components/ai/ad-copy-button.tsx`, `components/deal-forms/{registry-inquiry-dialog,disclosure-write-dialog}.tsx`
+- `app/(app)/properties/**`, `app/(app)/documents/[id]/**`, `app/(app)/contracts/**`, `app/(app)/assistant/page.tsx`, `app/(app)/settings/ai-billing-settings.tsx`
+- `supabase/migrations/20261023160000_document_ai_review.sql`, `20261027100000_property_nearby_keywords.sql`
+
+**결정 사항**
+- AI는 등기 법률 판단을 확정하지 않고 원문 대조 전까지 미검토 상태로 둔다
+- 광고 주변 시설은 카카오 조회 결과만 사용하며 입력하지 않은 층·방향·입주일은 생성하지 않는다
+- 카카오 Local은 보행 경로를 제공하지 않으므로 현재 도보 시간은 직선거리÷분당 67m의 참고 추정치다
+- 확인설명서 비선호시설은 검색 결과가 있을 때만 `있음`으로 채우고 결과가 없다고 `없음`으로 확정하지 않는다
+
+**남은 TODO**
+- `npm run db:push`, 배포 환경 `KAKAO_REST_API_KEY`·`GEMINI_MODEL` 반영
+- 실제 Gemini/OpenAI 등기 PDF와 카카오 Local 주소·주변 키워드 조회 스모크
+- 정확한 도보 경로 시간이 필요하면 TMAP 보행 경로 API 연동
 
 ### 2026-10-23 — CODEF 등기 원문 PDF 자동 열람
 **작업 요약**

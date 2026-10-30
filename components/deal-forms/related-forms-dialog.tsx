@@ -69,11 +69,13 @@ export function RelatedFormsDialog({
   onOpenChange,
   office,
   initialTab = "receipt",
+  presentation = "dialog",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   office: RelatedFormsOfficeDefaults;
   initialTab?: RelatedFormTabId;
+  presentation?: "dialog" | "page";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -131,21 +133,20 @@ export function RelatedFormsDialog({
     });
   };
 
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange} disablePointerDismissal>
-      <DialogContent
-        showCloseButton
-        className={cn(
-          "flex max-h-[min(96vh,960px)] w-[min(96vw,920px)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none",
-          "print:fixed print:inset-0 print:max-h-none print:w-full print:max-w-none print:translate-x-0 print:translate-y-0 print:rounded-none print:border-0 print:bg-white print:shadow-none",
-        )}
-      >
-        <DialogHeader className="space-y-0 border-b px-4 py-3 print:hidden">
-          <DialogTitle>영수증등 관련 서식</DialogTitle>
-          <DialogDescription className="sr-only">영수증·공과금 정산서 등 관련 서식을 수기로 작성합니다.</DialogDescription>
-        </DialogHeader>
+  const titleBar = presentation === "page" ? (
+    <div className="border-b px-4 py-3 print:hidden">
+      <h1 className="font-semibold">영수증 관련서식</h1>
+      <p className="sr-only">영수증·공과금 정산서 등 관련 서식을 수기로 작성합니다.</p>
+    </div>
+  ) : (
+    <DialogHeader className="space-y-0 border-b px-4 py-3 print:hidden">
+      <DialogTitle>영수증 관련서식</DialogTitle>
+      <DialogDescription className="sr-only">영수증·공과금 정산서 등 관련 서식을 수기로 작성합니다.</DialogDescription>
+    </DialogHeader>
+  );
 
-        <div className="flex flex-wrap items-center justify-end gap-2 border-b bg-muted/40 px-4 py-3 print:hidden">
+  const toolbar = (
+    <div className="flex flex-wrap items-center justify-end gap-2 border-b bg-muted/40 px-4 py-3 print:hidden">
           <Button type="submit" form="related-forms-form" size="sm" disabled={pending}>
             <Save data-icon="inline-start" />
             저장
@@ -157,9 +158,11 @@ export function RelatedFormsDialog({
           <Button type="button" size="sm" variant="ghost" onClick={() => handleOpenChange(false)}>
             닫기
           </Button>
-        </div>
+    </div>
+  );
 
-        <div className="flex flex-wrap gap-1 border-b px-3 py-2 print:hidden">
+  const tabs = (
+    <div className="flex flex-wrap gap-1 border-b px-3 py-2 print:hidden">
           {RELATED_FORM_TABS.map((t) => (
             <Button
               key={t.id}
@@ -172,9 +175,11 @@ export function RelatedFormsDialog({
               {t.label}
             </Button>
           ))}
-        </div>
+    </div>
+  );
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 print:overflow-visible print:p-6">
+  const formContent = (
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 print:overflow-visible print:p-6">
           <form
             id="related-forms-form"
             key={tabId}
@@ -190,7 +195,35 @@ export function RelatedFormsDialog({
             {tabId === "balance_settlement" && <BalanceSettlementSheet data={data} />}
             {tabId === "utility_settlement" && <UtilitySettlementSheet data={data} />}
           </form>
+    </div>
+  );
+
+  if (presentation === "page") {
+    return (
+      <div className="fixed inset-0 z-50 overflow-auto bg-background print:static">
+        <div className="mx-auto flex min-h-screen w-[920px] min-w-[920px] flex-col bg-background print:w-full print:min-w-0">
+          {titleBar}
+          {toolbar}
+          {tabs}
+          {formContent}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange} disablePointerDismissal>
+      <DialogContent
+        showCloseButton
+        className={cn(
+          "flex max-h-[min(96vh,960px)] w-[min(96vw,920px)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none",
+          "print:fixed print:inset-0 print:max-h-none print:w-full print:max-w-none print:translate-x-0 print:translate-y-0 print:rounded-none print:border-0 print:bg-white print:shadow-none",
+        )}
+      >
+        {titleBar}
+        {toolbar}
+        {tabs}
+        {formContent}
       </DialogContent>
     </Dialog>
   );
@@ -200,8 +233,8 @@ export function RelatedFormsWriteButton({ office }: { office: RelatedFormsOffice
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        영수증등 관련 서식
+      <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
+        영수증 관련서식
       </Button>
       <RelatedFormsDialog key={String(open)} open={open} onOpenChange={setOpen} office={office} />
     </>

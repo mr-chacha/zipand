@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Loader2, Sparkles } from "lucide-react";
+import { Copy, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { applyConsultationDraft } from "@/lib/actions/ai-assist";
 import type { ConsultationDraft, PropertyMatch } from "@/lib/ai/types";
+import { useBusy } from "@/lib/busy";
 import { formatManwon } from "@/lib/format";
 
 function DraftBody({
@@ -39,6 +40,7 @@ function DraftBody({
   const [applyCustomer, setApplyCustomer] = useState(true);
   const [sms, setSms] = useState(draft.sms_draft);
   const [summary, setSummary] = useState(draft.summary);
+  useBusy(pending, "상담 분석 결과를 반영하고 있습니다…");
 
   return (
     <>
@@ -161,7 +163,6 @@ function DraftBody({
               });
             }}
           >
-            {pending ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
             검토 후 반영
           </Button>
         ) : null}

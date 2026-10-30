@@ -73,7 +73,7 @@ export default async function DealFormDetailPage({
         }
       />
 
-      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
+      <div>
         <Card className="print:hidden">
           <CardHeader>
             <CardTitle>{isApp || form.status === "finalized" ? "공유·관리" : "작성"}</CardTitle>
@@ -92,8 +92,7 @@ export default async function DealFormDetailPage({
           </CardContent>
         </Card>
 
-        <div className="space-y-3">
-          <p className="text-sm font-medium print:hidden">미리보기</p>
+        <div className="hidden print:block">
           <DealFormDocumentView
             kind={kind}
             title={form.title}

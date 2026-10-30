@@ -699,6 +699,8 @@ export type Database = {
       }
       document_fields: {
         Row: {
+          ai_generated: boolean
+          confidence: number | null
           created_at: string
           document_id: string
           evidence_text: string | null
@@ -710,6 +712,8 @@ export type Database = {
           value: string
         }
         Insert: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           document_id: string
           evidence_text?: string | null
@@ -721,6 +725,8 @@ export type Database = {
           value: string
         }
         Update: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           document_id?: string
           evidence_text?: string | null
@@ -750,6 +756,8 @@ export type Database = {
       }
       document_signals: {
         Row: {
+          ai_generated: boolean
+          confidence: number | null
           created_at: string
           description: string | null
           document_id: string
@@ -759,9 +767,12 @@ export type Database = {
           next_action: string | null
           office_id: string
           page: number | null
+          reviewed: boolean
           title: string
         }
         Insert: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           description?: string | null
           document_id: string
@@ -771,9 +782,12 @@ export type Database = {
           next_action?: string | null
           office_id?: string
           page?: number | null
+          reviewed?: boolean
           title: string
         }
         Update: {
+          ai_generated?: boolean
+          confidence?: number | null
           created_at?: string
           description?: string | null
           document_id?: string
@@ -783,6 +797,7 @@ export type Database = {
           next_action?: string | null
           office_id?: string
           page?: number | null
+          reviewed?: boolean
           title?: string
         }
         Relationships: [
@@ -806,6 +821,9 @@ export type Database = {
         Row: {
           created_at: string
           doc_type: string
+          extracted_at: string | null
+          extraction_error: string | null
+          extraction_status: string
           file_name: string
           file_size: number | null
           id: string
@@ -821,6 +839,9 @@ export type Database = {
         Insert: {
           created_at?: string
           doc_type: string
+          extracted_at?: string | null
+          extraction_error?: string | null
+          extraction_status?: string
           file_name: string
           file_size?: number | null
           id?: string
@@ -836,6 +857,9 @@ export type Database = {
         Update: {
           created_at?: string
           doc_type?: string
+          extracted_at?: string | null
+          extraction_error?: string | null
+          extraction_status?: string
           file_name?: string
           file_size?: number | null
           id?: string
@@ -1164,12 +1188,14 @@ export type Database = {
           id: string
           internal_memo: string | null
           landlord_phone: string | null
+          location_fields: Json | null
           maintenance_fee: number | null
           maintenance_items: string[]
           maintenance_status: string | null
           main_use: string | null
           manager_id: string | null
           monthly_rent: number | null
+          nearby_keywords: string[]
           office_id: string
           price: number
           property_type: string
@@ -1201,12 +1227,14 @@ export type Database = {
           id?: string
           internal_memo?: string | null
           landlord_phone?: string | null
+          location_fields?: Json | null
           maintenance_fee?: number | null
           maintenance_items?: string[]
           maintenance_status?: string | null
           main_use?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
+          nearby_keywords?: string[]
           office_id?: string
           price?: number
           property_type: string
@@ -1238,12 +1266,14 @@ export type Database = {
           id?: string
           internal_memo?: string | null
           landlord_phone?: string | null
+          location_fields?: Json | null
           maintenance_fee?: number | null
           maintenance_items?: string[]
           maintenance_status?: string | null
           main_use?: string | null
           manager_id?: string | null
           monthly_rent?: number | null
+          nearby_keywords?: string[]
           office_id?: string
           price?: number
           property_type?: string

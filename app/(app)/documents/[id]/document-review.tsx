@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, Loader2, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { AlertTriangle, CheckCircle2, Pencil, Plus, RotateCcw, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ConfirmAction } from "@/components/form/confirm-action";
 import { FormMessage } from "@/components/form/form-message";
@@ -10,26 +10,25 @@ import { SubmitButton } from "@/components/form/submit-button";
 import { SignalBadge } from "@/components/status-badge";
 import { DatePicker } from "@/components/form/date-picker";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useBusy } from "@/lib/busy";
-import { extractDocumentFields } from "@/lib/actions/document-extract";
-// TODO(문서 AI 추출): UI에서 당분간 비활성. 다시 켤 때 extractDocumentFieldsAi + AiAccessBadge 복구.
-// import { extractDocumentFieldsAi } from "@/lib/actions/document-extract";
+import { extractDocumentFieldsAi } from "@/lib/actions/document-extract";
 import {
   addDocumentField,
   addDocumentSignal,
   completeReview,
-  deleteDocument,
   deleteDocumentField,
   deleteDocumentSignal,
   reopenReview,
   setAllFieldsReviewed,
   setFieldReviewed,
+  setSignalReviewed,
+  updateDocumentField,
   updateDocumentIssuedAt,
 } from "@/lib/actions/documents";
 import { SIGNAL_LEVELS } from "@/lib/constants";
@@ -39,6 +38,9 @@ import type { DocumentField, DocumentSignal } from "@/types";
 
 interface DocumentReviewProps {
   documentId: string;
+  docType: string;
+  extractionStatus: string;
+  extractionError: string | null;
   status: string;
   issuedAt: string | null;
   presets: string[];
@@ -48,6 +50,9 @@ interface DocumentReviewProps {
 
 export function DocumentReview({
   documentId,
+  docType,
+  extractionStatus,
+  extractionError,
   status,
   issuedAt,
   presets,
@@ -55,17 +60,17 @@ export function DocumentReview({
   signals,
 }: DocumentReviewProps) {
   const [pending, startTransition] = useTransition();
-  const [, startReviewToggle] = useTransition();
+  const [reviewPending, startReviewToggle] = useTransition();
   const [extracting, setExtracting] = useState(false);
+  const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [localFields, setLocalFields] = useState(fields);
-  useBusy(pending || extracting);
+  const [localSignals, setLocalSignals] = useState(signals);
+  useBusy(pending || extracting || reviewPending, extracting ? "서류를 AI로 추출하고 있습니다…" : undefined);
   const reviewedCount = localFields.filter((f) => f.reviewed).length;
+  const reviewedSignalCount = localSignals.filter((signal) => signal.reviewed).length;
   const allReviewed = localFields.length > 0 && reviewedCount === localFields.length;
+  const hasAiResult = localFields.some((field) => field.ai_generated);
   const done = status === "검토 완료";
-
-  useEffect(() => {
-    setLocalFields(fields);
-  }, [fields]);
 
   const run = (fn: () => Promise<{ error?: string; message?: string }>) =>
     startTransition(async () => {
@@ -99,11 +104,23 @@ export function DocumentReview({
     });
   };
 
+  const toggleSignalReviewed = (signalId: string, reviewed: boolean) => {
+    const prev = localSignals;
+    setLocalSignals((rows) => rows.map((signal) => (signal.id === signalId ? { ...signal, reviewed } : signal)));
+    startReviewToggle(async () => {
+      const result = await setSignalReviewed(signalId, documentId, reviewed);
+      if (result.error) {
+        setLocalSignals(prev);
+        toast.error(result.error);
+      }
+    });
+  };
+
   const runExtract = () => {
     setExtracting(true);
     startTransition(async () => {
       try {
-        const result = await extractDocumentFields(documentId);
+        const result = await extractDocumentFieldsAi(documentId);
         if (result.error) toast.error(result.error);
         else if (result.message) toast.success(result.message);
       } finally {
@@ -119,14 +136,22 @@ export function DocumentReview({
           <div className="space-y-1">
             <CardTitle>핵심 항목 정리</CardTitle>
             <CardDescription>
-              체크는 「원문과 대조했다」는 표시예요. 전부 체크해야 검토 완료할 수 있어요.
+           AI를 사용하여 서류의 핵심 내용을 추출하여, 계약서 작성시 자동으로 입력하여 계약서 작성 시간을 줄이세요.
             </CardDescription>
           </div>
-          <Button type="button" size="sm" variant="outline" disabled={pending || extracting || done} onClick={runExtract}>
-            {extracting ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
-            {extracting ? "추출 중…" : "자동 추출"}
+          <Button type="button" size="sm" variant="outline" disabled={pending || extracting} onClick={runExtract}>
+            <Sparkles data-icon="inline-start" />
+            {hasAiResult ? "AI 다시 추출" : "AI 추출"}
           </Button>
         </div>
+        {extractionStatus === "미추출" && (
+          <p className="rounded-md bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+            아직 AI 추출하지 않은 서류예요. 목록에서 선택하거나 위 버튼으로 추출하세요.
+          </p>
+        )}
+        {extractionStatus === "추출 실패" && extractionError && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">{extractionError}</p>
+        )}
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1.5">
             <Label htmlFor="issued_at">발급일</Label>
@@ -148,7 +173,9 @@ export function DocumentReview({
             <TabsTrigger value="fields">
               추출 항목 {fields.length > 0 && `(${reviewedCount}/${fields.length})`}
             </TabsTrigger>
-            <TabsTrigger value="signals">확인 사항 {signals.length > 0 && `(${signals.length})`}</TabsTrigger>
+            <TabsTrigger value="signals">
+              확인 사항 {localSignals.length > 0 && `(${reviewedSignalCount}/${localSignals.length})`}
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="fields" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
@@ -156,25 +183,64 @@ export function DocumentReview({
               {localFields.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">아직 입력한 항목이 없어요.</p>
               )}
-              {localFields.length > 0 && (
-                <label
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm",
-                    done ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40"
-                  )}
-                >
-                  <Checkbox
-                    checked={allReviewed}
-                    disabled={done}
-                    onCheckedChange={(v) => toggleAllReviewed(Boolean(v))}
-                    aria-label="추출 항목 전체 확인"
-                  />
-                  <span className="font-medium">전체 확인</span>
-                  <span className="text-xs text-muted-foreground">
-                    ({reviewedCount}/{localFields.length})
-                  </span>
-                </label>
-              )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {localFields.length > 0 ? (
+                  <label
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-sm",
+                      done ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-muted/40"
+                    )}
+                  >
+                    <Checkbox
+                      checked={allReviewed}
+                      disabled={done}
+                      onCheckedChange={(v) => toggleAllReviewed(Boolean(v))}
+                      aria-label="추출 항목 전체 확인"
+                    />
+                    <span className="font-medium">전체 확인</span>
+                    <span className="text-xs text-muted-foreground">
+                      ({reviewedCount}/{localFields.length})
+                    </span>
+                  </label>
+                ) : (
+                  <span />
+                )}
+                {done ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending}
+                    onClick={() => run(() => reopenReview(documentId))}
+                  >
+                    <RotateCcw data-icon="inline-start" />
+                    다시 검토
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={
+                      pending ||
+                      reviewPending ||
+                      localFields.length === 0 ||
+                      reviewedCount < localFields.length ||
+                      reviewedSignalCount < localSignals.length
+                    }
+                    onClick={() => run(() => completeReview(documentId))}
+                    title={
+                      localFields.length > 0 && reviewedCount < localFields.length
+                        ? `확인하지 않은 항목이 ${localFields.length - reviewedCount}개 있어요`
+                        : reviewedSignalCount < localSignals.length
+                          ? `확인하지 않은 확인 사항이 ${localSignals.length - reviewedSignalCount}개 있어요`
+                          : undefined
+                    }
+                  >
+                    <CheckCircle2 data-icon="inline-start" />
+                    검토 완료
+                  </Button>
+                )}
+              </div>
               {localFields.map((field) => (
                 <div
                   key={field.id}
@@ -193,7 +259,7 @@ export function DocumentReview({
                     }
                   }}
                   className={cn(
-                    "flex gap-3 rounded-lg border p-3 outline-none transition-colors",
+                    "flex flex-wrap gap-3 rounded-lg border p-3 outline-none transition-colors",
                     done ? "cursor-default" : "cursor-pointer hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring/50",
                     field.reviewed && "border-primary/30 bg-primary/5"
                   )}
@@ -210,6 +276,11 @@ export function DocumentReview({
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-baseline gap-x-2">
                       <span className="text-xs text-muted-foreground">{field.label}</span>
+                      {field.ai_generated && (
+                        <span className="text-[10px] font-medium text-primary">
+                          AI · 신뢰도 {field.confidence ?? 50}%
+                        </span>
+                      )}
                       <span className="whitespace-pre-wrap text-sm font-medium">{field.value}</span>
                     </div>
                     {(field.evidence_text || field.page) && (
@@ -220,11 +291,21 @@ export function DocumentReview({
                     )}
                   </div>
                   <div
+                    className="flex items-center"
                     onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}
                   >
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="항목 수정"
+                      disabled={pending}
+                      onClick={() => setEditingFieldId((current) => (current === field.id ? null : field.id))}
+                    >
+                      <Pencil />
+                    </Button>
                     <ConfirmAction
-                      appOnly
                       action={() => deleteDocumentField(field.id, documentId)}
                       title="추출 항목을 삭제할까요?"
                       description="삭제하면 되돌릴 수 없어요."
@@ -235,6 +316,20 @@ export function DocumentReview({
                       }
                     />
                   </div>
+                  {editingFieldId === field.id && (
+                    <div
+                      className="w-full"
+                      onClick={(event) => event.stopPropagation()}
+                      onKeyDown={(event) => event.stopPropagation()}
+                    >
+                      <FieldEditForm
+                        documentId={documentId}
+                        field={field}
+                        presets={presets}
+                        onClose={() => setEditingFieldId(null)}
+                      />
+                    </div>
+                  )}
                 </div>
               ))}
               <FieldForm documentId={documentId} presets={presets} />
@@ -243,16 +338,32 @@ export function DocumentReview({
 
           <TabsContent value="signals" className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pt-2 data-[state=inactive]:hidden">
             <div className="space-y-3 pb-1">
-              {signals.length === 0 && (
+              {localSignals.length === 0 && (
                 <p className="py-4 text-center text-sm text-muted-foreground">기록된 확인 사항이 없어요.</p>
               )}
-              {signals.map((signal) => (
-                <div key={signal.id} className="space-y-1.5 rounded-lg border p-3">
+              {localSignals.map((signal) => (
+                <div
+                  key={signal.id}
+                  className={cn(
+                    "space-y-1.5 rounded-lg border p-3 transition-colors",
+                    signal.reviewed && "border-primary/30 bg-primary/5"
+                  )}
+                >
                   <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={signal.reviewed}
+                      disabled={done}
+                      onCheckedChange={(value) => toggleSignalReviewed(signal.id, Boolean(value))}
+                      aria-label={`${signal.title} 원문 대조 확인`}
+                    />
                     <SignalBadge level={signal.level} />
                     <p className="flex-1 text-sm font-medium">{signal.title}</p>
+                    {signal.ai_generated && (
+                      <span className="text-[10px] font-medium text-primary">
+                        AI · 신뢰도 {signal.confidence ?? 50}%
+                      </span>
+                    )}
                     <ConfirmAction
-                      appOnly
                       action={() => deleteDocumentSignal(signal.id, documentId)}
                       title="확인 사항을 삭제할까요?"
                       description="삭제하면 되돌릴 수 없어요."
@@ -280,42 +391,64 @@ export function DocumentReview({
 
         <div className="flex shrink-0 items-start gap-2 rounded-lg bg-warning/10 p-3 text-xs text-muted-foreground">
           <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-          정리 결과는 업무 참고용입니다.<br/>정리 결과를 확인후 계약서를 작성해주세요.
+          <span>
+            추출결과는 필히 검토하시고, 잘못된 내용은 수정 후 계약서를 작성해주세요.
+          </span>
         </div>
       </CardContent>
-      <CardFooter className="shrink-0 flex flex-wrap justify-between gap-2 border-t bg-card">
-        <ConfirmAction
-          action={() => deleteDocument(documentId)}
-          title="문서를 삭제할까요?"
-          description="원본 파일과 정리한 항목이 모두 삭제되며 되돌릴 수 없어요."
-          trigger={
-            <Button variant="ghost" className="text-destructive">
-              <Trash2 data-icon="inline-start" />
-              문서 삭제
-            </Button>
-          }
-        />
-        {done ? (
-          <Button variant="outline" disabled={pending} onClick={() => run(() => reopenReview(documentId))}>
-            <RotateCcw data-icon="inline-start" />
-            다시 검토
-          </Button>
-        ) : (
-          <Button
-            disabled={pending || localFields.length === 0 || reviewedCount < localFields.length}
-            onClick={() => run(() => completeReview(documentId))}
-            title={
-              localFields.length > 0 && reviewedCount < localFields.length
-                ? `확인하지 않은 항목이 ${localFields.length - reviewedCount}개 있어요`
-                : undefined
-            }
-          >
-            <CheckCircle2 data-icon="inline-start" />
-            검토 완료
-          </Button>
-        )}
-      </CardFooter>
     </Card>
+  );
+}
+
+function FieldEditForm({
+  documentId,
+  field,
+  presets,
+  onClose,
+}: {
+  documentId: string;
+  field: DocumentField;
+  presets: string[];
+  onClose: () => void;
+}) {
+  const [label, setLabel] = useState(field.label);
+  const { state, pending, onSubmit } = useFormAction(
+    updateDocumentField.bind(null, field.id, documentId),
+    { onSuccess: onClose }
+  );
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-3 rounded-lg border border-dashed bg-background p-3">
+      <div className="flex flex-wrap gap-1">
+        {presets.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setLabel(preset)}
+            className="rounded-full bg-muted px-2 py-0.5 text-xs hover:bg-primary/10 hover:text-primary"
+          >
+            {preset}
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input name="label" value={label} onChange={(event) => setLabel(event.target.value)} required />
+        <Input name="value" defaultValue={field.value} required />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-[80px_1fr]">
+        <Input name="page" type="number" min={1} defaultValue={field.page ?? ""} placeholder="페이지" />
+        <Input name="evidence_text" defaultValue={field.evidence_text ?? ""} placeholder="원문 근거 문구" />
+      </div>
+      <FormMessage state={state} />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          취소
+        </Button>
+        <SubmitButton size="sm" pending={pending}>
+          수정 저장
+        </SubmitButton>
+      </div>
+    </form>
   );
 }
 

@@ -20,6 +20,7 @@ import {
   updateDealForm,
 } from "@/lib/actions/deal-forms";
 import type { DealFormKind } from "@/lib/deal-forms";
+import { useBusy } from "@/lib/busy";
 import { useFormAction } from "@/lib/use-form-action";
 import { useIsApp } from "@/lib/use-is-app";
 import { cn } from "@/lib/utils";
@@ -56,6 +57,7 @@ export function DealFormEditor({
   const isApp = useIsApp();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  useBusy(pending);
   const finalized = status === "finalized";
   const readOnly = finalized || isApp;
 

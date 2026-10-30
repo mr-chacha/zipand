@@ -2,10 +2,11 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { CreditCard, Loader2, Lock, Plus, Sparkles, Trash2 } from "lucide-react";
+import { CreditCard, Lock, Plus, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { AudioAttach, type AttachedAudio } from "@/components/audio-attach";
+import { useBusy } from "@/lib/busy";
 import { FormMessage } from "@/components/form/form-message";
 import { FormActions } from "@/components/form/form-actions";
 import { SubmitButton } from "@/components/form/submit-button";
@@ -107,6 +108,7 @@ export function VisitForm({
   const [followUps, setFollowUps] = useState("");
   const [memo, setMemo] = useState("");
   const [aiPending, startAi] = useTransition();
+  useBusy(aiPending, "임장 기록을 AI로 정리하고 있습니다…");
   const nextKey = useRef(100);
   const [visitedAt, setVisitedAt] = useState(() => isoToKstLocal(null));
 
@@ -264,9 +266,7 @@ export function VisitForm({
                 }
                 onClick={runTranscribe}
               >
-                {aiPending ? (
-                  <Loader2 className="animate-spin" data-icon="inline-start" />
-                ) : !aiAvailable ? (
+                {!aiAvailable ? (
                   <Lock data-icon="inline-start" />
                 ) : (
                   <Sparkles data-icon="inline-start" />
@@ -287,9 +287,7 @@ export function VisitForm({
                 }
                 onClick={runOrganize}
               >
-                {aiPending ? (
-                  <Loader2 className="animate-spin" data-icon="inline-start" />
-                ) : !aiAvailable ? (
+                {!aiAvailable ? (
                   <Lock data-icon="inline-start" />
                 ) : (
                   <Sparkles data-icon="inline-start" />

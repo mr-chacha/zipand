@@ -3,24 +3,25 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Building2, FileStack, Loader2, MapPin, Printer, Save } from "lucide-react";
+import { Printer, Save } from "lucide-react";
 import { toast } from "sonner";
-import type { WriteDealOption } from "@/components/deal-forms/contract-write-dialog";
+import type {
+  WriteDealOption,
+  WritePropertyOption,
+} from "@/components/deal-forms/contract-write-dialog";
 import {
   DisclosureFormSheet,
   DisclosurePageTabs,
+  NonResidentialDisclosureFormSheet,
   type DisclosurePageNo,
 } from "@/components/deal-forms/disclosure-form-sheet";
 import { NativeSelect } from "@/components/form/native-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AiAccessBadge } from "@/components/ai/ai-access-badge";
 import { suggestDisclosureLocation } from "@/lib/actions/ai-assist";
-import { getAiAccessState } from "@/lib/actions/ai-billing";
-import { lookupBuildingHubForDisclosure } from "@/lib/actions/building-hub";
 import { createDealFormForDeal, updateDealForm } from "@/lib/actions/deal-forms";
+import { ensureDealForProperty } from "@/lib/actions/deals";
 import { loadDisclosureFromDealProperty, loadDisclosureFromProperty } from "@/lib/actions/disclosure-docs";
 import { useBusy } from "@/lib/busy";
 import {
@@ -33,19 +34,25 @@ import {
 } from "@/lib/contract-templates";
 import { buildDealFormDefaults, type DealFormPrefill } from "@/lib/deal-forms";
 import { mergeContractIntoDisclosure, mergeDisclosurePatch } from "@/lib/disclosure-form";
-import { openKakaoPostcode } from "@/lib/kakao-postcode";
+import { clearDisclosureWriteSeed } from "@/lib/disclosure-write-seed";
+import { refreshContractWriteOpener } from "@/lib/open-contract-write";
 import { printContractSheet } from "@/lib/print-contract";
 import { cn } from "@/lib/utils";
 
 export type DisclosureWriteSeed = {
+  buildingKind?: "residential" | "nonresidential";
   propertyType: ContractPropertyType;
   dealType: ContractDealType;
   dealId: string;
   /** 계약서에서 연결한 매물 — 서류함 채우기용 */
   propertyId?: string;
+  /** 계약서 「연결 매물」에 보이던 이름 그대로 */
+  propertyLabel?: string;
   /** 계약서 작성 중인 값(또는 저장된 계약서) — 소재지·면적·인적사항 반영 */
   contractData?: Record<string, string>;
 };
+
+type DisclosureBuildingKind = "residential" | "nonresidential";
 
 function emptyPrefill(): DealFormPrefill {
   return {
@@ -126,109 +133,144 @@ function buildActiveDisclosure(
 
 function DisclosureWriteBody({
   deals,
+  properties = [],
   seed,
   onClose,
+  presentation = "dialog",
 }: {
   deals: WriteDealOption[];
+  properties?: WritePropertyOption[];
   seed: DisclosureWriteSeed | null;
   onClose: () => void;
+  presentation?: "dialog" | "page";
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [aiAvailable, setAiAvailable] = useState(false);
   useBusy(pending);
+  const isPage = presentation === "page";
 
-  useEffect(() => {
-    void getAiAccessState().then((r) => setAiAvailable(r.available));
-  }, []);
+  const handleClose = () => {
+    clearDisclosureWriteSeed();
+    if (isPage) {
+      refreshContractWriteOpener();
+      if (typeof window !== "undefined" && window.opener) {
+        window.close();
+        return;
+      }
+      router.push("/contracts");
+      return;
+    }
+    onClose();
+  };
+
+  const resolvedDealId = (() => {
+    if (seed?.dealId) return seed.dealId;
+    if (seed?.propertyId) {
+      return deals.find((d) => d.propertyId === seed.propertyId)?.value ?? "";
+    }
+    return "";
+  })();
+  const resolvedPropertyId =
+    seed?.propertyId ||
+    deals.find((d) => d.value === resolvedDealId)?.propertyId ||
+    "";
 
   const [pickProperty, setPickProperty] = useState<ContractPropertyType>(seed?.propertyType ?? "아파트");
   const [pickDeal, setPickDeal] = useState<ContractDealType>(seed?.dealType ?? "매매");
-  const [dealId, setDealId] = useState(seed?.dealId ?? "");
-  const [propertyId, setPropertyId] = useState(seed?.propertyId ?? "");
+  const [dealId, setDealId] = useState(resolvedDealId);
+  const [propertyId, setPropertyId] = useState(resolvedPropertyId);
   const [formId, setFormId] = useState<string | null>(null);
   const [formEpoch, setFormEpoch] = useState(0);
   const [liveContractData, setLiveContractData] = useState<Record<string, string> | null>(seed?.contractData ?? null);
   const [page, setPage] = useState<DisclosurePageNo>(1);
-  const [hubOpen, setHubOpen] = useState(false);
-  const [hubDong, setHubDong] = useState("");
-  const [hubHo, setHubHo] = useState("");
-  const [hubAddr, setHubAddr] = useState<{
-    label: string;
-    bcode: string;
-    bun: string;
-    ji: string;
-  } | null>(null);
-  const [hubPending, setHubPending] = useState(false);
-  const [docsPending, setDocsPending] = useState(false);
-  const [locPending, setLocPending] = useState(false);
+  const [disclosureKind, setDisclosureKind] = useState<DisclosureBuildingKind | null>(seed?.buildingKind ?? null);
+  const [pendingDisclosureKind, setPendingDisclosureKind] = useState<DisclosureBuildingKind>(seed?.buildingKind ?? "residential");
+  const [autoFillPending, setAutoFillPending] = useState(false);
+  useBusy(autoFillPending, "매물 서류·입지 정보를 반영하고 있습니다…");
 
   const matchedDeals = useMemo(() => matchDeals(deals, pickProperty, pickDeal), [deals, pickProperty, pickDeal]);
+  const linkedPropertyLabel =
+    seed?.propertyLabel?.trim() ||
+    properties.find((p) => p.value === propertyId)?.label ||
+    seed?.contractData?.property_title?.trim() ||
+    deals.find((d) => d.propertyId === propertyId)?.prefill?.propertyTitle?.trim() ||
+    seed?.contractData?.property_address?.trim() ||
+    "연결 매물";
 
-  const active = useMemo(
-    () => buildActiveDisclosure(pickProperty, pickDeal, dealId, deals, liveContractData),
-    [pickProperty, pickDeal, dealId, deals, liveContractData]
-  );
+  /** 셀렉트에는 계약서와 같은 매물 이름 표시 (거래 라벨 대신) */
+  const propertySelectOptions = useMemo(() => {
+    const labelFor = (d: WriteDealOption) => {
+      if (propertyId && d.propertyId === propertyId && linkedPropertyLabel !== "연결 매물") {
+        return linkedPropertyLabel;
+      }
+      if (d.propertyId) {
+        const fromProp = properties.find((p) => p.value === d.propertyId)?.label;
+        if (fromProp) return fromProp;
+      }
+      return (
+        d.prefill?.propertyTitle?.trim() ||
+        d.label
+      );
+    };
 
-  const pickHubAddress = async () => {
-    try {
-      const parts = await openKakaoPostcode();
-      if (!parts) return;
-      if (!parts.bcode || parts.bcode.length < 10) {
-        toast.error("법정동코드를 받지 못했어요. 다른 주소로 다시 검색해 주세요.");
-        return;
+    const base = matchedDeals.length ? matchedDeals : deals;
+    let list = base;
+    if (propertyId) {
+      const linked = deals.filter((d) => d.propertyId === propertyId);
+      const rest = base.filter((d) => d.propertyId !== propertyId);
+      if (linked.length) {
+        list = [...linked, ...rest.filter((d) => !linked.some((l) => l.value === d.value))];
       }
-      setHubAddr({
-        label: parts.roadAddress || parts.jibunAddress,
-        bcode: parts.bcode,
-        bun: parts.bun,
-        ji: parts.ji,
-      });
-      if (parts.apartment) {
-        /* 동·호 입력 유도 */
-      }
-      toast.success("주소를 선택했어요. 동·호를 넣고 조회하세요.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "주소 검색에 실패했어요.");
     }
-  };
+    if (dealId && !list.some((d) => d.value === dealId)) {
+      const extra = deals.find((d) => d.value === dealId);
+      if (extra) {
+        list = [extra, ...list];
+      } else {
+        list = [
+          {
+            value: dealId,
+            label: linkedPropertyLabel,
+            propertyType: pickProperty,
+            dealType: pickDeal,
+            propertyId: propertyId || undefined,
+          },
+          ...list,
+        ];
+      }
+    }
+    return list.map((d) => ({ value: d.value, label: labelFor(d) }));
+  }, [
+    matchedDeals,
+    deals,
+    properties,
+    dealId,
+    propertyId,
+    linkedPropertyLabel,
+    pickProperty,
+    pickDeal,
+  ]);
 
-  const applyHubLookup = async () => {
-    if (!hubAddr) {
-      toast.error("주소를 먼저 검색해 주세요.");
-      return;
-    }
-    setHubPending(true);
-    try {
-      const result = await lookupBuildingHubForDisclosure({
-        bcode: hubAddr.bcode,
-        bun: hubAddr.bun,
-        ji: hubAddr.ji,
-        dong: hubDong || undefined,
-        ho: hubHo || undefined,
-      });
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      const f = result.fields;
-      setLiveContractData((prev) => ({
-        ...(prev ?? {}),
-        ...(f.land_area ? { land_area: f.land_area } : {}),
-        ...(f.building_area ? { building_area: f.building_area } : {}),
-        ...(f.building_use ? { building_use: f.building_use } : {}),
-        ...(f.building_structure ? { building_structure: f.building_structure } : {}),
-        ...(f.building_year ? { building_year: f.building_year } : {}),
-        ...(hubAddr.label ? { property_address: hubAddr.label } : {}),
-      }));
-      setFormEpoch((n) => n + 1);
-      setPage(1);
-      setHubOpen(false);
-      toast.success(result.message);
-    } finally {
-      setHubPending(false);
-    }
-  };
+  const active = useMemo(() => {
+    const base = buildActiveDisclosure(pickProperty, pickDeal, dealId, deals, liveContractData);
+    if (!base || !disclosureKind) return base;
+    const nonresidential = disclosureKind === "nonresidential";
+    const title = nonresidential ? "비주거용 건축물 확인설명서" : base.title;
+    // 저장 액션은 기존 서식 ID를 검증하므로, 비주거 여부는 별도 데이터 필드로 저장한다.
+    const templateId = base.templateId;
+    return {
+      ...base,
+      title,
+      templateId,
+      data: {
+        ...base.data,
+        template_id: templateId,
+        template_title: title,
+        form_template: nonresidential ? "disclosure_nonresidential_v1" : "disclosure_v1",
+        disclosure_building_type: disclosureKind,
+      },
+    };
+  }, [pickProperty, pickDeal, dealId, deals, liveContractData, disclosureKind]);
 
   const keepOrClearDeal = (nextDeals: WriteDealOption[], prev: string) =>
     prev && nextDeals.some((d) => d.value === prev) ? prev : "";
@@ -253,62 +295,84 @@ function DisclosureWriteBody({
     setFormEpoch((n) => n + 1);
   };
 
-  const applyDocsFromLinked = async (opts?: {
-    silentEmpty?: boolean;
-    propertyId?: string;
-    dealId?: string;
-  }) => {
-    const pid =
-      (opts?.propertyId ?? propertyId) ||
-      deals.find((d) => d.value === (opts?.dealId ?? dealId))?.propertyId ||
-      "";
-    const did = opts?.dealId ?? dealId;
-    if (!pid && !did) {
-      if (!opts?.silentEmpty) toast.message("연결 매물 또는 거래를 선택해 주세요.");
-      return;
-    }
-    setDocsPending(true);
-    try {
-      const res = pid
-        ? await loadDisclosureFromProperty(pid)
-        : await loadDisclosureFromDealProperty(did);
-      if (!res.ok) {
-        if (!opts?.silentEmpty) toast.message(res.error);
-        return;
-      }
-      setLiveContractData((prev) => ({ ...(prev ?? {}), ...res.result.fields }));
-      setFormEpoch((n) => n + 1);
-      setPage(1);
-      const head = res.result.summary.slice(0, 3).join(", ");
-      toast.success(
-        `매물 서류 ${res.result.documentCount}건을 반영했어요${head ? `: ${head}` : ""}. 문서 상세에 입력한 항목만 채워집니다.`
-      );
-    } finally {
-      setDocsPending(false);
-    }
-  };
-
   const changeDealId = (value: string) => {
     setDealId(value);
     setFormId(null);
     const deal = deals.find((d) => d.value === value);
     const pid = deal?.propertyId ?? "";
     setPropertyId(pid);
-    setLiveContractData(deal?.contractData ?? null);
+    setLiveContractData((prev) => ({ ...(deal?.contractData ?? {}), ...(prev ?? {}) }));
     setPage(1);
     setFormEpoch((n) => n + 1);
-    if (pid || value) {
-      void applyDocsFromLinked({ silentEmpty: true, propertyId: pid, dealId: value });
-    }
   };
 
-  // 열릴 때 연결 매물·거래가 있으면 서류 추출값을 바로 반영
+  // 열릴 때: 연결 거래 확정 → 검토완료 서류 + 카카오 입지 자동 반영
   useEffect(() => {
-    if (!propertyId && !dealId) return;
-    const t = window.setTimeout(() => {
-      void applyDocsFromLinked({ silentEmpty: true, propertyId, dealId });
-    }, 0);
-    return () => window.clearTimeout(t);
+    let cancelled = false;
+    const boot = async () => {
+      let pid = propertyId;
+      let did = dealId;
+      if (!did && pid) {
+        const linked = deals.find((d) => d.propertyId === pid);
+        if (linked) {
+          did = linked.value;
+        } else {
+          const ensured = await ensureDealForProperty(pid);
+          if (ensured.ok) did = ensured.dealId;
+        }
+        if (did && !cancelled) setDealId(did);
+      }
+      if (!pid && did) {
+        pid = deals.find((d) => d.value === did)?.propertyId ?? "";
+        if (pid && !cancelled) setPropertyId(pid);
+      }
+      if (!pid && !did) return;
+
+      setAutoFillPending(true);
+      try {
+        const patch: Record<string, string> = {};
+        let hasCachedLocation = false;
+        if (pid || did) {
+          const res = pid
+            ? await loadDisclosureFromProperty(pid)
+            : await loadDisclosureFromDealProperty(did);
+          if (!cancelled && res.ok) {
+            Object.assign(patch, res.result.fields);
+            hasCachedLocation = Boolean(
+              res.result.locationFields && Object.keys(res.result.locationFields).length
+            );
+          }
+        }
+        // 매물에 저장된 입지가 없으면 주소로 카카오 조회(기존 매물 호환)
+        if (!hasCachedLocation) {
+          const addr =
+            seed?.contractData?.property_address?.trim() ||
+            patch.property_address?.trim() ||
+            deals.find((d) => d.value === did)?.prefill?.propertyAddress?.trim() ||
+            "";
+          if (addr) {
+            const loc = await suggestDisclosureLocation(addr);
+            if (!cancelled && loc.ok) {
+              const { note: _note, ...fields } = loc.fields;
+              for (const [k, v] of Object.entries(fields)) {
+                if (v) patch[k] = v;
+              }
+            }
+          }
+        }
+        if (!cancelled && Object.keys(patch).length) {
+          setLiveContractData((prev) => ({ ...(prev ?? {}), ...patch }));
+          setFormEpoch((n) => n + 1);
+        }
+      } finally {
+        if (!cancelled) setAutoFillPending(false);
+      }
+    };
+    const t = window.setTimeout(() => void boot(), 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
     // 마운트·시드 기준 1회
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -319,11 +383,20 @@ function DisclosureWriteBody({
       return;
     }
     startTransition(async () => {
+      // 계약서와 세트로 묶이도록 연결 매물·소재지 보존
+      if (propertyId) fd.set("property_id", propertyId);
+      const address =
+        String(fd.get("property_address") ?? "").trim() ||
+        liveContractData?.property_address?.trim() ||
+        "";
+      if (address) fd.set("property_address", address);
+
       if (formId) {
         const result = await updateDealForm(formId, null, fd);
         if (result.error) toast.error(result.error);
         else {
           toast.success(result.message ?? "저장했어요.");
+          refreshContractWriteOpener();
           router.refresh();
         }
         return;
@@ -346,24 +419,34 @@ function DisclosureWriteBody({
       }
       setFormId(created.id);
       toast.success("확인설명서를 저장했어요.");
+      refreshContractWriteOpener();
       router.refresh();
     });
   };
 
-  return (
-    <DialogContent
-      showCloseButton
-      className={cn(
-        "flex max-h-[min(96vh,960px)] w-[min(98vw,1100px)] max-w-none flex-col gap-0 overflow-hidden p-0 sm:max-w-none",
-        "print:fixed print:inset-0 print:max-h-none print:w-full print:max-w-none print:translate-x-0 print:translate-y-0 print:rounded-none print:border-0 print:bg-white print:shadow-none",
+  const shellClass = cn(
+    "flex flex-col gap-0 bg-background",
+    isPage
+      ? "min-h-[900px] w-full overflow-visible"
+      : "max-h-[min(96vh,960px)] w-[min(98vw,1100px)] max-w-none overflow-hidden",
+    "print:fixed print:inset-0 print:max-h-none print:h-auto print:w-full print:max-w-none print:overflow-visible print:translate-x-0 print:translate-y-0 print:rounded-none print:border-0 print:bg-white print:shadow-none"
+  );
+
+  const body = (
+    <>
+      {isPage ? (
+        <div className="space-y-0 border-b px-4 py-3 print:hidden">
+          <h1 className="text-base font-semibold">확인설명서 작성</h1>
+          <p className="sr-only">계약서의 소재지·면적·인적사항이 반영됩니다. 1~4페이지를 눌러 확인하세요.</p>
+        </div>
+      ) : (
+        <DialogHeader className="space-y-0 border-b px-4 py-3 print:hidden">
+          <DialogTitle>확인설명서 작성</DialogTitle>
+          <DialogDescription className="sr-only">
+            계약서의 소재지·면적·인적사항이 반영됩니다. 1~4페이지를 눌러 확인하세요.
+          </DialogDescription>
+        </DialogHeader>
       )}
-    >
-      <DialogHeader className="space-y-0 border-b px-4 py-3 print:hidden">
-        <DialogTitle>확인설명서 작성</DialogTitle>
-        <DialogDescription className="sr-only">
-          계약서의 소재지·면적·인적사항이 반영됩니다. 1~4페이지를 눌러 확인하세요.
-        </DialogDescription>
-      </DialogHeader>
 
       <div className="flex flex-wrap items-end gap-3 border-b bg-slate-800 px-4 py-3 text-white print:hidden">
         <p className="w-full text-[14px] font-medium text-white/80 sm:w-auto sm:pb-2">확인설명서 종류</p>
@@ -392,32 +475,40 @@ function DisclosureWriteBody({
           />
         </div>
         <div className="ml-auto space-y-1">
-          <Label htmlFor="dw-link-deal" className="text-[14px] text-white/70">
-            연결 거래
+          <Label htmlFor="dw-link-property" className="text-[14px] text-white/70">
+            연결 매물
           </Label>
-          {deals.length === 0 ? (
-            <p className="max-w-xs text-[14px] text-white/80">
-              거래가 없어요.{" "}
-              <Link href="/contracts/new" className="underline">
-                계약 시작
-              </Link>
+          {propertyId && linkedPropertyLabel !== "연결 매물" ? (
+            <p
+              id="dw-link-property"
+              className="flex h-8 min-w-48 max-w-xs items-center truncate rounded-lg border border-input bg-white px-2.5 text-sm text-foreground"
+              title={linkedPropertyLabel}
+            >
+              {linkedPropertyLabel}
             </p>
-          ) : (
+          ) : propertySelectOptions.length > 0 ? (
             <NativeSelect
-              id="dw-link-deal"
+              id="dw-link-property"
               value={dealId}
               onChange={(e) => changeDealId(e.target.value)}
               placeholder="선택안함"
-              options={(matchedDeals.length ? matchedDeals : deals).map((d) => ({ value: d.value, label: d.label }))}
+              options={propertySelectOptions}
               className="min-w-48 max-w-xs bg-white text-foreground"
             />
+          ) : (
+            <p className="max-w-xs text-[14px] text-white/80">
+              매물이 없어요.{" "}
+              <Link href="/properties/new" className="underline">
+                매물 등록
+              </Link>
+            </p>
           )}
         </div>
       </div>
 
       <div className="shrink-0 border-b bg-muted/40 print:hidden">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2">
-          <Button type="submit" form="disclosure-write-form" size="sm" disabled={pending || !active}>
+          <Button type="submit" form="disclosure-write-form" size="sm" disabled={pending || !active || !disclosureKind}>
             <Save data-icon="inline-start" />
             저장
           </Button>
@@ -425,93 +516,27 @@ function DisclosureWriteBody({
             type="button"
             size="sm"
             variant="outline"
-            disabled={!active}
+            disabled={!active || !disclosureKind}
             onClick={() => printContractSheet(active?.title, "disclosure-print-root")}
           >
             <Printer data-icon="inline-start" />
             인쇄 · PDF
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!active || (!propertyId && !dealId) || docsPending}
-            onClick={() => void applyDocsFromLinked()}
-          >
-            {docsPending ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <FileStack data-icon="inline-start" />
-            )}
-            매물 서류에서 채우기
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!active || hubPending}
-            onClick={() => setHubOpen(true)}
-          >
-            <Building2 data-icon="inline-start" />
-            건축HUB 채우기
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            disabled={!active || locPending}
-            onClick={() => {
-              if (!active) return;
-              if (!aiAvailable) {
-                toast.error("구독 후 혹은 크레딧 결제 후 사용할 수 있어요. 설정 → AI·요금에서 확인해 주세요.");
-                return;
-              }
-              const addr =
-                active.data.property_address?.trim() ||
-                deals.find((d) => d.value === dealId)?.prefill?.propertyAddress?.trim() ||
-                "";
-              if (!addr) {
-                toast.message("소재지 주소를 먼저 입력해 주세요.");
-                return;
-              }
-              setLocPending(true);
-              void suggestDisclosureLocation(addr)
-                .then((res) => {
-                  if (!res.ok) {
-                    toast.error(res.error);
-                    return;
-                  }
-                  const { note, ...fields } = res.fields;
-                  setLiveContractData((prev) => ({ ...(prev ?? {}), ...fields }));
-                  setFormEpoch((n) => n + 1);
-                  setPage(2);
-                  toast.success(
-                    note
-                      ? `입지 초안을 채웠어요. ${note}`
-                      : "입지 초안을 채웠어요. 추정값이니 현장·지도로 확인하세요."
-                  );
-                })
-                .finally(() => setLocPending(false));
-            }}
-          >
-            {locPending ? (
-              <Loader2 className="animate-spin" data-icon="inline-start" />
-            ) : (
-              <MapPin data-icon="inline-start" />
-            )}
-            AI 입지 채우기
-          </Button>
-          <AiAccessBadge available={aiAvailable} compact />
-          <Button type="button" size="sm" variant="ghost" onClick={onClose}>
+          <Button type="button" size="sm" variant="ghost" onClick={handleClose}>
             닫기
           </Button>
+          {disclosureKind ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setDisclosureKind(null)}>
+              서식 종류 변경
+            </Button>
+          ) : null}
           {propertyId || dealId ? (
             <span className="text-[14px] text-muted-foreground">
-              매물 서류함·자동 추출·수동 입력값을 반영합니다
+              연결 매물의 검토 완료 서류·입지 정보를 자동 반영합니다
             </span>
           ) : null}
         </div>
-        {active ? (
+        {active && disclosureKind ? (
           <DisclosurePageTabs
             page={page}
             onPageChange={(next) => {
@@ -519,6 +544,7 @@ function DisclosureWriteBody({
               document.getElementById("disclosure-scroll")?.scrollTo({ top: 0 });
             }}
             className="border-t border-border/60"
+            pageCount={disclosureKind === "nonresidential" ? 3 : 4}
           />
         ) : null}
       </div>
@@ -527,64 +553,7 @@ function DisclosureWriteBody({
         id="disclosure-scroll"
         className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[14px] print:overflow-visible print:p-0"
       >
-        {hubOpen ? (
-          <div className="mb-4 space-y-3 rounded-lg border bg-muted/30 p-4 print:hidden">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium">건축HUB로 면적·용도 채우기</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  공공데이터 속성 조회입니다(공식 등본 PDF 아님). 「건축HUB 건축물대장」 활용신청이 필요합니다.
-                </p>
-              </div>
-              <Button type="button" size="sm" variant="ghost" onClick={() => setHubOpen(false)}>
-                닫기
-              </Button>
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label>주소</Label>
-                <Button type="button" size="sm" variant="outline" onClick={() => void pickHubAddress()}>
-                  주소 검색
-                </Button>
-              </div>
-              <p className="rounded-md border bg-background px-2.5 py-1.5 text-xs text-muted-foreground">
-                {hubAddr?.label || "카카오 주소검색으로 선택하세요."}
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="hub-dong">동 (아파트 등)</Label>
-                <Input
-                  id="hub-dong"
-                  value={hubDong}
-                  onChange={(e) => setHubDong(e.target.value)}
-                  placeholder="예: 101"
-                  disabled={hubPending}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="hub-ho">호</Label>
-                <Input
-                  id="hub-ho"
-                  value={hubHo}
-                  onChange={(e) => setHubHo(e.target.value)}
-                  placeholder="예: 410"
-                  disabled={hubPending}
-                />
-              </div>
-            </div>
-            <Button type="button" disabled={hubPending || !hubAddr} onClick={() => void applyHubLookup()}>
-              {hubPending ? (
-                <Loader2 className="animate-spin" data-icon="inline-start" />
-              ) : (
-                <Building2 data-icon="inline-start" />
-              )}
-              조회 후 반영
-            </Button>
-          </div>
-        ) : null}
-
-        {!active ? (
+        {!active || !disclosureKind ? (
           <p className="py-16 text-center text-[14px] text-muted-foreground">해당 종류의 확인설명서 서식이 없어요.</p>
         ) : (
           <form
@@ -596,18 +565,86 @@ function DisclosureWriteBody({
             }}
           >
             <input type="hidden" name="title" value={active.title} />
-            <DisclosureFormSheet
-              propertyType={active.propertyType}
-              dealType={active.dealType}
-              title={active.title}
-              data={active.data}
-              page={page}
-              onPageChange={setPage}
-              showPageTabs={false}
-            />
+            <input type="hidden" name="property_id" value={propertyId} />
+            {disclosureKind === "nonresidential" ? (
+              <NonResidentialDisclosureFormSheet title={active.title} data={active.data} page={page} />
+            ) : (
+              <DisclosureFormSheet
+                propertyType={active.propertyType}
+                dealType={active.dealType}
+                title={active.title}
+                data={active.data}
+                page={page}
+                onPageChange={setPage}
+                showPageTabs={false}
+              />
+            )}
           </form>
         )}
       </div>
+      {!disclosureKind ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4 print:hidden">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="disclosure-kind-title"
+            className="w-full max-w-[440px] border border-border bg-background p-4 shadow-xl"
+          >
+            <h2 id="disclosure-kind-title" className="mb-4 text-center text-[15px] font-semibold">
+              확인설명서 종류를 선택하세요
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["residential", "주거용"],
+                ["nonresidential", "비주거용"],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={pendingDisclosureKind === value}
+                  onClick={() => setPendingDisclosureKind(value)}
+                  className={cn(
+                    "h-14 border text-[14px] font-medium transition-colors",
+                    pendingDisclosureKind === value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted/40 hover:bg-muted"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-center text-[12px] text-muted-foreground">
+              주거용은 기존 서식, 비주거용은 3쪽 서식으로 작성합니다.
+            </p>
+            <div className="mt-4 flex justify-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setDisclosureKind(pendingDisclosureKind);
+                  setPage(1);
+                }}
+              >
+                확인
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={handleClose}>
+                취소
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (isPage) {
+    return <div className={shellClass}>{body}</div>;
+  }
+
+  return (
+    <DialogContent showCloseButton className={cn(shellClass, "p-0 sm:max-w-none")}>
+      {body}
     </DialogContent>
   );
 }
@@ -617,16 +654,34 @@ export function DisclosureWriteDialog({
   open,
   onOpenChange,
   deals,
+  properties = [],
   seed = null,
+  presentation = "dialog",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   deals: WriteDealOption[];
+  properties?: WritePropertyOption[];
   seed?: DisclosureWriteSeed | null;
+  presentation?: "dialog" | "page";
 }) {
   const sessionKey = seed
-    ? `${seed.dealId}:${seed.propertyId ?? ""}:${seed.propertyType}:${seed.dealType}:${seed.contractData ? Object.keys(seed.contractData).length : 0}`
+    ? `${seed.dealId}:${seed.propertyId ?? ""}:${seed.propertyLabel ?? ""}:${seed.propertyType}:${seed.dealType}:${seed.contractData ? Object.keys(seed.contractData).length : 0}`
     : "blank";
+
+  if (presentation === "page") {
+    if (!open) return null;
+    return (
+      <DisclosureWriteBody
+        key={sessionKey}
+        deals={deals}
+        properties={properties}
+        seed={seed}
+        presentation="page"
+        onClose={() => onOpenChange(false)}
+      />
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange} disablePointerDismissal>
@@ -634,6 +689,7 @@ export function DisclosureWriteDialog({
         <DisclosureWriteBody
           key={sessionKey}
           deals={deals}
+          properties={properties}
           seed={seed}
           onClose={() => onOpenChange(false)}
         />

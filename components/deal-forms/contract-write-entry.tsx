@@ -1,20 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FileText } from "lucide-react";
 import {
   ContractWriteButton,
-  ContractWriteDialog,
   type WriteDealOption,
   type WritePropertyOption,
 } from "@/components/deal-forms/contract-write-dialog";
 import type { RelatedFormsOfficeDefaults } from "@/components/deal-forms/related-forms-dialog";
 import { OfficeRequiredDialog } from "@/components/office-gate";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { openContractWriteWindow } from "@/lib/open-contract-write";
 import { cn } from "@/lib/utils";
 
-/** 계약관리 헤더용: 게이트 + 작성 창 */
+/** 계약관리 헤더용: 게이트 + 새 창 작성 */
 export function ContractWriteEntry({
   properties,
   deals = [],
@@ -50,46 +49,29 @@ export function ContractWriteEntry({
   );
 }
 
-/** 계약서 관리 툴바 + ?write=1 로 창 열기 */
+/** 계약서 관리 툴바 — 작성은 새 창으로 연다 */
 export function DocumentsWriteControls({
-  properties,
-  deals = [],
-  office = null,
   children,
+  trailing,
 }: {
-  properties: WritePropertyOption[];
+  properties?: WritePropertyOption[];
   deals?: WriteDealOption[];
   office?: RelatedFormsOfficeDefaults | null;
   children?: React.ReactNode;
+  trailing?: React.ReactNode;
+  editSeed?: unknown;
+  onEditSeedChange?: (seed: null) => void;
 }) {
-  const searchParams = useSearchParams();
-  const pathname = usePathname();
-  const router = useRouter();
-  const writeParam = searchParams.get("write") === "1";
-  const [manualOpen, setManualOpen] = useState(false);
-  const open = manualOpen || writeParam;
-
-  const setOpen = (next: boolean) => {
-    setManualOpen(next);
-    if (!next && writeParam) router.replace(pathname, { scroll: false });
-  };
-
   return (
-    <>
+    <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" onClick={() => setOpen(true)}>
+        <Button type="button" size="sm" onClick={() => openContractWriteWindow()}>
           <FileText data-icon="inline-start" />
           계약서 작성
         </Button>
         {children}
       </div>
-      <ContractWriteDialog
-        open={open}
-        onOpenChange={setOpen}
-        properties={properties}
-        deals={deals}
-        office={office}
-      />
-    </>
+      {trailing}
+    </div>
   );
 }

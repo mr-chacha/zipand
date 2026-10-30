@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { addTestCredits, setAiProvider, setBillingMode, setPlanId } from "@/lib/actions/ai-billing";
+import { useBusy } from "@/lib/busy";
 import {
   AI_PROVIDERS,
   BILLING_MODES,
@@ -69,6 +70,7 @@ function ChoiceCard({
 
 export function AiBillingSettings({ isOwner, aiProvider, billingMode, planId, creditBalance }: Props) {
   const [pending, start] = useTransition();
+  useBusy(pending, "AI 설정을 저장하고 있습니다…");
   const providerLabel = AI_PROVIDERS.find((p) => p.id === aiProvider)?.name;
   const modeLabel = BILLING_MODES.find((m) => m.id === billingMode)?.name;
   const plan = PLANS.find((p) => p.id === planId) ?? PLANS[0];
@@ -214,7 +216,7 @@ export function AiBillingSettings({ isOwner, aiProvider, billingMode, planId, cr
             <CardHeader>
               <CardTitle className="text-base">3. 크레딧 잔액</CardTitle>
               <CardDescription>
-                1크레딧 ≈ 통화 요약 1회(약 5분). 광고 문구·입지 초안은 더 적게 차감할 예정이에요.
+                1크레딧 ≈ 통화 요약 1회(약 5분). 광고 문구 초안도 사용 시 크레딧이 차감돼요.
               </CardDescription>
             </CardHeader>
             <CardContent>
