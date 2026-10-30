@@ -3,12 +3,13 @@ import type { RelatedFormsOfficeDefaults } from "@/components/deal-forms/related
 import { asStringRecord } from "@/lib/deal-forms";
 import { mergeDocFormExtras } from "@/lib/doc-extract/form-extras";
 import { getSession } from "@/lib/auth";
+import { signedUrls } from "@/lib/storage";
 
 /** 계약서 작성 창에 필요한 매물·거래·사무소 옵션 */
 export async function loadContractWriteOptions() {
   const { supabase, profile, office } = await getSession();
 
-  const [{ data: forms }, { data: deals }, { data: propertyRows }] = await Promise.all([
+  const [{ data: forms }, { data: deals }, { data: propertyRows }, certificateUrls] = await Promise.all([
     supabase
       .from("deal_forms")
       .select("id, deal_id, kind, title, status, data, created_at")
@@ -28,6 +29,9 @@ export async function loadContractWriteOptions() {
       )
       .order("updated_at", { ascending: false })
       .limit(200),
+    office.guarantee_certificate_path
+      ? signedUrls(supabase, "office-docs", [office.guarantee_certificate_path])
+      : Promise.resolve({} as Record<string, string>),
   ]);
 
   const propertyIds = (propertyRows ?? []).map((p) => p.id);
@@ -183,5 +187,13 @@ export async function loadContractWriteOptions() {
     };
   });
 
-  return { forms: forms ?? [], deals: dealsOptions, properties, office: officeDefaults };
+  return {
+    forms: forms ?? [],
+    deals: dealsOptions,
+    properties,
+    office: officeDefaults,
+    guaranteeCertificateUrl: office.guarantee_certificate_path
+      ? certificateUrls[office.guarantee_certificate_path] ?? null
+      : null,
+  };
 }

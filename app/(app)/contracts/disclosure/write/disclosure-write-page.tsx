@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   WriteDealOption,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/disclosure-write-seed";
 import { refreshContractWriteOpener } from "@/lib/open-contract-write";
 
-/** 계약서 작성 창에서 전환된 확인설명서 전용 페이지 */
+/** 계약서 작성에서 새 탭으로 연 확인설명서 전용 페이지 */
 export function DisclosureWritePageClient({
   deals,
   properties,
@@ -27,9 +27,15 @@ export function DisclosureWritePageClient({
   const router = useRouter();
   const [seed, setSeed] = useState<DisclosureWriteSeed | null>(null);
   const [ready, setReady] = useState(false);
+  const seedRead = useRef(false);
 
   useEffect(() => {
-    setSeed(peekDisclosureWriteSeed());
+    if (seedRead.current) return;
+    seedRead.current = true;
+    const next = peekDisclosureWriteSeed();
+    setSeed(next);
+    // 새 탭 핸드오프용 — 한 번 읽으면 제거
+    if (next) clearDisclosureWriteSeed();
     setReady(true);
   }, []);
 

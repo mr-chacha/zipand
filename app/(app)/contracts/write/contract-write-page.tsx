@@ -16,11 +16,13 @@ export function ContractWritePageClient({
   properties,
   deals,
   office,
+  guaranteeCertificateUrl = null,
   edit = null,
 }: {
   properties: WritePropertyOption[];
   deals: WriteDealOption[];
   office: RelatedFormsOfficeDefaults;
+  guaranteeCertificateUrl?: string | null;
   edit?: ContractWriteEditSeed | null;
 }) {
   const router = useRouter();
@@ -39,6 +41,7 @@ export function ContractWritePageClient({
           properties={properties}
           deals={deals}
           office={office}
+          guaranteeCertificateUrl={guaranteeCertificateUrl}
           edit={edit}
           onOpenChange={(next) => {
             if (next) return;

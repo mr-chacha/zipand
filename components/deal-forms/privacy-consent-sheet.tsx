@@ -30,13 +30,21 @@ function CellInput({
 }
 
 /** 한국공인중개사협회 양식 기준 개인정보 수집·이용 동의서 */
-export function PrivacyConsentSheet({ data }: { data: Record<string, string> }) {
+export function PrivacyConsentSheet({
+  data,
+  id = "contract-print-root",
+  className,
+}: {
+  data: Record<string, string>;
+  id?: string;
+  className?: string;
+}) {
   const officeName = data.office_name || "개업공인중개사사무소";
 
   return (
     <div
-      id="contract-print-root"
-      className="space-y-4 bg-white text-[13px] leading-relaxed text-foreground print:space-y-3 print:text-[11px]"
+      id={id}
+      className={cn("space-y-4 bg-white text-[13px] leading-relaxed text-foreground print:space-y-3 print:text-[11px]", className)}
     >
       <header className="text-center">
         <h2 className="text-xl font-bold tracking-tight print:text-[18px]">개인정보 수집 및 이용 동의서</h2>

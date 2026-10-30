@@ -12,6 +12,7 @@ import type {
 import {
   DisclosureFormSheet,
   DisclosurePageTabs,
+  NonResidentialDisclosureFormSheet,
   type DisclosurePageNo,
 } from "@/components/deal-forms/disclosure-form-sheet";
 import { NativeSelect } from "@/components/form/native-select";
@@ -39,6 +40,7 @@ import { printContractSheet } from "@/lib/print-contract";
 import { cn } from "@/lib/utils";
 
 export type DisclosureWriteSeed = {
+  buildingKind?: "residential" | "nonresidential";
   propertyType: ContractPropertyType;
   dealType: ContractDealType;
   dealId: string;
@@ -49,6 +51,8 @@ export type DisclosureWriteSeed = {
   /** 계약서 작성 중인 값(또는 저장된 계약서) — 소재지·면적·인적사항 반영 */
   contractData?: Record<string, string>;
 };
+
+type DisclosureBuildingKind = "residential" | "nonresidential";
 
 function emptyPrefill(): DealFormPrefill {
   return {
@@ -179,6 +183,8 @@ function DisclosureWriteBody({
   const [formEpoch, setFormEpoch] = useState(0);
   const [liveContractData, setLiveContractData] = useState<Record<string, string> | null>(seed?.contractData ?? null);
   const [page, setPage] = useState<DisclosurePageNo>(1);
+  const [disclosureKind, setDisclosureKind] = useState<DisclosureBuildingKind | null>(seed?.buildingKind ?? null);
+  const [pendingDisclosureKind, setPendingDisclosureKind] = useState<DisclosureBuildingKind>(seed?.buildingKind ?? "residential");
   const [autoFillPending, setAutoFillPending] = useState(false);
   useBusy(autoFillPending, "매물 서류·입지 정보를 반영하고 있습니다…");
 
@@ -245,10 +251,26 @@ function DisclosureWriteBody({
     pickDeal,
   ]);
 
-  const active = useMemo(
-    () => buildActiveDisclosure(pickProperty, pickDeal, dealId, deals, liveContractData),
-    [pickProperty, pickDeal, dealId, deals, liveContractData]
-  );
+  const active = useMemo(() => {
+    const base = buildActiveDisclosure(pickProperty, pickDeal, dealId, deals, liveContractData);
+    if (!base || !disclosureKind) return base;
+    const nonresidential = disclosureKind === "nonresidential";
+    const title = nonresidential ? "비주거용 건축물 확인설명서" : base.title;
+    // 저장 액션은 기존 서식 ID를 검증하므로, 비주거 여부는 별도 데이터 필드로 저장한다.
+    const templateId = base.templateId;
+    return {
+      ...base,
+      title,
+      templateId,
+      data: {
+        ...base.data,
+        template_id: templateId,
+        template_title: title,
+        form_template: nonresidential ? "disclosure_nonresidential_v1" : "disclosure_v1",
+        disclosure_building_type: disclosureKind,
+      },
+    };
+  }, [pickProperty, pickDeal, dealId, deals, liveContractData, disclosureKind]);
 
   const keepOrClearDeal = (nextDeals: WriteDealOption[], prev: string) =>
     prev && nextDeals.some((d) => d.value === prev) ? prev : "";
@@ -486,7 +508,7 @@ function DisclosureWriteBody({
 
       <div className="shrink-0 border-b bg-muted/40 print:hidden">
         <div className="flex flex-wrap items-center gap-2 px-4 py-2">
-          <Button type="submit" form="disclosure-write-form" size="sm" disabled={pending || !active}>
+          <Button type="submit" form="disclosure-write-form" size="sm" disabled={pending || !active || !disclosureKind}>
             <Save data-icon="inline-start" />
             저장
           </Button>
@@ -494,7 +516,7 @@ function DisclosureWriteBody({
             type="button"
             size="sm"
             variant="outline"
-            disabled={!active}
+            disabled={!active || !disclosureKind}
             onClick={() => printContractSheet(active?.title, "disclosure-print-root")}
           >
             <Printer data-icon="inline-start" />
@@ -503,13 +525,18 @@ function DisclosureWriteBody({
           <Button type="button" size="sm" variant="ghost" onClick={handleClose}>
             닫기
           </Button>
+          {disclosureKind ? (
+            <Button type="button" size="sm" variant="ghost" onClick={() => setDisclosureKind(null)}>
+              서식 종류 변경
+            </Button>
+          ) : null}
           {propertyId || dealId ? (
             <span className="text-[14px] text-muted-foreground">
               연결 매물의 검토 완료 서류·입지 정보를 자동 반영합니다
             </span>
           ) : null}
         </div>
-        {active ? (
+        {active && disclosureKind ? (
           <DisclosurePageTabs
             page={page}
             onPageChange={(next) => {
@@ -517,6 +544,7 @@ function DisclosureWriteBody({
               document.getElementById("disclosure-scroll")?.scrollTo({ top: 0 });
             }}
             className="border-t border-border/60"
+            pageCount={disclosureKind === "nonresidential" ? 3 : 4}
           />
         ) : null}
       </div>
@@ -525,7 +553,7 @@ function DisclosureWriteBody({
         id="disclosure-scroll"
         className="min-h-0 flex-1 overflow-y-auto px-4 py-4 text-[14px] print:overflow-visible print:p-0"
       >
-        {!active ? (
+        {!active || !disclosureKind ? (
           <p className="py-16 text-center text-[14px] text-muted-foreground">해당 종류의 확인설명서 서식이 없어요.</p>
         ) : (
           <form
@@ -538,18 +566,75 @@ function DisclosureWriteBody({
           >
             <input type="hidden" name="title" value={active.title} />
             <input type="hidden" name="property_id" value={propertyId} />
-            <DisclosureFormSheet
-              propertyType={active.propertyType}
-              dealType={active.dealType}
-              title={active.title}
-              data={active.data}
-              page={page}
-              onPageChange={setPage}
-              showPageTabs={false}
-            />
+            {disclosureKind === "nonresidential" ? (
+              <NonResidentialDisclosureFormSheet title={active.title} data={active.data} page={page} />
+            ) : (
+              <DisclosureFormSheet
+                propertyType={active.propertyType}
+                dealType={active.dealType}
+                title={active.title}
+                data={active.data}
+                page={page}
+                onPageChange={setPage}
+                showPageTabs={false}
+              />
+            )}
           </form>
         )}
       </div>
+      {!disclosureKind ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 px-4 print:hidden">
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="disclosure-kind-title"
+            className="w-full max-w-[440px] border border-border bg-background p-4 shadow-xl"
+          >
+            <h2 id="disclosure-kind-title" className="mb-4 text-center text-[15px] font-semibold">
+              확인설명서 종류를 선택하세요
+            </h2>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ["residential", "주거용"],
+                ["nonresidential", "비주거용"],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={pendingDisclosureKind === value}
+                  onClick={() => setPendingDisclosureKind(value)}
+                  className={cn(
+                    "h-14 border text-[14px] font-medium transition-colors",
+                    pendingDisclosureKind === value
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-muted/40 hover:bg-muted"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-3 text-center text-[12px] text-muted-foreground">
+              주거용은 기존 서식, 비주거용은 3쪽 서식으로 작성합니다.
+            </p>
+            <div className="mt-4 flex justify-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  setDisclosureKind(pendingDisclosureKind);
+                  setPage(1);
+                }}
+              >
+                확인
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={handleClose}>
+                취소
+              </Button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </>
   );
 

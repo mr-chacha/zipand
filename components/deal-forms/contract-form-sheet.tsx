@@ -243,7 +243,10 @@ function LeaseTerminateClause({
   );
 }
 
-/** 만원 저장값 ↔ 원 표시(쉼표). 입력 중에는 원 자릿수를 유지하고, blur 시 만원 단위로 맞춘다. */
+/**
+ * 금액 입력(만원 단위): 포커스 중 숫자, blur 시 한글(사억육천오백만).
+ * 원정 옆에는 원 환산액(쉼표)을 TermsRow detail에 표시한다.
+ */
 function WonAmountInput({
   name,
   manwon,
@@ -255,46 +258,52 @@ function WonAmountInput({
   onManwonChange?: (manwon: string) => void;
   className?: string;
 }) {
-  /** null이면 manwon에서 표시, 문자열이면 입력 중인 원 자리 */
+  /** null이면 blur(한글) 표시, 문자열이면 입력 중인 만원 자리 */
   const [draft, setDraft] = useState<string | null>(null);
-  const wonFromManwon = (() => {
-    const won = parseManwon(manwon) * 10_000;
-    return won > 0 ? String(won) : "";
-  })();
-  const wonDigits = draft !== null ? draft : wonFromManwon;
-
-  const commitManwon = (digits: string) => {
-    if (!onManwonChange) return;
-    if (!digits) {
-      onManwonChange("");
-      return;
-    }
-    onManwonChange(String(Math.floor(Number(digits) / 10_000)));
-  };
+  const manwonNum = parseManwon(manwon);
+  const manwonDigits = manwonNum > 0 ? String(manwonNum) : "";
+  const hangul = manwonToHangul(manwonNum).replace(/원$/, "");
+  const editing = draft !== null;
+  const digits = editing ? draft : manwonDigits;
+  const displayValue = editing
+    ? digits
+      ? formatNumberInput(digits)
+      : ""
+    : hangul;
 
   return (
     <div className={cn("flex min-w-0 flex-1 items-center gap-1.5", className)}>
       <Input
         inputMode="numeric"
         autoComplete="off"
-        value={wonDigits ? formatNumberInput(wonDigits) : ""}
-        onFocus={() => setDraft(wonFromManwon)}
+        value={displayValue}
+        onFocus={() => setDraft(manwonDigits)}
         onBlur={() => setDraft(null)}
         onChange={(e) => {
-          const digits = e.target.value
+          const next = e.target.value
             .replace(/\D/g, "")
             .replace(/^0+(?=\d)/, "")
-            .slice(0, 15);
-          setDraft(digits);
-          commitManwon(digits);
+            .slice(0, 12);
+          setDraft(next);
+          onManwonChange?.(next);
         }}
-        placeholder="0"
+        placeholder="만원"
         className={cn(
-          "h-8 min-w-0 flex-1 text-[14px] tabular-nums md:text-[14px] app:text-[14px]",
+          "h-8 min-w-0 flex-1 text-[14px] md:text-[14px] app:text-[14px]",
+          editing ? "tabular-nums" : null,
           fieldBorder
         )}
       />
-      <span className="shrink-0 text-muted-foreground">원</span>
+      {/* 한글 표시 때는 '원정' 칸과 겹치지 않게 자리만 맞춤 */}
+      <span
+        className={cn(
+          "shrink-0 text-muted-foreground",
+          !editing && hangul ? "invisible select-none" : null
+        )}
+        aria-hidden={!editing && Boolean(hangul)}
+      >
+        만원
+      </span>
       <input type="hidden" name={name} value={manwon} />
     </div>
   );
@@ -595,7 +604,12 @@ function ContractTermsTable({
         name="down_payment_date"
         value={data.down_payment_date ?? ""}
       />
-      <table className="w-full border-collapse border text-[14px] print:border-b-0">
+      <table
+        className={cn(
+          "contract-terms-table w-full border-collapse border text-[14px] print:border-b-0",
+          isSale && "contract-terms-table-sale"
+        )}
+      >
         <tbody>
           <TermsRow
             className={isSale ? "print:hidden" : undefined}
@@ -609,9 +623,9 @@ function ContractTermsTable({
             }
             mid="원정"
             detail={
-              amount ? (
-                <span className="text-muted-foreground tabular-nums">
-                  (₩ {formatNumberInput(String(parseManwon(amount) * 10_000))})
+              parseManwon(amount) > 0 ? (
+                <span className="tabular-nums text-foreground">
+                  {formatNumberInput(String(parseManwon(amount) * 10_000))}
                 </span>
               ) : null
             }
@@ -736,7 +750,7 @@ function ContractTermsTable({
               isSale
                 ? undefined
                 : printOptional(balanceManwon > 0 || Boolean(data.balance_date)),
-              !isMonthly && "print:border-b-0"
+              "contract-balance-row"
             )}
             label="잔금"
             amount={
@@ -1361,7 +1375,7 @@ export function ContractFormSheet({
         <h3 className="mb-2 font-bold print:mb-0 print:border-b print:border-black">
           1. 부동산의 표시
         </h3>
-        <table className="w-full border-collapse border text-[14px] print:border-t-0">
+        <table className="contract-property-table w-full border-collapse border text-[14px] print:border-t-0">
           <tbody>
             <tr className="border-b">
               <th className="w-28 border-r bg-muted/40 px-2 py-1.5 text-left">
@@ -1548,7 +1562,7 @@ export function ContractFormSheet({
         <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
           <h3 className="font-bold">2. 계약내용</h3>
           <p className="text-[14px] text-muted-foreground print:hidden">
-            입력·표시: 원 (저장은 만원 단위)
+            금액은 만원 단위로 입력 · 다음 칸으로 이동하면 한글로 표시
           </p>
         </div>
         <p className="mb-2 text-[14px] leading-relaxed text-muted-foreground print:mb-0 print:text-[10.5px] print:leading-relaxed print:text-foreground">

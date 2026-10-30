@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import { Copy, Printer, Save } from "lucide-react";
 import { toast } from "sonner";
 import { ContractFormSheet } from "@/components/deal-forms/contract-form-sheet";
-import {
-  DisclosureWriteDialog,
-  type DisclosureWriteSeed,
-} from "@/components/deal-forms/disclosure-write-dialog";
+import { PrivacyConsentSheet } from "@/components/deal-forms/privacy-consent-sheet";
 import type { RelatedFormsOfficeDefaults } from "@/components/deal-forms/related-forms-dialog";
 import {
   StandardLeaseFormSheet,
@@ -19,6 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/dialogs";
 import { NativeSelect } from "@/components/form/native-select";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { createDealFormForDeal, updateDealForm } from "@/lib/actions/deal-forms";
@@ -38,9 +36,11 @@ import {
   newContractNo,
   type DealFormPrefill,
 } from "@/lib/deal-forms";
-import { stashDisclosureWriteSeed } from "@/lib/disclosure-write-seed";
+import { openDisclosureWriteTab } from "@/lib/disclosure-write-seed";
+import { openRelatedFormsWindow } from "@/lib/open-related-forms";
 import { refreshContractWriteOpener, tagContractWriteFormId } from "@/lib/open-contract-write";
-import { printContractSheet } from "@/lib/print-contract";
+import { printContractBatch } from "@/lib/print-contract";
+import { buildPrivacyConsentDefaults } from "@/lib/privacy-consent";
 import {
   CONTRACT_FORM_STYLE_OPTIONS,
   STANDARD_LEASE_TITLE,
@@ -327,6 +327,7 @@ export function ContractWriteDialog({
   properties,
   deals = [],
   office = null,
+  guaranteeCertificateUrl = null,
   edit = null,
   presentation = "dialog",
 }: {
@@ -337,6 +338,7 @@ export function ContractWriteDialog({
   deals?: WriteDealOption[];
   /** 설정에 등록된 사무소·담당자 — 개업공인중개사 란에 반영 */
   office?: RelatedFormsOfficeDefaults | null;
+  guaranteeCertificateUrl?: string | null;
   /** 기존 계약서 열람·수정 */
   edit?: ContractWriteEditSeed | null;
   /** dialog: 모달 / page: 새 창·전용 페이지 */
@@ -361,12 +363,22 @@ export function ContractWriteDialog({
   /** 종류·거래가 바뀔 때 양식을 다시 마운트하기 위한 키 */
   const [formEpoch, setFormEpoch] = useState(0);
   const [leasePage, setLeasePage] = useState<StandardLeasePageNo>(1);
-  const [disclosureOpen, setDisclosureOpen] = useState(false);
-  const [disclosureSeed, setDisclosureSeed] = useState<DisclosureWriteSeed | null>(null);
+  const [printColor, setPrintColor] = useState<"monochrome" | "color">("monochrome");
+  const [printItems, setPrintItems] = useState({ contract: true, privacyConsent: false, guaranteeCertificate: false });
   const [propertyConfirmOpen, setPropertyConfirmOpen] = useState(false);
   const [pendingPropertyId, setPendingPropertyId] = useState<string | null>(null);
   const [dealTypeConfirmOpen, setDealTypeConfirmOpen] = useState(false);
   const [pendingDealType, setPendingDealType] = useState<ContractDealType | null>(null);
+  const [disclosurePickerOpen, setDisclosurePickerOpen] = useState(false);
+  const [pendingDisclosureSeed, setPendingDisclosureSeed] = useState<{
+    propertyType: ContractPropertyType;
+    dealType: ContractDealType;
+    dealId: string;
+    propertyId: string;
+    propertyLabel: string;
+    contractData: Record<string, string>;
+  } | null>(null);
+  const [pendingDisclosureKind, setPendingDisclosureKind] = useState<"residential" | "nonresidential">("residential");
   /** 표준임대차 전환 등으로 거래종류 확인이 필요할 때 함께 적용 */
   const [pendingFormStyle, setPendingFormStyle] = useState<ContractFormStyle | null>(null);
   const editing = Boolean(formId && editData);
@@ -398,6 +410,33 @@ export function ContractWriteDialog({
     };
   }, [open, pickProperty, pickDeal, propertyId, properties, formStyle, office, editData, editTitle]);
 
+  const privacyConsentData = buildPrivacyConsentDefaults({
+    dealType: active?.data.deal_type || pickDeal,
+    propertyTitle: active?.data.property_title || linkedProperty?.prefill?.propertyTitle || "",
+    propertyAddress: active?.data.property_address || linkedProperty?.prefill?.propertyAddress || "",
+    propertyType: active?.data.property_type || pickProperty,
+    amount: null,
+    monthlyRent: null,
+    downPayment: null,
+    balanceDate: null,
+    contractDate: active?.data.contract_date || null,
+    moveInDate: null,
+    lessorName: active?.data.lessor_name || null,
+    lessorPhone: active?.data.lessor_phone || null,
+    lessorAccount: null,
+    lesseeName: active?.data.lessee_name || null,
+    lesseePhone: active?.data.lessee_phone || null,
+    termsNote: null,
+    clauses: [],
+    officeName: active?.data.office_name || office?.officeName || "",
+    officePhone: active?.data.office_phone || office?.officePhone || null,
+    officeAddress: active?.data.office_address || office?.officeAddress || null,
+    officeRepresentative: office?.officeRepresentative ?? null,
+    officeRegistrationNo: office?.officeRegistrationNo ?? null,
+    agentName: active?.data.agent_name || office?.agentName || "",
+    agentPhone: active?.data.agent_phone || office?.agentPhone || null,
+  });
+
   const findDealIdForProperty = (pid: string) =>
     deals.find((d) => d.propertyId === pid)?.value ?? null;
 
@@ -413,8 +452,6 @@ export function ContractWriteDialog({
     setLinkedDealIdState("");
     setFormEpoch(0);
     setLeasePage(1);
-    setDisclosureOpen(false);
-    setDisclosureSeed(null);
   };
 
   const handleOpenChange = (next: boolean) => {
@@ -538,15 +575,10 @@ export function ContractWriteDialog({
         propertyLabel: linkedProperty?.label || "",
         contractData,
       };
-      // 웹·전용 작성 창에서는 같은 창을 확인설명서 페이지로 전환
-      if (isPage) {
-        tagContractWriteFormId(formId ?? edit?.formId ?? "");
-        stashDisclosureWriteSeed(seed);
-        router.replace("/contracts/disclosure/write");
-        return;
-      }
-      setDisclosureSeed(seed);
-      setDisclosureOpen(true);
+      // 먼저 현재 계약서 창에서 서식 종류를 선택하고, 확정 후 확인설명서 팝업을 연다.
+      setPendingDisclosureSeed(seed);
+      setPendingDisclosureKind("residential");
+      setDisclosurePickerOpen(true);
     });
   };
 
@@ -745,6 +777,49 @@ export function ContractWriteDialog({
     });
   };
 
+  const printSelected = () => {
+    const selected = Object.values(printItems).some(Boolean);
+    if (!selected) {
+      toast.error("인쇄할 서류를 선택해 주세요.");
+      return;
+    }
+    if (printItems.guaranteeCertificate && !guaranteeCertificateUrl) {
+      toast.error("인쇄할 공제증서가 등록되어 있지 않아요. 설정에서 공제증서를 등록해 주세요.");
+      return;
+    }
+
+    const current = readFormRecord("contract-write-form");
+    const consentRoot = document.getElementById("privacy-consent-print-root");
+    if (consentRoot) {
+      const consentValues: Record<string, string> = {
+        provider1_name: current.lessor_name || privacyConsentData.provider1_name,
+        provider2_name: current.lessee_name || privacyConsentData.provider2_name,
+        collected_at: current.contract_date || privacyConsentData.collected_at,
+        office_name: current.office_name || privacyConsentData.office_name,
+        collector_name: current.agent_name || privacyConsentData.collector_name,
+      };
+      for (const [name, value] of Object.entries(consentValues)) {
+        const input = consentRoot.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${name}"]`);
+        if (input) input.value = value;
+      }
+    }
+
+    const items: Parameters<typeof printContractBatch>[0] = [];
+    if (printItems.contract) {
+      items.push({
+        root: formStyle === "standard_lease" ? "standard-lease-print-root" : "contract-print-root",
+        title: active?.title,
+      });
+    }
+    if (printItems.privacyConsent) {
+      items.push({ root: "privacy-consent-print-root", title: "개인정보 수집 및 이용 동의서" });
+    }
+    if (printItems.guaranteeCertificate && guaranteeCertificateUrl) {
+      items.push({ pdfUrl: guaranteeCertificateUrl, title: "공제증서" });
+    }
+    printContractBatch(items, printColor);
+  };
+
   const save = (fd: FormData) => {
     if (!active) {
       toast.error("계약서 양식을 불러오지 못했어요.");
@@ -821,26 +896,27 @@ export function ContractWriteDialog({
 
   const body = (
     <>
+      <div className="sticky top-0 z-30 bg-background">
         {isPage ? (
           <div className="space-y-0 border-b px-4 py-3 print:hidden">
-            <h1 className="text-base font-semibold">{editing ? "계약서 조회·수정" : "계약서 작성"}</h1>
+            <h1 className="text-[14px] font-semibold">{editing ? "계약서 조회·수정" : "계약서 작성"}</h1>
             <p className="sr-only">
               일반 계약서 또는 표준임대차 계약서를 선택하고 부동산·거래 종류를 바꾸면 아래 양식이 바뀝니다.
             </p>
           </div>
         ) : (
           <DialogHeader className="space-y-0 border-b px-4 py-3 print:hidden">
-            <DialogTitle>{editing ? "계약서 조회·수정" : "계약서 작성"}</DialogTitle>
+          <DialogTitle className="text-[14px] font-semibold">{editing ? "계약서 조회·수정" : "계약서 작성"}</DialogTitle>
             <DialogDescription className="sr-only">
               일반 계약서 또는 표준임대차 계약서를 선택하고 부동산·거래 종류를 바꾸면 아래 양식이 바뀝니다.
             </DialogDescription>
           </DialogHeader>
         )}
 
-        <div className="flex flex-wrap items-end gap-3 border-b bg-slate-800 px-4 py-3 text-white print:hidden">
-          <p className="w-full text-[14px] font-medium text-white/80 sm:w-auto sm:pb-2">계약서종류</p>
+        <div className="flex flex-wrap items-center gap-3 border-b bg-slate-800 px-4 py-3 text-white print:hidden">
+          <p className="w-full text-[14px] font-normal text-white/80 sm:w-auto">계약서 종류</p>
           <div className="space-y-1">
-            <Label htmlFor="cw-style" className="text-[14px] text-white/70">
+            <Label htmlFor="cw-style" className="sr-only">
               서식
             </Label>
             <NativeSelect
@@ -853,7 +929,7 @@ export function ContractWriteDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="cw-property" className="text-[14px] text-white/70">
+            <Label htmlFor="cw-property" className="sr-only">
               부동산 종류
             </Label>
             <NativeSelect
@@ -866,7 +942,7 @@ export function ContractWriteDialog({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="cw-deal" className="text-[14px] text-white/70">
+            <Label htmlFor="cw-deal" className="sr-only">
               거래 종류
             </Label>
             <NativeSelect
@@ -878,8 +954,8 @@ export function ContractWriteDialog({
               className="w-28 bg-white text-foreground"
             />
           </div>
-          <div className="ml-auto space-y-1">
-            <Label htmlFor="cw-link-property" className="text-[14px] text-white/70">
+          <div className="ml-auto flex items-center gap-2">
+            <Label htmlFor="cw-link-property" className="shrink-0 text-[14px] font-semibold text-white/70">
               연결 매물
             </Label>
             {properties.length === 0 ? (
@@ -906,17 +982,9 @@ export function ContractWriteDialog({
           </div>
         </div>
 
-        <div className="shrink-0 border-b bg-muted/40 print:hidden">
-          <div className="flex flex-wrap items-center gap-2 px-4 py-2">
-            <Button
-              type="submit"
-              form="contract-write-form"
-              size="sm"
-              disabled={pending || !active || readOnly}
-            >
-              <Save data-icon="inline-start" />
-              계약서저장
-            </Button>
+        <div className="shrink-0 border-b bg-muted/40 px-4 py-2 print:hidden">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[14px] font-semibold text-foreground">계약서 작업</span>
             <Button
               type="button"
               size="sm"
@@ -930,41 +998,89 @@ export function ContractWriteDialog({
             <Button type="button" size="sm" variant="outline" disabled={!active} onClick={openDisclosure}>
               확인설명서 작성
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={!active}
-              onClick={() =>
-                printContractSheet(
-                  active?.title,
-                  formStyle === "standard_lease" ? "standard-lease-print-root" : "contract-print-root"
-                )
-              }
-            >
+            <Button type="button" size="sm" variant="outline" onClick={openRelatedFormsWindow}>
+              영수증 관련서식
+            </Button>
+          </div>
+        </div>
+
+        <div className="shrink-0 border-b bg-muted/40 print:hidden">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2">
+            <div className="flex items-center gap-1 text-[14px] font-semibold text-foreground">
+              <Printer className="size-4" />
+              <span>인쇄설정</span>
+              <span aria-hidden="true" className="text-muted-foreground">›</span>
+            </div>
+            <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+              <Checkbox checked={printItems.contract} onCheckedChange={(checked) => setPrintItems((v) => ({ ...v, contract: checked === true }))} />
+              계약서
+            </label>
+            <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+              <Checkbox checked={printItems.privacyConsent} onCheckedChange={(checked) => setPrintItems((v) => ({ ...v, privacyConsent: checked === true }))} />
+              개인정보활용동의서
+            </label>
+            <label className="flex items-center gap-1.5 text-sm whitespace-nowrap">
+              <Checkbox
+                checked={printItems.guaranteeCertificate}
+                onCheckedChange={(checked) => setPrintItems((v) => ({ ...v, guaranteeCertificate: checked === true }))}
+              />
+              공제증서{guaranteeCertificateUrl ? "" : " (미등록)"}
+            </label>
+            <Button type="button" size="sm" disabled={!active} onClick={printSelected} className="bg-emerald-600 text-white hover:bg-emerald-700">
               <Printer data-icon="inline-start" />
-              인쇄 · PDF
+              인쇄
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => handleOpenChange(false)}>
-              닫기
+            <fieldset className="flex items-center gap-3 rounded-md border px-2 py-1 text-xs">
+              <legend className="sr-only">인쇄 색상</legend>
+              <label className="flex items-center gap-1.5 whitespace-nowrap">
+                <input
+                  type="radio"
+                  name="contract-print-color"
+                  value="monochrome"
+                  checked={printColor === "monochrome"}
+                  onChange={() => setPrintColor("monochrome")}
+                />
+                흑백인쇄
+              </label>
+              <label className="flex items-center gap-1.5 whitespace-nowrap">
+                <input
+                  type="radio"
+                  name="contract-print-color"
+                  value="color"
+                  checked={printColor === "color"}
+                  onChange={() => setPrintColor("color")}
+                />
+                컬러인쇄
+              </label>
+            </fieldset>
+            <Button type="button" size="sm" variant="outline" disabled={!active} onClick={printSelected}>
+              PDF로 저장
             </Button>
-            {readOnly && <span className="text-[14px] text-muted-foreground">확정됨 · 조회만 가능해요</span>}
-            {!readOnly && formId && <span className="text-[14px] text-muted-foreground">저장됨</span>}
-            {!formId && active && (
-              <span className="text-[14px] text-destructive">신규계약서작성 모드 · 아직 저장되지 않았어요</span>
-            )}
+            <Button
+              type="submit"
+              form="contract-write-form"
+              size="sm"
+              disabled={pending || !active || readOnly}
+              className="ml-auto bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Save data-icon="inline-start" />
+              계약서 저장
+            </Button>
           </div>
           {active?.formStyle === "standard_lease" ? (
-            <StandardLeasePageTabs
-              page={leasePage}
-              onPageChange={(next) => {
-                setLeasePage(next);
-                document.getElementById("contract-write-scroll")?.scrollTo({ top: 0 });
-              }}
-              className="border-t border-border/60"
-            />
+            <div className="border-t border-border/60 bg-muted px-4 py-2">
+              <StandardLeasePageTabs
+                page={leasePage}
+                onPageChange={(next) => {
+                  setLeasePage(next);
+                  document.getElementById("contract-write-scroll")?.scrollTo({ top: 0 });
+                }}
+                className="bg-transparent p-0"
+              />
+            </div>
           ) : null}
         </div>
+      </div>
 
         <div
           id="contract-write-scroll"
@@ -1008,6 +1124,15 @@ export function ContractWriteDialog({
             </form>
           )}
         </div>
+        {active ? (
+          <div className="absolute -left-[20000px] top-0 w-[1000px]" aria-hidden="true">
+            <PrivacyConsentSheet
+              id="privacy-consent-print-root"
+              className="privacy-consent-print"
+              data={privacyConsentData}
+            />
+          </div>
+        ) : null}
     </>
   );
 
@@ -1023,13 +1148,73 @@ export function ContractWriteDialog({
       </Dialog>
     )}
 
-    <DisclosureWriteDialog
-      open={disclosureOpen}
-      onOpenChange={setDisclosureOpen}
-      deals={deals}
-      properties={properties}
-      seed={disclosureSeed}
-    />
+    <Dialog
+      open={disclosurePickerOpen}
+      onOpenChange={(next) => {
+        setDisclosurePickerOpen(next);
+        if (!next) setPendingDisclosureSeed(null);
+      }}
+    >
+      <DialogContent className="w-[min(92vw,440px)] p-4 sm:max-w-[440px]">
+        <DialogHeader>
+          <DialogTitle className="text-center">확인설명서 종류를 선택하세요</DialogTitle>
+          <DialogDescription className="text-center">
+           선순위 임차인에 관한 확인서식은 임대관련서식을 클릭하여 주십시요.
+※ 반드시 건축물대장상 용도로 선택하셔야 합니다.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-2 gap-2">
+          {([
+            ["residential", "주거용"],
+            ["nonresidential", "비주거용"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={pendingDisclosureKind === value}
+              onClick={() => setPendingDisclosureKind(value)}
+              className={cn(
+                "h-14 rounded-md border text-[14px] font-medium transition-colors",
+                pendingDisclosureKind === value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-muted/40 hover:bg-muted"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex justify-center gap-2">
+          <Button
+            type="button"
+            className="h-[42px] px-[15px] app:h-[54px] app:px-[21px]"
+            disabled={!pendingDisclosureSeed}
+            onClick={() => {
+              if (!pendingDisclosureSeed) return;
+              openDisclosureWriteTab({
+                ...pendingDisclosureSeed,
+                buildingKind: pendingDisclosureKind,
+              });
+              setDisclosurePickerOpen(false);
+              setPendingDisclosureSeed(null);
+            }}
+          >
+            확인
+          </Button>
+          <Button
+            type="button"
+            className="h-[42px] px-[15px] app:h-[54px] app:px-[21px]"
+            variant="outline"
+            onClick={() => {
+              setDisclosurePickerOpen(false);
+              setPendingDisclosureSeed(null);
+            }}
+          >
+            취소
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
 
     <ConfirmDialog
       open={propertyConfirmOpen}
@@ -1062,6 +1247,7 @@ export function ContractWriteDialog({
       confirmLabel="변경"
       onConfirm={confirmDealTypeChange}
     />
+
     </>
   );
 }

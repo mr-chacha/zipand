@@ -11,10 +11,8 @@ let contractWriteWindow: WriteWindow | null = null;
 
 function isContractWriteSurface(win: Window) {
   try {
-    const path = win.location.pathname;
-    return (
-      path.startsWith("/contracts/write") || path.startsWith("/contracts/disclosure/write")
-    );
+    // 확인설명서는 별도 탭 — 계약서 작성 창 재오픈 판별에서 제외
+    return win.location.pathname.startsWith("/contracts/write");
   } catch {
     return true;
   }
@@ -34,10 +32,6 @@ function readWriteFormId(win: WriteWindow): string | undefined {
     const u = new URL(win.location.href);
     if (u.pathname.startsWith("/contracts/write")) {
       return u.searchParams.get("id")?.trim() || "";
-    }
-    if (u.pathname.startsWith("/contracts/disclosure/write")) {
-      // 시드만 있고 태그가 없으면 판별 불가 → undefined
-      return undefined;
     }
     return "";
   } catch {

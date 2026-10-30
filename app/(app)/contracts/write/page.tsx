@@ -14,7 +14,7 @@ export default async function ContractWritePage({
 }) {
   const sp = await searchParams;
   const id = typeof sp.id === "string" ? sp.id : "";
-  const { forms, deals, properties, office } = await loadContractWriteOptions();
+  const { forms, deals, properties, office, guaranteeCertificateUrl } = await loadContractWriteOptions();
 
   let edit: ContractWriteEditSeed | null = null;
   if (id) {
@@ -39,6 +39,7 @@ export default async function ContractWritePage({
       properties={properties}
       deals={deals}
       office={office}
+      guaranteeCertificateUrl={guaranteeCertificateUrl}
       edit={edit}
     />
   );
